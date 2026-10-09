@@ -128,3 +128,45 @@ D2. Root files are not touched by the backend workstream. Backend-local
 
 D3. The backend uses its own `package-lock.json` inside `apps/api/`. If you
 later adopt a root workspace, that migration is a root-config change for you.
+
+## E. Schema notes (Milestone 2)
+
+Source: `prisma/schema.prisma` and `prisma/migrations/`.
+
+E1. **Patient row is created at registration.** The contract has
+`GET/PATCH /patients/me` but no create endpoint, so registering a patient user
+also creates its `Patient` row with a generated `healthId`. Profile fields are
+nullable until the patient fills them in. (Applies in Milestones 3 and 4.)
+
+E2. **One confirmed booking per slot is enforced by the database.**
+`Appointment.activeSlotId` is nullable and unique. It equals `slotId` while the
+appointment is `confirmed` and is NULL after cancellation (CHECK constraint).
+A duplicate booking fails with a unique violation, which the API maps to
+`CONFLICT`.
+
+E3. **Append-only tables.** Triggers block UPDATE and DELETE on `AuditEvent`,
+`PrescriptionVersion`, and `PrescriptionMedication` (and TRUNCATE on
+`AuditEvent`). The `originalStorageKey`, `originalFileName`,
+`originalMimeType`, `originalSizeBytes`, and `originalSha256` columns of
+`PrescriptionRecord` cannot change after insert. A correction is always a new
+`PrescriptionVersion` row.
+
+E4. **Record-level prescription fields are derived.** The contract's
+prescription object shows `verificationStatus`, `prescriptionDate`,
+`prescriberName`, and `medications` at the top level. These come from the
+latest `PrescriptionVersion`. `processingStatus` is stored on the record.
+
+E5. **Open question for Milestone 7.** The contract makes medication
+`confidence` a number. The schema keeps it required (0 to 1). For a
+patient-corrected field the proposal is to carry the extraction confidence
+forward and let `verificationStatus` express that a correction is not
+professional verification. Confirm or change before Milestone 7.
+
+E6. **Provisional tables.** `MedicationSchedule` and `Hospital` have minimal
+fields because the contract defines none. Their final shape is fixed in a
+decision note before Milestones 8 and 9. `Session` supports logout
+revocation (B1). Dose events, health history, and QR access sessions get their
+own tables in the milestone that implements them.
+
+E7. **Consent scopes are stored as text with a CHECK constraint**, not a
+Prisma enum, so the stored value is exactly the wire string (`prescriptions:read`).

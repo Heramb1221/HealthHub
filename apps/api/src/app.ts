@@ -8,7 +8,7 @@ import { log } from "./lib/logger.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { notFound } from "./middleware/notFound.js";
 import { requestId } from "./middleware/requestId.js";
-import { healthRouter } from "./routes/health.js";
+import { createHealthRouter } from "./routes/health.js";
 
 export const API_PREFIX = "/api/v1";
 
@@ -17,7 +17,12 @@ export const API_PREFIX = "/api/v1";
  * routers under the API prefix; they are mounted after the rate limiter and
  * before the 404 and error handlers.
  */
-export function createApp(env: Env, register?: (router: Router) => void): Express {
+export interface AppDeps {
+  /** Reports whether the database is reachable; omitted in tests that do not need it. */
+  checkDatabase?: () => Promise<boolean>;
+}
+
+export function createApp(env: Env, register?: (router: Router) => void, deps: AppDeps = {}): Express {
   const app = express();
   app.disable("x-powered-by");
 
@@ -49,7 +54,7 @@ export function createApp(env: Env, register?: (router: Router) => void): Expres
   app.use(express.json({ limit: "100kb" }));
 
   const api = Router();
-  api.use(healthRouter);
+  api.use(createHealthRouter(deps.checkDatabase));
   api.use(
     rateLimit({
       windowMs: env.RATE_LIMIT_WINDOW_MS,

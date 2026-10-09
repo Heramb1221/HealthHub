@@ -15,6 +15,9 @@ const schema = z.object({
     .refine((origins) => origins.every((origin) => origin !== "*"), {
       message: "wildcard origins are not allowed",
     }),
+  DATABASE_URL: z
+    .string()
+    .refine((value) => /^postgres(ql)?:\/\//.test(value), { message: "must be a postgres connection string" }),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).default(60_000),
   RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(120),
 });

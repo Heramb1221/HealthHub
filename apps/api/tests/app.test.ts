@@ -4,7 +4,8 @@ import { createApp } from "../src/app.js";
 import { loadEnv } from "../src/config/env.js";
 import { AppError } from "../src/lib/errors.js";
 
-const env = loadEnv({ CORS_ORIGINS: "http://allowed.test" });
+const DB = { DATABASE_URL: "postgresql://u:p@localhost:5432/x" };
+const env = loadEnv({ ...DB, CORS_ORIGINS: "http://allowed.test" });
 
 const app = createApp(env, (router) => {
   router.get("/boom", () => {
@@ -24,6 +25,22 @@ describe("health", () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ data: { status: "ok" } });
     expect(res.headers["x-request-id"]).toMatch(/^[0-9a-f-]{36}$/);
+  });
+});
+
+describe("health with database check", () => {
+  it("reports ok when the database is reachable", async () => {
+    const withDb = createApp(env, undefined, { checkDatabase: async () => true });
+    const res = await request(withDb).get("/api/v1/health");
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ data: { status: "ok", database: "ok" } });
+  });
+
+  it("returns 503 without connection details when the database is down", async () => {
+    const withDb = createApp(env, undefined, { checkDatabase: async () => false });
+    const res = await request(withDb).get("/api/v1/health");
+    expect(res.status).toBe(503);
+    expect(res.body).toEqual({ data: { status: "degraded", database: "unavailable" } });
   });
 });
 
@@ -83,7 +100,7 @@ describe("security headers and CORS", () => {
 
 describe("rate limiting", () => {
   it("returns RATE_LIMITED after the limit is exceeded", async () => {
-    const limited = createApp(loadEnv({ RATE_LIMIT_MAX: "2" }), (router) => {
+    const limited = createApp(loadEnv({ ...DB, RATE_LIMIT_MAX: "2" }), (router) => {
       router.get("/ping", (_req, res) => {
         res.json({ data: "pong" });
       });
