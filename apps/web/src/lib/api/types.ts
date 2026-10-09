@@ -46,3 +46,32 @@ export interface Prescription {
 export interface ListResult<T> {
   items: T[];
 }
+
+/**
+ * ASSUMED: auth shapes. docs/API_CONTRACT.md lists POST /auth/register, /auth/login, /auth/logout
+ * but defines no request or response bodies, and has no "who am I" endpoint.
+ * Open contract questions for the backend owner:
+ *   1. Request bodies for register and login (assumed below).
+ *   2. Response body (assumed: the AuthUser, bare or wrapped as { user }).
+ *   3. A GET /auth/me (assumed) so the web app can learn the signed-in user and role after a reload.
+ * The role is informational for navigation only. The server enforces every permission.
+ */
+export type UserRole = "patient" | "admin" | "provider" | "staff";
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  role: UserRole;
+  displayName: string | null;
+}
+
+export interface LoginInput {
+  email: string;
+  password: string;
+}
+
+export interface RegisterInput {
+  fullName: string;
+  email: string;
+  password: string;
+}
