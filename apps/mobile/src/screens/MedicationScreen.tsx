@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { medicationApi } from "../api/endpoints";
 import { describeError } from "../api/errors";
@@ -163,15 +163,23 @@ function LocalReminders({ schedules }: { schedules: MedicationSchedule[] }) {
   const [message, setMessage] = useState<string | null>(null);
   const times = enabledReminderTimes(schedules);
 
-  const refresh = useCallback(async () => {
-    try {
-      setPermission(await getReminderPermission());
-      setCount(await countLocalReminders());
-    } catch {
-      setPermission(null);
-    }
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [perm, scheduled] = [await getReminderPermission(), await countLocalReminders()];
+        if (!cancelled) {
+          setPermission(perm);
+          setCount(scheduled);
+        }
+      } catch {
+        if (!cancelled) setPermission(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
-  useEffect(() => { void refresh(); }, [refresh]);
 
   async function turnOn() {
     setBusy(true);

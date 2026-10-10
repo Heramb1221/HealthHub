@@ -7,6 +7,7 @@ import { medicationApi, prescriptionApi } from "../api/endpoints";
 import { describeError } from "../api/errors";
 import type { MedicationInput, Prescription, PrescriptionMedication } from "../api/types";
 import { useResource } from "../hooks/useResource";
+import { useServerValue } from "../hooks/useServerValue";
 import { formatDateOnly, formatDateTime, orDash, toDateInput } from "../lib/format";
 import { canOfferSchedule, doseLine, medicationReviewReasons, REVIEW_REASON_LABEL } from "../lib/safety";
 import { PROCESSING_STATUS, SOURCE_TYPE_LABEL, VERIFICATION_STATUS } from "../lib/status";
@@ -71,7 +72,8 @@ export function PrescriptionDetailScreen({ route }: Props) {
   const { id } = route.params;
   const res = useResource((signal) => prescriptionApi.get(id, signal));
   const versions = useResource((signal) => prescriptionApi.versions(id, signal));
-  const [rx, setRx] = useState<Prescription | null>(null);
+  const [rx, setRx] = useServerValue<Prescription>(res.data);
+  const [gaveUp, setGaveUp] = useState(false);
 
   const [editing, setEditing] = useState(false);
   const [dateText, setDateText] = useState("");
@@ -87,25 +89,23 @@ export function PrescriptionDetailScreen({ route }: Props) {
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfMsg, setPdfMsg] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (res.data && !editing) setRx(res.data);
-  }, [res.data, editing]);
-
   // Poll while the server is still working on the file, with an upper bound.
   const pollCount = useRef(0);
   const status = rx?.processingStatus;
+  const poll = res.poll;
   useEffect(() => {
     if (status !== "pending" && status !== "processing") return;
     const timer = setInterval(() => {
       pollCount.current += 1;
       if (pollCount.current > MAX_POLLS) {
         clearInterval(timer);
+        setGaveUp(true);
         return;
       }
-      void res.poll();
+      void poll();
     }, POLL_MS);
     return () => clearInterval(timer);
-  }, [status, res.poll]);
+  }, [status, poll]);
 
   if (res.loading && !rx) return <Screen><LoadingState label="Loading prescription…" /></Screen>;
   if (res.error && !rx) return <Screen><ErrorState error={res.error} onRetry={res.reload} /></Screen>;
@@ -115,7 +115,6 @@ export function PrescriptionDetailScreen({ route }: Props) {
   const ver = VERIFICATION_STATUS[rx.verificationStatus];
   const canEdit = rx.processingStatus === "completed" || rx.processingStatus === "failed";
   const stillWorking = rx.processingStatus === "pending" || rx.processingStatus === "processing";
-  const gaveUp = stillWorking && pollCount.current > MAX_POLLS;
 
   async function startProcessing() {
     setProcessing(true);
@@ -123,6 +122,7 @@ export function PrescriptionDetailScreen({ route }: Props) {
     try {
       setRx(await prescriptionApi.process(id));
       pollCount.current = 0;
+      setGaveUp(false);
       void res.poll();
     } catch (error) {
       const info = describeError(error);

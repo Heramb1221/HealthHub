@@ -7,7 +7,7 @@ import { appointmentHospitalName, appointmentStart, nextAppointment } from "../l
 import { formatDateTime } from "../lib/format";
 import { nextReminder } from "../lib/schedule";
 import type { RootStackParamList } from "../navigation/types";
-import { AppText, Banner, Button, Card, Field, ListRow, Screen, Stack } from "../ui/components";
+import { AppText, Banner, Card, Field, ListRow, Screen, Stack } from "../ui/components";
 import { ErrorState, LoadingState } from "../ui/states";
 import { colors, space } from "../ui/theme";
 

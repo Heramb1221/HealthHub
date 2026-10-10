@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { patientApi } from "../api/endpoints";
 import { describeError } from "../api/errors";
 import type { Patient, PatientUpdate } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import { useResource } from "../hooks/useResource";
+import { useServerValue } from "../hooks/useServerValue";
 import { formatDateOnly, orDash, toDateInput } from "../lib/format";
 import { blankToNull, isFutureDateOnly, isValidDateOnly, listToText, parseList } from "../lib/validation";
 import { AppText, Banner, Button, Card, Divider, Field, Screen, Stack, TextField } from "../ui/components";
@@ -44,17 +45,13 @@ function toForm(p: Patient): Form {
 export function ProfileScreen() {
   const { state, signOut } = useAuth();
   const res = useResource((signal) => patientApi.me(signal));
-  const [patient, setPatient] = useState<Patient | null>(null);
+  const [patient, setPatient] = useServerValue<Patient>(res.data);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<Form | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
-
-  useEffect(() => {
-    if (res.data && !editing) setPatient(res.data);
-  }, [res.data, editing]);
 
   const email = state.status === "signedIn" ? state.user.email : "";
 

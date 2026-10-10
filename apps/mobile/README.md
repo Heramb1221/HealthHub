@@ -26,10 +26,10 @@ npm start                   # then press a / i, or scan the QR with Expo Go
 
 ```bash
 npm run typecheck     # tsc --noEmit
+npm run lint          # eslint (eslint-config-expo, includes React hooks rules)
 npm test              # Node built-in test runner (types stripped, no extra dependency)
 npm run export:check  # Metro/Hermes bundle for android + ios into .export-check/ (delete afterwards)
 ```
-No linter is configured in the repo yet.
 
 ## Structure
 
@@ -37,6 +37,7 @@ No linter is configured in the repo yet.
 App.tsx, index.ts
 src/config.ts            API address validation (no hidden fallback server)
 src/api/                 errors.ts, http.ts (no RN imports, unit-tested), types.ts (provenance-tagged), endpoints.ts
+src/hooks/               useResource (focus-loading, polling), useServerValue (show a save result until refetch)
 src/auth/                SecureStore session (token + expiry + identity only), AuthContext
 src/lib/                 safety.ts (review policy), status.ts, format.ts, validation.ts, schedule.ts, appointments.ts, reminders.ts
 src/ui/                  theme.ts (tokens from DESIGN_SYSTEM), components.tsx, states.tsx (loading/empty/error/permission)
@@ -60,7 +61,7 @@ history · Hospital directory · Hospital detail with slot booking · My appoint
 - Seeded hospitals flagged `isDemo` show a "Demo data" tag. No ratings, credentials or payments exist.
 
 ## Dependencies added beyond core Expo/React Navigation
-`expo-secure-store` (token storage), `expo-image-picker` (required by design doc), `expo-document-picker` (PDF selection),
+`eslint` + `eslint-config-expo` (dev only; lint), `expo-secure-store` (token storage), `expo-image-picker` (required by design doc), `expo-document-picker` (PDF selection),
 `expo-notifications` (local reminder prototype), `expo-file-system` + `expo-sharing` (authenticated PDF download and share),
 `react-native-qrcode-svg` + `react-native-svg` (QR rendering). Versions come from the Expo SDK 57 table.
 
