@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+/*
+  HealthHub design tokens (docs/DESIGN_SYSTEM.md)
+  Deep navy / clinical blue / muted teal on warm neutral surfaces.
+  Spacing scale used throughout: 4, 8, 12, 16, 24, 32 (Tailwind 1, 2, 3, 4, 6, 8).
+  Status colours are always paired with an icon and text, never colour alone.
+*/
+:root {
+  --radius: 0.375rem;
+
+  --background: #f6f5f2;
+  --foreground: #14202e;
+  --card: #ffffff;
+  --card-foreground: #14202e;
+  --popover: #ffffff;
+  --popover-foreground: #14202e;
+
+  --primary: #12355b;
+  --primary-foreground: #ffffff;
+  --secondary: #e8edf2;
+  --secondary-foreground: #12355b;
+  --muted: #eeece7;
+  --muted-foreground: #556070;
+  --accent: #dcecec;
+  --accent-foreground: #0e4a4f;
+
+  --destructive: #b3261e;
+  --destructive-foreground: #ffffff;
+  --border: #d9d5cc;
+  --input: #bfbaae;
+  --ring: #1f6fb2;
+
+  /* Status tokens: surface + ink + edge */
+  --success: #1e6b4a;
+  --success-surface: #e5f2ec;
+  --warning: #7a4f00;
+  --warning-surface: #fbf1db;
+  --info: #1d5a92;
+  --info-surface: #e3eef8;
+  --danger-surface: #fbe9e7;
+  --demo: #5b3f8c;
+  --demo-surface: #efe9f7;
+}
+
+@theme inline {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-success: var(--success);
+  --color-success-surface: var(--success-surface);
+  --color-warning: var(--warning);
+  --color-warning-surface: var(--warning-surface);
+  --color-info: var(--info);
+  --color-info-surface: var(--info-surface);
+  --color-danger-surface: var(--danger-surface);
+  --color-demo: var(--demo);
+  --color-demo-surface: var(--demo-surface);
+
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: "cv11", "ss03";
+    line-height: 1.6;
+  }
+  h1, h2, h3 {
+    @apply text-foreground font-semibold tracking-tight;
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+  :focus-visible {
+    @apply ring-ring ring-2 ring-offset-2 ring-offset-background outline-none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

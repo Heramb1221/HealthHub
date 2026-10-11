@@ -1,0 +1,308 @@
+"use client";
+
+import * as React from "react";
+import Link from "next/link";
+import { ArrowLeft, Download, FileSearch, LoaderCircle, PencilLine, RefreshCw, ShieldCheck, TriangleAlert, UserPen } from "lucide-react";
+import { toast } from "sonner";
+
+import { EmptyState, ErrorState, LoadingState } from "@/components/feedback/states";
+import { PageHeader } from "@/components/layout/page-header";
+import { CorrectionForm } from "@/components/prescriptions/correction-form";
+import { MedicationList } from "@/components/prescriptions/medication-list";
+import { VersionHistory } from "@/components/prescriptions/version-history";
+import { DemoTag } from "@/components/status/demo-tag";
+import { ProcessingBadge, VerificationBadge } from "@/components/status/verification-badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { describeError, isApiError } from "@/lib/api/errors";
+import { prescriptionsApi } from "@/lib/api/prescriptions";
+import type { Prescription } from "@/lib/api/types";
+import { formatBytes } from "@/lib/file-sniff";
+import { formatDate } from "@/lib/format";
+import { SOURCE_TYPE_LABEL } from "@/lib/status";
+import { useResource } from "@/lib/use-resource";
+
+const POLL_MS = 2000;
+const SLOW_AFTER_MS = 60_000;
+
+function StatusBanner({ rx, onRetry, retrying, slow }: { rx: Prescription; onRetry: () => void; retrying: boolean; slow: boolean }) {
+  if (rx.processingStatus === "pending" || rx.processingStatus === "processing") {
+    return (
+      <Alert tone="info" role="status">
+        <LoaderCircle aria-hidden="true" className="animate-spin motion-reduce:animate-none" />
+        <AlertTitle>{rx.processingStatus === "pending" ? "Waiting to be read" : "Reading your file"}</AlertTitle>
+        <AlertDescription>
+          <p>
+            {slow ? "This is taking longer than usual. You can leave this page and come back; your file is saved." : "This page updates by itself. You can leave and come back; your file is saved."}
+          </p>
+          {rx.processingStatus === "pending" ? (
+            <Button variant="outline" size="sm" className="mt-3" onClick={onRetry} disabled={retrying}>
+              <RefreshCw aria-hidden="true" /> Start reading now
+            </Button>
+          ) : null}
+        </AlertDescription>
+      </Alert>
+    );
+  }
+  if (rx.processingStatus === "failed") {
+    return (
+      <Alert tone="danger">
+        <TriangleAlert aria-hidden="true" />
+        <AlertTitle>We couldn’t read this file</AlertTitle>
+        <AlertDescription>
+          <p>Try reading it again. If it keeps failing, upload a clearer photo or the original PDF.</p>
+          <Button variant="outline" size="sm" className="mt-3" onClick={onRetry} disabled={retrying}>
+            <RefreshCw aria-hidden="true" /> Try reading again
+          </Button>
+        </AlertDescription>
+      </Alert>
+    );
+  }
+  if (rx.verificationStatus === "verified_by_authorized_clinician") {
+    return (
+      <Alert tone="success">
+        <ShieldCheck aria-hidden="true" />
+        <AlertTitle>Verified by a clinician</AlertTitle>
+        <AlertDescription>An authorized clinician has verified this record.</AlertDescription>
+      </Alert>
+    );
+  }
+  if (rx.verificationStatus === "patient_corrected") {
+    return (
+      <Alert tone="info">
+        <UserPen aria-hidden="true" />
+        <AlertTitle>You corrected these details</AlertTitle>
+        <AlertDescription>Your corrections are saved as a new version. They are not verified by a clinician.</AlertDescription>
+      </Alert>
+    );
+  }
+  return (
+    <Alert tone="warning">
+      <FileSearch aria-hidden="true" />
+      <AlertTitle>Check these details against your paper prescription</AlertTitle>
+      <AlertDescription>
+        <p>Automatic reading can be wrong. Medicines marked “Needs review” are kept out of your schedule until you correct them. Ask your doctor or pharmacist how to take any medicine.</p>
+      </AlertDescription>
+    </Alert>
+  );
+}
+
+function RecordDetails({ rx }: { rx: Prescription }) {
+  const rows: [string, React.ReactNode][] = [
+    ["Prescriber", rx.prescriberName ?? <span className="text-muted-foreground">Not provided</span>],
+    ["Source", SOURCE_TYPE_LABEL[rx.sourceType]],
+    [
+      "Original file",
+      rx.sourceFile ? (
+        <>
+          <span className="break-all">{rx.sourceFile.fileName}</span>
+          <span className="text-muted-foreground block text-xs">{formatBytes(rx.sourceFile.sizeBytes)} · kept unchanged</span>
+        </>
+      ) : (
+        <span className="text-muted-foreground">Kept unchanged</span>
+      ),
+    ],
+    ["Added", formatDate(rx.createdAt)],
+    ["Last updated", formatDate(rx.updatedAt)],
+    ["Record ID", <code key="id" className="bg-muted rounded-sm px-1.5 py-0.5 font-mono text-xs break-all">{rx.id}</code>],
+  ];
+  return (
+    <dl className="divide-y text-sm">
+      {rows.map(([label, value]) => (
+        <div key={label} className="space-y-0.5 py-3 first:pt-0">
+          <dt className="text-muted-foreground text-xs">{label}</dt>
+          <dd>{value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+export function PrescriptionDetail({ id }: { id: string }) {
+  const rx = useResource(() => prescriptionsApi.get(id), id);
+  const [editing, setEditing] = React.useState(false);
+  const [downloading, setDownloading] = React.useState(false);
+  const [retrying, setRetrying] = React.useState(false);
+  const [tick, setTick] = React.useState(0);
+  const startedAt = React.useRef<number | null>(null);
+  const [slow, setSlow] = React.useState(false);
+
+  const status = rx.status === "ready" ? rx.data.processingStatus : null;
+  const stamp = rx.status === "ready" ? rx.data.updatedAt : "";
+  const { setData } = rx;
+
+  // Poll quietly (no skeleton flicker) while the file is being read.
+  React.useEffect(() => {
+    if (status !== "pending" && status !== "processing") return;
+    startedAt.current ??= Date.now();
+    const timer = setTimeout(async () => {
+      try {
+        setData(await prescriptionsApi.get(id));
+      } catch {
+        /* transient failure: try again on the next tick */
+      }
+      if (startedAt.current && Date.now() - startedAt.current > SLOW_AFTER_MS) setSlow(true);
+      setTick((n) => n + 1);
+    }, POLL_MS);
+    return () => clearTimeout(timer);
+  }, [status, id, tick, setData]);
+
+  const versions = useResource(() => prescriptionsApi.versions(id), `${id}:${status}:${stamp}`);
+
+  async function download() {
+    setDownloading(true);
+    try {
+      const { blob, filename } = await prescriptionsApi.downloadPdf(id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename ?? `healthhub-prescription-${id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      const { title, detail } = describeError(error);
+      toast.error("PDF couldn’t be downloaded", { description: `${title}. ${detail}` });
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  async function retry() {
+    setRetrying(true);
+    try {
+      await prescriptionsApi.process(id);
+      startedAt.current = Date.now();
+      setSlow(false);
+      setData(await prescriptionsApi.get(id));
+    } catch (error) {
+      const { title, detail } = describeError(error);
+      toast.error("Couldn’t start reading", { description: `${title}. ${detail}` });
+    } finally {
+      setRetrying(false);
+    }
+  }
+
+  const back = (
+    <Link href="/prescriptions" className="text-info inline-flex items-center gap-1 text-sm font-medium underline-offset-4 hover:underline">
+      <ArrowLeft aria-hidden="true" className="size-4" /> All prescriptions
+    </Link>
+  );
+
+  if (rx.status === "loading") {
+    return (
+      <div className="space-y-6">
+        {back}
+        <LoadingState label="Loading prescription" rows={4} />
+      </div>
+    );
+  }
+
+  if (rx.status === "error") {
+    return (
+      <div className="space-y-6">
+        {back}
+        {isApiError(rx.error) && rx.error.isNotFound ? (
+          <EmptyState title="Prescription not found" description="It may have been removed, or it isn’t available to your account." />
+        ) : (
+          <ErrorState error={rx.error} onRetry={rx.reload} />
+        )}
+      </div>
+    );
+  }
+
+  const p = rx.data;
+  const title = p.prescriptionDate ? `Prescription from ${formatDate(p.prescriptionDate)}` : "Prescription (undated)";
+  /** Corrections and the PDF only make sense once the file has been read. */
+  const canCorrect = p.processingStatus === "completed";
+
+  if (editing) {
+    return (
+      <div className="space-y-6">
+        {back}
+        <PageHeader title="Correct details" description={`${title}. Your original file and the automatic reading stay unchanged; your correction is saved as a new version.`} />
+        <CorrectionForm
+          prescription={p}
+          onCancel={() => setEditing(false)}
+          onSaved={(updated) => {
+            setData(updated);
+            setEditing(false);
+          }}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      {back}
+      <PageHeader
+        title={title}
+        actions={
+          <>
+            {canCorrect ? (
+              <Button variant="outline" onClick={download} disabled={downloading}>
+                {downloading ? <LoaderCircle className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <Download aria-hidden="true" />} Download PDF
+              </Button>
+            ) : null}
+            {canCorrect ? (
+              <Button onClick={() => setEditing(true)}>
+                <PencilLine aria-hidden="true" /> Correct details
+              </Button>
+            ) : null}
+          </>
+        }
+      />
+      <div className="-mt-4 flex flex-wrap items-center gap-2">
+        <ProcessingBadge status={p.processingStatus} />
+        <VerificationBadge status={p.verificationStatus} />
+        {p.isDemo ? <DemoTag /> : null}
+      </div>
+
+      <StatusBanner rx={p} onRetry={retry} retrying={retrying} slow={slow} />
+
+      <div className="grid gap-10 lg:grid-cols-[2fr_1fr]">
+        <div className="min-w-0 space-y-10">
+          <section aria-labelledby="medicines" className="space-y-4">
+            <h2 id="medicines" className="text-lg">
+              Medicines
+            </h2>
+            {p.medications.length > 0 ? (
+              <MedicationList medications={p.medications} />
+            ) : p.processingStatus === "completed" ? (
+              <EmptyState title="No medicines were found" description="Nothing could be read as a medicine from this file. Use Correct details to enter them from your paper prescription." />
+            ) : (
+              <p className="text-muted-foreground text-sm">Medicines appear here once the file has been read.</p>
+            )}
+          </section>
+
+          <section aria-labelledby="history" className="space-y-4">
+            <div className="max-w-prose space-y-1">
+              <h2 id="history" className="text-lg">
+                History
+              </h2>
+              <p className="text-muted-foreground text-sm">Every reading and correction is kept. Earlier values are never erased.</p>
+            </div>
+            {versions.status === "loading" ? (
+              <LoadingState label="Loading history" rows={2} />
+            ) : versions.status === "error" ? (
+              <ErrorState error={versions.error} onRetry={versions.reload} />
+            ) : versions.data.length === 0 ? (
+              <p className="text-muted-foreground text-sm">No readings yet.</p>
+            ) : (
+              <VersionHistory versions={versions.data} />
+            )}
+          </section>
+        </div>
+
+        <aside aria-labelledby="record" className="space-y-3">
+          <h2 id="record" className="text-lg">
+            Record details
+          </h2>
+          <RecordDetails rx={p} />
+        </aside>
+      </div>
+    </div>
+  );
+}
