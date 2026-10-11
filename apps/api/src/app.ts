@@ -8,6 +8,13 @@ import { log } from "./lib/logger.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { notFound } from "./middleware/notFound.js";
 import { requestId } from "./middleware/requestId.js";
+import type { Db } from "./db/client.js";
+import { createAuthRouter } from "./modules/auth/routes.js";
+import { createConsentRouter } from "./modules/consents/routes.js";
+import { createPatientRouter } from "./modules/patients/routes.js";
+import { createPrescriptionRouter } from "./modules/prescriptions/routes.js";
+import type { ExtractionProvider } from "./extraction/types.js";
+import type { PrivateFileStore } from "./storage/types.js";
 import { createHealthRouter } from "./routes/health.js";
 
 export const API_PREFIX = "/api/v1";
@@ -20,6 +27,12 @@ export const API_PREFIX = "/api/v1";
 export interface AppDeps {
   /** Reports whether the database is reachable; omitted in tests that do not need it. */
   checkDatabase?: () => Promise<boolean>;
+  /** Database access; when omitted only the health route is mounted. */
+  db?: Db;
+  /** Private file storage; prescription routes are mounted only when both db and store are given. */
+  store?: PrivateFileStore;
+  /** Extraction provider; null or omitted means extraction is disabled. */
+  extraction?: ExtractionProvider | null;
 }
 
 export function createApp(env: Env, register?: (router: Router) => void, deps: AppDeps = {}): Express {
@@ -64,6 +77,12 @@ export function createApp(env: Env, register?: (router: Router) => void, deps: A
       handler: (_req, _res, next) => next(new AppError("RATE_LIMITED")),
     }),
   );
+  if (deps.db) {
+    api.use("/auth", createAuthRouter(deps.db, env));
+    api.use("/consents", createConsentRouter(deps.db, env));
+    api.use("/patients", createPatientRouter(deps.db, env));
+    if (deps.store) api.use("/prescriptions", createPrescriptionRouter(deps.db, env, deps.store, deps.extraction ?? null));
+  }
   register?.(api);
   app.use(API_PREFIX, api);
 

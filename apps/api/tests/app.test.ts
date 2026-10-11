@@ -4,7 +4,7 @@ import { createApp } from "../src/app.js";
 import { loadEnv } from "../src/config/env.js";
 import { AppError } from "../src/lib/errors.js";
 
-const DB = { DATABASE_URL: "postgresql://u:p@localhost:5432/x" };
+const DB = { DATABASE_URL: "postgresql://u:p@localhost:5432/x", JWT_SECRET: "j".repeat(40) };
 const env = loadEnv({ ...DB, CORS_ORIGINS: "http://allowed.test" });
 
 const app = createApp(env, (router) => {

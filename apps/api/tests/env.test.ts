@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { EnvError, loadEnv } from "../src/config/env.js";
 
-const DB = { DATABASE_URL: "postgresql://u:p@localhost:5432/x" };
+const DB = { DATABASE_URL: "postgresql://u:p@localhost:5432/x", JWT_SECRET: "j".repeat(40) };
 
 describe("loadEnv", () => {
   it("applies defaults", () => {
@@ -37,7 +37,7 @@ describe("loadEnv", () => {
 
   it("requires a postgres DATABASE_URL and never echoes it", () => {
     try {
-      loadEnv({ DATABASE_URL: "mysql://secret-user:secret-pw@host/db" });
+      loadEnv({ ...DB, DATABASE_URL: "mysql://secret-user:secret-pw@host/db" });
       expect.unreachable();
     } catch (err) {
       expect(err).toBeInstanceOf(EnvError);
@@ -45,5 +45,32 @@ describe("loadEnv", () => {
       expect((err as EnvError).message).not.toContain("secret");
     }
     expect(() => loadEnv({})).toThrow(EnvError);
+  });
+
+  it("rejects a short JWT_SECRET without echoing it", () => {
+    try {
+      loadEnv({ ...DB, JWT_SECRET: "too-short-secret" });
+      expect.unreachable();
+    } catch (err) {
+      expect((err as EnvError).variables).toEqual(["JWT_SECRET"]);
+      expect((err as EnvError).message).not.toContain("too-short-secret");
+    }
+    expect(() => loadEnv({ DATABASE_URL: DB.DATABASE_URL })).toThrow(EnvError);
+  });
+
+  it("keeps the development-only login off by default", () => {
+    expect(loadEnv({ ...DB }).DEV_AUTH_ENABLED).toBe(false);
+    expect(loadEnv({ ...DB, DEV_AUTH_ENABLED: "true" }).DEV_AUTH_ENABLED).toBe(true);
+    expect(() => loadEnv({ ...DB, DEV_AUTH_ENABLED: "yes" })).toThrow(EnvError);
+  });
+
+  it("refuses the development-only login in production", () => {
+    try {
+      loadEnv({ ...DB, NODE_ENV: "production", DEV_AUTH_ENABLED: "true" });
+      expect.unreachable();
+    } catch (err) {
+      expect((err as EnvError).variables).toEqual(["DEV_AUTH_ENABLED"]);
+    }
+    expect(loadEnv({ ...DB, NODE_ENV: "production" }).NODE_ENV).toBe("production");
   });
 });

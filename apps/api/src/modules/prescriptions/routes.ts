@@ -1,0 +1,107 @@
+import { Router } from "express";
+import { rateLimit } from "express-rate-limit";
+import { z } from "zod";
+import type { Env } from "../../config/env.js";
+import type { Db } from "../../db/client.js";
+import { AppError } from "../../lib/errors.js";
+import { parse, uuidParam } from "../../lib/validate.js";
+import { authenticate, requireAuth, requireRole } from "../../middleware/authenticate.js";
+import type { ExtractionProvider } from "../../extraction/types.js";
+import type { PrivateFileStore } from "../../storage/types.js";
+import { requirePatientAccess } from "../access/patientAccess.js";
+import { processPrescription } from "./processing.js";
+import { createPrescription, getPrescription, listPrescriptions } from "./service.js";
+import { parseUpload } from "./upload.js";
+import { getLatestVersion, listVersions } from "./versions.js";
+
+const listQuerySchema = z.strictObject({
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  cursor: z.uuid().optional(),
+});
+
+export function createPrescriptionRouter(
+  db: Db,
+  env: Env,
+  store: PrivateFileStore,
+  /** null means extraction is disabled: processing is refused with PROVIDER_DISABLED. */
+  extraction: ExtractionProvider | null,
+): Router {
+  const router = Router();
+  router.use(authenticate(db, env));
+
+  const uploadLimiter = rateLimit({
+    windowMs: env.RATE_LIMIT_WINDOW_MS,
+    limit: env.UPLOAD_RATE_LIMIT_MAX,
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+    handler: (_req, _res, next) => next(new AppError("RATE_LIMITED")),
+  });
+
+  // Role check and rate limit run before the request body is read.
+  router.post("/", requireRole("patient"), uploadLimiter, async (req, res) => {
+    const upload = await parseUpload(req, env.UPLOAD_MAX_BYTES);
+    const prescription = await createPrescription({ db, store, env }, requireAuth(req), upload, { requestId: req.requestId });
+    res.status(201).json({ data: prescription });
+  });
+
+  router.get("/", requireRole("patient"), async (req, res) => {
+    const query = parse(listQuerySchema, req.query);
+    res.json(await listPrescriptions(db, requireAuth(req), query));
+  });
+
+  // Resolves the owning patient from the route and runs the consent check
+  // before any handler. Patients pass only for their own record.
+  const accessGuard = () =>
+    requirePatientAccess(db, {
+      scope: "prescriptions:read",
+      resourceType: "prescription",
+      getPatientId: async (req) => {
+        const record = await db.prescriptionRecord.findUnique({
+          where: { id: uuidParam(req.params.prescriptionId) },
+          select: { patientId: true },
+        });
+        return record?.patientId ?? null;
+      },
+      getResourceId: (req) => String(req.params.prescriptionId),
+    });
+
+  const processLimiter = rateLimit({
+    windowMs: env.RATE_LIMIT_WINDOW_MS,
+    limit: env.PROCESS_RATE_LIMIT_MAX,
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+    handler: (_req, _res, next) => next(new AppError("RATE_LIMITED")),
+  });
+
+  // Owner or a provider with a live prescriptions:read consent.
+  router.get("/:prescriptionId", accessGuard(), async (req, res) => {
+    res.json({ data: await getPrescription(db, uuidParam(req.params.prescriptionId)) });
+  });
+
+  // Same access as the record itself. Always carries its verification status.
+  router.get("/:prescriptionId/latest", accessGuard(), async (req, res) => {
+    res.json({ data: await getLatestVersion(db, uuidParam(req.params.prescriptionId)) });
+  });
+
+  // History is owner-only: the patient role is required first, so providers
+  // are refused even when they hold a consent.
+  router.get("/:prescriptionId/versions", requireRole("patient"), accessGuard(), async (req, res) => {
+    const query = parse(listQuerySchema, req.query);
+    res.json(await listVersions(db, uuidParam(req.params.prescriptionId), query));
+  });
+
+  // Owner-only for the same reason: a consent grants reading, never processing.
+  router.post("/:prescriptionId/process", requireRole("patient"), processLimiter, accessGuard(), async (req, res) => {
+    const access = req.access;
+    if (!access) throw new AppError("FORBIDDEN");
+    const prescription = await processPrescription(
+      { db, store, provider: extraction },
+      requireAuth(req),
+      { prescriptionId: uuidParam(req.params.prescriptionId), patientId: access.patientId },
+      { requestId: req.requestId },
+    );
+    res.json({ data: prescription });
+  });
+
+  return router;
+}

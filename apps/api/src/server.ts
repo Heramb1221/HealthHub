@@ -1,6 +1,8 @@
 import { createApp } from "./app.js";
 import { EnvError, loadEnv } from "./config/env.js";
 import { createDb, isDatabaseReachable } from "./db/client.js";
+import { createExtractionProvider } from "./extraction/index.js";
+import { LocalFileStore } from "./storage/localFileStore.js";
 import { log } from "./lib/logger.js";
 
 function main(): void {
@@ -15,8 +17,16 @@ function main(): void {
     throw err;
   }
 
+  if (env.DEV_AUTH_ENABLED) {
+    log("warn", "DEVELOPMENT-ONLY login is enabled (DEV_AUTH_ENABLED=true); never use this in production");
+  }
+
+  if (env.EXTRACTION_PROVIDER === "mock") {
+    log("warn", "extraction provider is the synthetic-only mock; real prescriptions cannot be processed");
+  }
+
   const db = createDb(env.DATABASE_URL);
-  const app = createApp(env, undefined, { checkDatabase: () => isDatabaseReachable(db) });
+  const app = createApp(env, undefined, { db, store: new LocalFileStore(env.STORAGE_DIR), extraction: createExtractionProvider(env.EXTRACTION_PROVIDER), checkDatabase: () => isDatabaseReachable(db) });
   const server = app.listen(env.PORT, () => {
     log("info", "api listening", { port: env.PORT, env: env.NODE_ENV });
   });
