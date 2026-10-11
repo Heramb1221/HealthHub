@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "HealthHub",
+    "slug": "healthhub-mobile",
+    "version": "0.1.0",
+    "scheme": "healthhub",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "in.healthhub.mobile",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "in.healthhub.mobile"
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "HealthHub uses the camera only when you choose to photograph a prescription to upload.",
+          "photosPermission": "HealthHub reads a photo from your library only when you choose one to upload as a prescription."
+        }
+      ],
+      "expo-document-picker",
+      [
+        "expo-notifications",
+        {
+          "color": "#12355b"
+        }
+      ]
+    ]
+  }
+}
