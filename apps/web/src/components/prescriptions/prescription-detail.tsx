@@ -20,6 +20,7 @@ import type { Prescription } from "@/lib/api/types";
 import { formatBytes } from "@/lib/file-sniff";
 import { formatDate } from "@/lib/format";
 import { SOURCE_TYPE_LABEL } from "@/lib/status";
+import { useDocumentTitle } from "@/lib/use-document-title";
 import { useResource } from "@/lib/use-resource";
 
 const POLL_MS = 2000;
@@ -148,6 +149,7 @@ export function PrescriptionDetail({ id }: { id: string }) {
   }, [status, id, tick, setData]);
 
   const versions = useResource(() => prescriptionsApi.versions(id), `${id}:${status}:${stamp}`);
+  useDocumentTitle(rx.status === "ready" ? (rx.data.prescriptionDate ? `Prescription from ${formatDate(rx.data.prescriptionDate)}` : "Prescription (undated)") : null);
 
   async function download() {
     setDownloading(true);

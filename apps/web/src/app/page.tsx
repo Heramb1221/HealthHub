@@ -74,12 +74,12 @@ export default function Home() {
             </h2>
             <dl className="divide-y">
               {CAPABILITIES.map(({ icon: Icon, title, body }) => (
-                <div key={title} className="flex gap-4 py-5 first:pt-0">
-                  <Icon aria-hidden="true" className="text-accent-foreground mt-1 size-5 shrink-0" />
-                  <div className="max-w-prose">
-                    <dt className="font-semibold">{title}</dt>
-                    <dd className="text-muted-foreground mt-1">{body}</dd>
-                  </div>
+                <div key={title} className="py-5 first:pt-0">
+                  <dt className="flex items-center gap-3 font-semibold">
+                    <Icon aria-hidden="true" className="text-accent-foreground size-5 shrink-0" />
+                    {title}
+                  </dt>
+                  <dd className="text-muted-foreground mt-1 max-w-prose pl-8">{body}</dd>
                 </div>
               ))}
             </dl>

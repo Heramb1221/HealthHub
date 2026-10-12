@@ -204,9 +204,17 @@ export function DashboardView() {
                   <>
                     <p className="font-medium">{next.hospitalName}</p>
                     <p className="text-sm">{formatWhen(new Date(next.startsAt), now)}</p>
+                    <Link href="/appointments" className="text-info inline-block pt-1 text-sm font-medium underline underline-offset-4">
+                      View appointments
+                    </Link>
                   </>
                 ) : (
-                  <p className="text-muted-foreground text-sm">No upcoming appointments.</p>
+                  <p className="text-muted-foreground text-sm">
+                    No upcoming appointments.{" "}
+                    <Link href="/hospitals" className="text-info font-medium underline underline-offset-4">
+                      Find a hospital
+                    </Link>
+                  </p>
                 ),
               };
             }}
@@ -225,8 +233,9 @@ export function DashboardView() {
                       {latest.medications.length} {latest.medications.length === 1 ? "medicine" : "medicines"} listed
                     </p>
                     <div className="flex flex-wrap gap-2 pt-1">
-                      <ProcessingBadge status={latest.processingStatus} />
-                      <VerificationBadge status={latest.verificationStatus} />
+                      {/* Once reading has finished, the status that matters is verification; "reading finished" is just noise. */}
+                      {latest.processingStatus !== "completed" ? <ProcessingBadge status={latest.processingStatus} /> : null}
+                      {latest.processingStatus === "completed" ? <VerificationBadge status={latest.verificationStatus} /> : null}
                     </div>
                     <Link href={`/prescriptions/${latest.id}`} className="text-info inline-block pt-1 text-sm font-medium underline underline-offset-4">
                       Open prescription

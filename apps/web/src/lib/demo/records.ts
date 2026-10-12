@@ -1,5 +1,5 @@
 import { ApiError } from "@/lib/api/errors";
-import type { Appointment, AuthUser, Patient, UpdatePatientInput } from "@/lib/api/types";
+import type { AuthUser, Patient, UpdatePatientInput } from "@/lib/api/types";
 import { demoAuthApi } from "@/lib/demo/auth";
 
 /**
@@ -114,15 +114,3 @@ export const demoPatientsApi = {
 export function isSeeded(user: AuthUser) {
   return user.id === SEEDED_USER_ID;
 }
-
-export const demoAppointmentsApi = {
-  async list(): Promise<Appointment[]> {
-    const user = await currentUser();
-    requirePatient(user);
-    if (!isSeeded(user)) return [];
-    const when = new Date();
-    when.setDate(when.getDate() + 3);
-    when.setHours(10, 30, 0, 0);
-    return [{ id: "demo-appt-1", hospitalId: "demo-hospital-1", hospitalName: "Demo City Hospital (sample)", startsAt: when.toISOString(), status: "booked", isDemo: true }];
-  },
-};

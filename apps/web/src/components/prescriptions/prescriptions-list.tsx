@@ -87,8 +87,8 @@ export function PrescriptionsList() {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1.5">
-                          <ProcessingBadge status={rx.processingStatus} />
-                          <VerificationBadge status={rx.verificationStatus} />
+                          {rx.processingStatus !== "completed" ? <ProcessingBadge status={rx.processingStatus} /> : null}
+                          {rx.processingStatus === "completed" ? <VerificationBadge status={rx.verificationStatus} /> : null}
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
@@ -114,8 +114,8 @@ export function PrescriptionsList() {
                     <p className="text-muted-foreground text-sm">{m.names}</p>
                     {m.review > 0 ? <p className="text-warning text-xs font-medium">{m.review} need review</p> : null}
                     <div className="flex flex-wrap gap-1.5">
-                      <ProcessingBadge status={rx.processingStatus} />
-                      <VerificationBadge status={rx.verificationStatus} />
+                      {rx.processingStatus !== "completed" ? <ProcessingBadge status={rx.processingStatus} /> : null}
+                      {rx.processingStatus === "completed" ? <VerificationBadge status={rx.verificationStatus} /> : null}
                     </div>
                   </Link>
                 </li>

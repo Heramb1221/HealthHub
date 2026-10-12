@@ -124,14 +124,67 @@ export interface Patient {
 
 export type UpdatePatientInput = Partial<Omit<Patient, "id" | "healthId" | "email" | "isDemo">>;
 
-/** ASSUMED: minimum appointment fields the dashboard needs. Booking shapes arrive with slice 7. */
+/**
+ * ASSUMED: hospitals, availability and appointments. Contract: GET /hospitals, GET /hospitals/:id,
+ * GET /hospitals/:id/availability, POST /appointments, GET /appointments, POST /appointments/:id/cancel.
+ * No bodies are defined. Open questions for the backend owner:
+ *   1. Hospital fields (assumed below). Nothing here may be invented by the UI: no ratings, no doctors, no credentials.
+ *   2. Whether GET /hospitals returns inactive hospitals to patients. The UI hides them and shows
+ *      "not accepting appointments" on a direct link, but the server should not offer them.
+ *   3. Availability returns open, future slots only (assumed). Each slot has a stable ID.
+ *   4. POST /appointments body is { hospitalId, slotId }. The SERVER must check the slot is still open and use a
+ *      transaction or unique constraint so two people can never hold the same slot. On a lost race it should answer
+ *      409 so the UI can say the time was just taken. The web app never decides availability.
+ *   5. Whether the hospital receives anything about the patient (name? contact?). The UI makes no such claim.
+ */
+export interface Hospital {
+  id: string;
+  name: string;
+  city: string | null;
+  address: string | null;
+  phone: string | null;
+  specialties: string[];
+  /** false = deactivated by an administrator */
+  active: boolean;
+  isDemo?: boolean;
+}
+
+/**
+ * ASSUMED: admin hospital management. Contract: POST /admin/hospitals, PATCH /admin/hospitals/:id,
+ * POST /admin/hospitals/:id/deactivate. Open questions for the backend owner:
+ *   1. Bodies (assumed below). The SERVER must check the caller's role on every one of these; the web app hides
+ *      the portal from non-admins only as a courtesy.
+ *   2. There is no admin list endpoint. The web app assumes GET /hospitals returns deactivated hospitals too when
+ *      the caller is an administrator (and only active ones for patients).
+ *   3. There is no way to reactivate a hospital, and no admin endpoints to create or change appointment slots.
+ *      The portal therefore offers a read-only view of open times and no reactivate button.
+ *   4. Whether deactivating cancels or keeps existing appointments (the demo keeps them).
+ *   5. Administrators must not be able to read patient records or see who booked a slot (spec: hospital-admin
+ *      permissions do not imply access to medical records). The portal shows open times only.
+ */
+export type HospitalInput = Pick<Hospital, "name" | "city" | "address" | "phone" | "specialties">;
+export type UpdateHospitalInput = Partial<HospitalInput>;
+
+export interface AvailabilitySlot {
+  id: string;
+  hospitalId: string;
+  startsAt: string;
+  endsAt: string;
+}
+
 export interface Appointment {
   id: string;
   hospitalId: string;
   hospitalName: string;
   startsAt: string;
+  endsAt?: string | null;
   status: "booked" | "cancelled" | "completed";
   isDemo?: boolean;
+}
+
+export interface BookAppointmentInput {
+  hospitalId: string;
+  slotId: string;
 }
 
 /**

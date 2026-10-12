@@ -3,10 +3,11 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarClock, FileText, History, IdCard, LayoutDashboard, LogOut, UserRound, type LucideIcon } from "lucide-react";
+import { CalendarClock, CalendarDays, FileText, History, Hospital, IdCard, LayoutDashboard, LogOut, UserRound, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Brand } from "@/components/layout/brand";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { describeError } from "@/lib/api/errors";
 import { useSession } from "@/lib/session/session-provider";
@@ -19,18 +20,25 @@ interface NavItem {
 }
 
 /** Only routes that exist are listed. Each build slice adds its own entries. */
-const NAV_ITEMS: NavItem[] = [
+const PATIENT_NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/prescriptions", label: "Prescriptions", icon: FileText },
   { href: "/medications", label: "Medications", icon: CalendarClock },
   { href: "/history", label: "History", icon: History },
   { href: "/health-card", label: "Health card", icon: IdCard },
+  { href: "/hospitals", label: "Hospitals", icon: Hospital },
+  { href: "/appointments", label: "Appointments", icon: CalendarDays },
   { href: "/profile", label: "Profile", icon: UserRound },
 ];
+
+/** Administrators manage the hospital directory only. They have no patient records, so no patient screens are listed. */
+const ADMIN_NAV: NavItem[] = [{ href: "/admin/hospitals", label: "Hospitals", icon: Hospital }];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, signOut } = useSession();
+  const isAdmin = user.role === "admin";
+  const navItems = isAdmin ? ADMIN_NAV : PATIENT_NAV;
 
   // On narrow screens the tab bar scrolls sideways; keep the current tab visible.
   React.useEffect(() => {
@@ -50,9 +58,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-dvh flex-col">
       <header className="bg-card border-b print:hidden">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-3">
-          <Brand href="/dashboard" />
+          <Brand href={isAdmin ? "/admin/hospitals" : "/dashboard"} />
           <div className="flex items-center gap-3">
-            <p className="text-muted-foreground hidden text-sm sm:block">{user.displayName ?? user.email}</p>
+            <p className="text-muted-foreground hidden items-center gap-2 text-sm sm:flex">
+              {user.displayName ?? user.email}
+              {isAdmin ? <Badge tone="info">Administrator</Badge> : null}
+            </p>
             <Button variant="outline" size="sm" onClick={handleSignOut}>
               <LogOut aria-hidden="true" /> Sign out
             </Button>
@@ -60,7 +71,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
         <nav aria-label="Main" className="mx-auto max-w-6xl overflow-x-auto px-4">
           <ul className="flex gap-1">
-            {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+            {navItems.map(({ href, label, icon: Icon }) => {
               const active = pathname === href || pathname.startsWith(`${href}/`);
               return (
                 <li key={href}>

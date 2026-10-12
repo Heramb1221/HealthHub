@@ -87,8 +87,8 @@ export function SignInForm({ next }: { next?: string }) {
   const { errors, formError, pending, onSubmit } = useAuthSubmit<{ email: string; password: string }>(
     signInSchema,
     async (data) => {
-      await authApi.login(data);
-      router.replace(safeNextPath(next) ?? "/dashboard");
+      const user = await authApi.login(data);
+      router.replace(safeNextPath(next) ?? (user.role === "admin" ? "/admin" : "/dashboard"));
     },
     focusFirst,
   );
