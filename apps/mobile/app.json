@@ -15,9 +15,22 @@
       }
     },
     "android": {
-      "package": "in.healthhub.mobile"
+      "package": "in.healthhub.mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#12355b"
+      }
     },
     "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#f6f5f2"
+        }
+      ],
       "expo-secure-store",
       [
         "expo-image-picker",
@@ -33,6 +46,7 @@
           "color": "#12355b"
         }
       ]
-    ]
+    ],
+    "icon": "./assets/icon.png"
   }
 }

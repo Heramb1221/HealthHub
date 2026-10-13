@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
 
-import { appointmentApi, authApi, hospitalApi, medicationApi, patientApi, prescriptionApi, qrApi } from "../src/api/endpoints.ts";
+import { appointmentApi, authApi, consentApi, hospitalApi, medicationApi, patientApi, prescriptionApi, qrApi } from "../src/api/endpoints.ts";
 import { isApiError } from "../src/api/errors.ts";
 import { configureHttp, request } from "../src/api/http.ts";
 import { DEMO_BASE_URL, demoFetch, resetDemo } from "../src/demo/demoFetch.ts";
@@ -167,5 +167,22 @@ describe("demo hospitals, booking and QR", () => {
     await rejectsWith(qrApi.getSession("missing"), "NOT_FOUND");
     const history = await patientApi.accessHistory();
     assert.ok(history.items.some((e) => e.action === "consent.created"));
+  });
+});
+
+describe("demo consents (backend F3)", () => {
+  it("lists granted consents, revokes idempotently, and audits the revoke", async () => {
+    await signIn();
+    const before = await consentApi.list();
+    assert.ok(before.items.length >= 2);
+    const active = before.items.find((c) => !c.revokedAt && (!c.expiresAt || new Date(c.expiresAt) > new Date()));
+    assert.ok(active);
+    const revoked = await consentApi.revoke(active.id);
+    assert.ok(revoked.revokedAt);
+    const again = await consentApi.revoke(active.id);
+    assert.equal(again.revokedAt, revoked.revokedAt); // repeating is a no-op
+    const history = await patientApi.accessHistory();
+    assert.equal(history.items.filter((e) => e.action === "consent.revoked").length, 1);
+    await rejectsWith(consentApi.revoke("missing"), "NOT_FOUND");
   });
 });

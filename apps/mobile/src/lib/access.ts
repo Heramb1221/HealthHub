@@ -1,6 +1,6 @@
 import type { AccessEvent } from "../api/types.ts";
 
-const SCOPE_LABEL: Record<string, string> = {
+export const SCOPE_LABEL: Record<string, string> = {
   "profile:read": "your profile",
   "prescriptions:read": "your prescriptions",
   "health_history:read": "your health history",

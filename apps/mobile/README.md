@@ -59,7 +59,8 @@ Welcome / sign in / register · Dashboard · Profile (view/edit) · Prescription
 PDF) · Prescription detail (processing status with polling, source and verification state, per-medicine review
 flags, editable corrections saved as a new version, version history, PDF share) · Medicines (schedule, self-reported
 doses, reminder preferences, local-reminder prototype) · Medical history · Health card + protected QR + access
-history · Hospital directory · Hospital detail with slot booking · My appointments (cancel).
+history · Hospital directory · Hospital search and detail with slot booking · My appointments (upcoming, past and cancelled; cancel) · Sharing and access (list and revoke
+provider consents; granting is not in the app yet) · Profile > About (version, connection mode, safety statement).
 
 ## Safety and privacy decisions
 - Tokens only in `expo-secure-store`. API data is held in memory; no medical record is written to device storage. The shared PDF is deleted from the cache after sharing.
@@ -70,7 +71,7 @@ history · Hospital directory · Hospital detail with slot booking · My appoint
 
 ## Dependencies added beyond core Expo/React Navigation
 `eslint` + `eslint-config-expo` (dev only; lint), `expo-secure-store` (token storage), `expo-image-picker` (required by design doc), `expo-document-picker` (PDF selection),
-`expo-notifications` (local reminder prototype), `expo-file-system` + `expo-sharing` (authenticated PDF download and share),
+`expo-notifications` (local reminder prototype), `expo-splash-screen` (SDK-native splash configuration; icon and splash images are in `assets/`), `expo-file-system` + `expo-sharing` (authenticated PDF download and share),
 `react-native-qrcode-svg` + `react-native-svg` (QR rendering). Versions come from the Expo SDK 57 table.
 
 ## Known limitations

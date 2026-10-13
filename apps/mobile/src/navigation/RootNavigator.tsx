@@ -16,6 +16,7 @@ import { PrescriptionDetailScreen } from "../screens/PrescriptionDetailScreen";
 import { PrescriptionListScreen } from "../screens/PrescriptionListScreen";
 import { PrescriptionUploadScreen } from "../screens/PrescriptionUploadScreen";
 import { ProfileScreen } from "../screens/ProfileScreen";
+import { SharingScreen } from "../screens/SharingScreen";
 import { RegisterScreen, SignInScreen, WelcomeScreen } from "../screens/AuthScreens";
 import { AppText, Banner, Button, Screen, Stack } from "../ui/components";
 import { LoadingState } from "../ui/states";
@@ -97,6 +98,7 @@ export function RootNavigator() {
         <RootStack.Screen name="PrescriptionDetail" component={PrescriptionDetailScreen} options={{ title: "Prescription" }} />
         <RootStack.Screen name="History" component={HistoryScreen} options={{ title: "Medical history" }} />
         <RootStack.Screen name="HealthCard" component={HealthCardScreen} options={{ title: "Health card" }} />
+        <RootStack.Screen name="Sharing" component={SharingScreen} options={{ title: "Sharing and access" }} />
         <RootStack.Screen name="Hospital" component={HospitalScreen} options={{ title: "Hospital" }} />
       </RootStack.Navigator>
     </NavigationContainer>

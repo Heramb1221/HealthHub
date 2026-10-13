@@ -2,12 +2,14 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { ApiError, describeError } from "../src/api/errors.ts";
-import type { Appointment, MedicationSchedule, Prescription, PrescriptionMedication } from "../src/api/types.ts";
+import type { Appointment, Consent, Hospital, MedicationSchedule, Prescription, PrescriptionMedication } from "../src/api/types.ts";
 import { nextAppointment } from "../src/lib/appointments.ts";
 import { formatCountdown, formatDateOnly, localTimeToIso, toDateInput } from "../src/lib/format.ts";
 import { canOfferSchedule, doseLine, isInstructionSafe, medicationReviewReasons } from "../src/lib/safety.ts";
 import { enabledReminderTimes, nextReminder } from "../src/lib/schedule.ts";
 import { describeAccessEvent } from "../src/lib/access.ts";
+import { consentStatus, providerLabel, scopeLabel, sortConsents } from "../src/lib/consents.ts";
+import { filterHospitals, groupAppointments } from "../src/lib/filter.ts";
 import { BLOOD_GROUPS, GENDER_OPTIONS, genderLabel } from "../src/lib/profileOptions.ts";
 import { blankToNull, dateOfBirthProblem, isFutureDateOnly, listProblem, phoneProblem, isValidDateOnly, isValidEmail, isValidTimeOfDay, parseList, passwordProblem } from "../src/lib/validation.ts";
 
@@ -187,5 +189,63 @@ describe("access history descriptions (note G7)", () => {
   });
   it("falls back to the action name for unknown actions", () => {
     assert.equal(describeAccessEvent({ ...base, action: "something.new_thing" }).text, "something new thing");
+  });
+});
+
+describe("consents", () => {
+  const now = new Date(2026, 9, 14, 12, 0);
+  const c = (id: string, over: Partial<Consent>): Consent => ({ id, patientId: "p", granteeUserId: "provider-user-1234", resourceScope: "prescriptions:read", purpose: "x", expiresAt: null, revokedAt: null, createdAt: "2026-10-01T00:00:00Z", ...over });
+
+  it("is active only while neither revoked nor expired", () => {
+    assert.equal(consentStatus(c("a", {}), now), "active");
+    assert.equal(consentStatus(c("b", { expiresAt: new Date(2026, 9, 15).toISOString() }), now), "active");
+    assert.equal(consentStatus(c("c", { expiresAt: new Date(2026, 9, 13).toISOString() }), now), "expired");
+    assert.equal(consentStatus(c("d", { revokedAt: "2026-10-02T00:00:00Z", expiresAt: new Date(2026, 9, 20).toISOString() }), now), "revoked");
+  });
+
+  it("sorts active first, then expired, then revoked, newest first within a group", () => {
+    const list = [
+      c("revoked", { revokedAt: "2026-10-02T00:00:00Z" }),
+      c("old-active", { createdAt: "2026-09-01T00:00:00Z" }),
+      c("expired", { expiresAt: new Date(2026, 9, 1).toISOString() }),
+      c("new-active", { createdAt: "2026-10-10T00:00:00Z" }),
+    ];
+    assert.deepEqual(sortConsents(list, now).map((x) => x.id), ["new-active", "old-active", "expired", "revoked"]);
+  });
+
+  it("labels scopes and never shows a full provider id", () => {
+    assert.equal(scopeLabel("health_history:read"), "Your health history");
+    assert.equal(scopeLabel("unknown:scope"), "unknown:scope");
+    assert.equal(providerLabel("provider-user-1234"), "Provider account ending 1234");
+    assert.ok(!providerLabel("provider-user-1234").includes("provider-user"));
+  });
+});
+
+describe("hospital search and appointment grouping", () => {
+  const h = (id: string, over: Partial<Hospital>): Hospital => ({ id, name: id, ...over });
+  it("filters on name, city, address and specialty, case-insensitively", () => {
+    const list = [h("Demo City Hospital", { city: "Pune", specialties: ["Cardiology"] }), h("Example Clinic", { city: "Nashik", address: "22 Test Lane", specialties: ["Family medicine"] })];
+    assert.equal(filterHospitals(list, "  ").length, 2);
+    assert.deepEqual(filterHospitals(list, "PUNE").map((x) => x.id), ["Demo City Hospital"]);
+    assert.deepEqual(filterHospitals(list, "cardio").map((x) => x.id), ["Demo City Hospital"]);
+    assert.deepEqual(filterHospitals(list, "test lane").map((x) => x.id), ["Example Clinic"]);
+    assert.equal(filterHospitals(list, "zzz").length, 0);
+  });
+
+  it("groups upcoming confirmed appointments soonest first, and the rest newest first", () => {
+    const now = new Date(2026, 9, 14, 12, 0);
+    const a = (id: string, status: Appointment["status"], d: Date): Appointment => ({ id, slotId: id, status, slot: { startsAt: d.toISOString(), endsAt: d.toISOString() } });
+    const g = groupAppointments(
+      [
+        a("later", "confirmed", new Date(2026, 9, 20)),
+        a("soon", "confirmed", new Date(2026, 9, 15)),
+        a("cancelled-future", "cancelled", new Date(2026, 9, 16)),
+        a("past", "confirmed", new Date(2026, 9, 10)),
+        a("older", "confirmed", new Date(2026, 9, 1)),
+      ],
+      now,
+    );
+    assert.deepEqual(g.upcoming.map((x) => x.id), ["soon", "later"]);
+    assert.deepEqual(g.past.map((x) => x.id), ["cancelled-future", "past", "older"]);
   });
 });

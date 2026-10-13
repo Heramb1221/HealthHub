@@ -1,15 +1,20 @@
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import Constants from "expo-constants";
 import { useState } from "react";
 
 import { patientApi } from "../api/endpoints";
 import { describeError } from "../api/errors";
 import type { BloodGroup, Gender, Patient, PatientUpdate } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
+import { API_CONFIG, IS_DEMO } from "../config";
 import { useResource } from "../hooks/useResource";
 import { useServerValue } from "../hooks/useServerValue";
 import { formatDateOnly, orDash } from "../lib/format";
 import { BLOOD_GROUPS, GENDER_OPTIONS, genderLabel } from "../lib/profileOptions";
 import { blankToNull, dateOfBirthProblem, listProblem, listToText, parseList, phoneProblem } from "../lib/validation";
-import { AppText, Banner, Button, Card, Chip, Divider, Field, Row, Screen, Stack, TextField } from "../ui/components";
+import type { RootStackParamList } from "../navigation/types";
+import { AppText, Banner, Button, Card, Chip, Divider, Field, ListRow, Row, Screen, Stack, TextField } from "../ui/components";
 import { ErrorState, LoadingState } from "../ui/states";
 import { space } from "../ui/theme";
 
@@ -45,6 +50,7 @@ function toForm(p: Patient): Form {
 
 export function ProfileScreen() {
   const { state, signOut } = useAuth();
+  const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const res = useResource((signal) => patientApi.me(signal));
   const [patient, setPatient] = useServerValue<Patient>(res.data);
   const [editing, setEditing] = useState(false);
@@ -173,7 +179,21 @@ export function ProfileScreen() {
           <Field label="Existing conditions" value={patient.existingConditions.length ? patient.existingConditions.join(", ") : "None listed"} />
           <Field label="Current medications" value={patient.currentMedications.length ? patient.currentMedications.join(", ") : "None listed"} />
         </Card>
+        <Card style={{ gap: 0 }}>
+          <ListRow title="Sharing and access" subtitle="See and revoke who can view your records" onPress={() => nav.navigate("Sharing")} />
+          <ListRow title="Digital health card" onPress={() => nav.navigate("HealthCard")} />
+          <ListRow title="Medical history" onPress={() => nav.navigate("History")} />
+        </Card>
         <Button label="Edit profile" icon="edit-2" onPress={() => { setForm(toForm(patient)); setSaved(false); setEditing(true); }} />
+        <Card>
+          <AppText variant="heading" accessibilityRole="header">About HealthHub</AppText>
+          <Field label="Version" value={Constants.expoConfig?.version ?? "Unknown"} />
+          <Field label="Connection" value={IS_DEMO ? "Demo mode (built-in sample data)" : `Live server: ${hostOf(API_CONFIG.baseUrl)}`} />
+          <AppText variant="small" muted>
+            HealthHub is a prototype, not a medical device. It does not diagnose, prescribe or change treatment. Text read from a prescription by
+            computer can be wrong, so always check it against your paper prescription and follow your doctor's instructions.
+          </AppText>
+        </Card>
         <Button label="Sign out" variant="danger" icon="log-out" loading={signingOut} onPress={() => void doSignOut()} />
         <AppText variant="caption" muted style={{ paddingTop: space.sm }}>
           Signing out ends your session on the server and clears this phone's stored sign-in and local reminders.
@@ -181,4 +201,12 @@ export function ProfileScreen() {
       </Stack>
     </Screen>
   );
+}
+
+function hostOf(url: string | null): string {
+  try {
+    return url ? new URL(url).host : "not set";
+  } catch {
+    return "not set";
+  }
 }

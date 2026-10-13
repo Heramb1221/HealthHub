@@ -24,6 +24,7 @@ integrator, so they are treated as the working contract. Mobile was updated to m
 | Upload (H1-H3) | Matches (`file` part, 201 pending) | iOS photos requested in a compatible (JPEG) form because only JPEG/PNG/WebP/PDF are accepted |
 | Process (I4/I5) | **Differed** | The call is synchronous (up to 30 s), so the client timeout for it is 45 s. `completed` records return 409 (already read) |
 | Versions (I8) | Superset of what mobile reads | none |
+| Consents (F3) | Matches (`{data, page}`, `DELETE` returns the consent with `revokedAt`) | New Sharing and access screen: list, revoke. Creating a consent is not offered (needs a provider user id the patient cannot know) |
 | `/latest` (I6/I7) | Not used by mobile | none |
 
 Still **not implemented on the backend** (mobile code for these remains on the assumptions below and will show a "not found" or error
@@ -71,4 +72,4 @@ version regardless of verification (I7).
 ## Not built (outside the mobile prompt or blocked)
 - Server-delivered push notifications (only a labelled local-reminder prototype exists).
 - Original-file preview (the contract has no endpoint that returns the original upload).
-- Consent management screens, QR scanning for providers, payments.
+- Granting a consent (the patient has no way to look up a provider's user id), QR scanning for providers, payments.

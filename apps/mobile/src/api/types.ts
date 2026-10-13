@@ -94,6 +94,18 @@ export interface AccessEvent {
   details?: { resourceScope?: string; reason?: string; changedFields?: string[]; consentId?: string; granteeUserId?: string };
 }
 
+/** BACKEND F3: consent object. Timestamps are ISO 8601 UTC. */
+export interface Consent {
+  id: string;
+  patientId: string;
+  granteeUserId: string;
+  resourceScope: string;
+  purpose: string;
+  expiresAt: string | null;
+  revokedAt: string | null;
+  createdAt: string;
+}
+
 // ---------- Prescriptions ----------
 export type ProcessingStatus = "pending" | "processing" | "completed" | "failed"; // CONTRACT
 export type VerificationStatus = "unverified" | "needs_review" | "patient_corrected" | "verified_by_authorized_clinician"; // CONTRACT

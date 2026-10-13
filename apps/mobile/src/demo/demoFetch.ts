@@ -90,6 +90,7 @@ interface State {
   schedules: Schedule[];
   history: Json[];
   access: Json[];
+  consents: Json[];
   qr: Map<string, { prescriptionId: string; expiresAt: number }>;
   slots: Slot[];
   appts: Appt[];
@@ -164,6 +165,11 @@ function freshState(): State {
     ],
     access: [
       { id: "demo-a1", occurredAt: iso(new Date(Date.now() - 86_400_000)), action: "patient.profile_updated", outcome: "success", actor: { type: "self" }, resourceType: "patient", details: { changedFields: ["phone"] } },
+    ],
+    consents: [
+      { id: "demo-consent-1", patientId: "demo-patient", granteeUserId: "demo-provider-0001", resourceScope: "prescriptions:read", purpose: "Follow-up visit (demo)", expiresAt: iso(new Date(Date.now() + 30 * 86_400_000)), revokedAt: null, createdAt: iso(new Date(Date.now() - 3 * 86_400_000)) },
+      { id: "demo-consent-2", patientId: "demo-patient", granteeUserId: "demo-provider-0002", resourceScope: "health_history:read", purpose: "Second opinion (demo)", expiresAt: null, revokedAt: null, createdAt: iso(new Date(Date.now() - 10 * 86_400_000)) },
+      { id: "demo-consent-3", patientId: "demo-patient", granteeUserId: "demo-provider-0003", resourceScope: "profile:read", purpose: "Old request (demo)", expiresAt: iso(new Date(Date.now() - 86_400_000)), revokedAt: null, createdAt: iso(new Date(Date.now() - 40 * 86_400_000)) },
     ],
     qr: new Map(),
     slots: [],
@@ -442,6 +448,19 @@ export async function demoFetch(input: string | URL | Request, init?: RequestIni
       return ok(rxView(rx));
     }
     if (sub === "pdf") return fail(404, "NOT_FOUND", "PDF is not available in demo mode");
+  }
+
+  // ----- consents (backend F3: patient sees consents they granted; revoke is idempotent) -----
+  if (path === "/consents" && method === "GET") return list(state.consents);
+  const consentMatch = /^\/consents\/([^/]+)$/.exec(path);
+  if (consentMatch && method === "DELETE") {
+    const c = state.consents.find((x) => x.id === decodeURIComponent(consentMatch[1] ?? ""));
+    if (!c) return notFound();
+    if (!c.revokedAt) {
+      c.revokedAt = iso(new Date());
+      state.access.unshift({ id: nextId("demo-a"), occurredAt: iso(new Date()), action: "consent.revoked", outcome: "success", actor: { type: "self" }, resourceType: "consent", details: { resourceScope: c.resourceScope, consentId: c.id } });
+    }
+    return ok(c);
   }
 
   // ----- medication schedules -----
