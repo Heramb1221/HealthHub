@@ -2,12 +2,16 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { ApiError, describeError } from "../src/api/errors.ts";
-import type { Appointment, MedicationSchedule, Prescription, PrescriptionMedication } from "../src/api/types.ts";
+import type { Appointment, Consent, Hospital, MedicationSchedule, Prescription, PrescriptionMedication } from "../src/api/types.ts";
 import { nextAppointment } from "../src/lib/appointments.ts";
 import { formatCountdown, formatDateOnly, localTimeToIso, toDateInput } from "../src/lib/format.ts";
 import { canOfferSchedule, doseLine, isInstructionSafe, medicationReviewReasons } from "../src/lib/safety.ts";
 import { enabledReminderTimes, nextReminder } from "../src/lib/schedule.ts";
-import { blankToNull, isFutureDateOnly, isValidDateOnly, isValidEmail, isValidTimeOfDay, parseList, passwordProblem } from "../src/lib/validation.ts";
+import { describeAccessEvent } from "../src/lib/access.ts";
+import { consentStatus, providerLabel, scopeLabel, sortConsents } from "../src/lib/consents.ts";
+import { filterHospitals, groupAppointments } from "../src/lib/filter.ts";
+import { BLOOD_GROUPS, GENDER_OPTIONS, genderLabel } from "../src/lib/profileOptions.ts";
+import { blankToNull, dateOfBirthProblem, isFutureDateOnly, listProblem, phoneProblem, isValidDateOnly, isValidEmail, isValidTimeOfDay, parseList, passwordProblem } from "../src/lib/validation.ts";
 
 const goodMed: PrescriptionMedication = {
   name: "Paracetamol", strength: "500 mg", dose: "1 tablet", route: "oral", frequency: "twice a day", duration: "3 days", instructions: null, confidence: 0.95,
@@ -135,5 +139,113 @@ describe("error descriptions", () => {
     assert.equal(describeError(new ApiError({ code: "NETWORK_ERROR", message: "x", status: 0 })).retryable, true);
     assert.equal(describeError(new ApiError({ code: "PROVIDER_DISABLED", message: "x", status: 503 })).retryable, false);
     assert.equal(describeError(new ApiError({ code: "FORBIDDEN", message: "x", status: 403 })).title, "No access");
+  });
+});
+
+describe("backend profile rules (note G3)", () => {
+  it("validates phone numbers like the server", () => {
+    assert.equal(phoneProblem(""), null);
+    assert.equal(phoneProblem("+91 98765 43210"), null);
+    assert.equal(phoneProblem("(022) 555-0100"), null);
+    assert.ok(phoneProblem("123456"));
+    assert.ok(phoneProblem("98765abcde"));
+    assert.ok(phoneProblem("9".repeat(21)));
+    assert.ok(phoneProblem("91+98765432"));
+  });
+
+  it("validates date of birth between 1900 and today", () => {
+    const now = new Date(2026, 9, 13);
+    assert.equal(dateOfBirthProblem("", now), null);
+    assert.equal(dateOfBirthProblem("1998-04-23", now), null);
+    assert.equal(dateOfBirthProblem("2026-10-13", now), null);
+    assert.ok(dateOfBirthProblem("2026-10-14", now));
+    assert.ok(dateOfBirthProblem("1899-12-31", now));
+    assert.ok(dateOfBirthProblem("23-04-1998", now));
+  });
+
+  it("limits list size and item length", () => {
+    assert.equal(listProblem(Array.from({ length: 30 }, (_, i) => `a${i}`)), null);
+    assert.ok(listProblem(Array.from({ length: 31 }, (_, i) => `a${i}`)));
+    assert.ok(listProblem(["x".repeat(101)]));
+  });
+
+  it("offers exactly the server's enum values", () => {
+    assert.deepEqual(GENDER_OPTIONS.map((g) => g.value), ["female", "male", "other", "prefer_not_to_say"]);
+    assert.deepEqual(BLOOD_GROUPS, ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]);
+    assert.equal(genderLabel("prefer_not_to_say"), "Prefer not to say");
+    assert.equal(genderLabel(null), "Not provided");
+  });
+});
+
+describe("access history descriptions (note G7)", () => {
+  const base = { id: "e", occurredAt: "2026-10-13T00:00:00Z" };
+  it("describes known actions in plain language and never shows ids", () => {
+    const granted = describeAccessEvent({ ...base, action: "access.granted", actor: { type: "provider", userId: "u-secret" }, details: { resourceScope: "prescriptions:read" } });
+    assert.equal(granted.text, "A provider you authorised viewed your prescriptions.");
+    assert.ok(!granted.text.includes("u-secret"));
+    assert.equal(describeAccessEvent({ ...base, action: "access.denied" }).tone, "warning");
+    assert.equal(describeAccessEvent({ ...base, action: "consent.revoked", details: { resourceScope: "profile:read" } }).text, "You revoked a provider's access to your profile.");
+    assert.equal(describeAccessEvent({ ...base, action: "patient.profile_updated", details: { changedFields: ["phone", "address"] } }).text, "Your profile was updated (phone, address).");
+  });
+  it("falls back to the action name for unknown actions", () => {
+    assert.equal(describeAccessEvent({ ...base, action: "something.new_thing" }).text, "something new thing");
+  });
+});
+
+describe("consents", () => {
+  const now = new Date(2026, 9, 14, 12, 0);
+  const c = (id: string, over: Partial<Consent>): Consent => ({ id, patientId: "p", granteeUserId: "provider-user-1234", resourceScope: "prescriptions:read", purpose: "x", expiresAt: null, revokedAt: null, createdAt: "2026-10-01T00:00:00Z", ...over });
+
+  it("is active only while neither revoked nor expired", () => {
+    assert.equal(consentStatus(c("a", {}), now), "active");
+    assert.equal(consentStatus(c("b", { expiresAt: new Date(2026, 9, 15).toISOString() }), now), "active");
+    assert.equal(consentStatus(c("c", { expiresAt: new Date(2026, 9, 13).toISOString() }), now), "expired");
+    assert.equal(consentStatus(c("d", { revokedAt: "2026-10-02T00:00:00Z", expiresAt: new Date(2026, 9, 20).toISOString() }), now), "revoked");
+  });
+
+  it("sorts active first, then expired, then revoked, newest first within a group", () => {
+    const list = [
+      c("revoked", { revokedAt: "2026-10-02T00:00:00Z" }),
+      c("old-active", { createdAt: "2026-09-01T00:00:00Z" }),
+      c("expired", { expiresAt: new Date(2026, 9, 1).toISOString() }),
+      c("new-active", { createdAt: "2026-10-10T00:00:00Z" }),
+    ];
+    assert.deepEqual(sortConsents(list, now).map((x) => x.id), ["new-active", "old-active", "expired", "revoked"]);
+  });
+
+  it("labels scopes and never shows a full provider id", () => {
+    assert.equal(scopeLabel("health_history:read"), "Your health history");
+    assert.equal(scopeLabel("unknown:scope"), "unknown:scope");
+    assert.equal(providerLabel("provider-user-1234"), "Provider account ending 1234");
+    assert.ok(!providerLabel("provider-user-1234").includes("provider-user"));
+  });
+});
+
+describe("hospital search and appointment grouping", () => {
+  const h = (id: string, over: Partial<Hospital>): Hospital => ({ id, name: id, ...over });
+  it("filters on name, city, address and specialty, case-insensitively", () => {
+    const list = [h("Demo City Hospital", { city: "Pune", specialties: ["Cardiology"] }), h("Example Clinic", { city: "Nashik", address: "22 Test Lane", specialties: ["Family medicine"] })];
+    assert.equal(filterHospitals(list, "  ").length, 2);
+    assert.deepEqual(filterHospitals(list, "PUNE").map((x) => x.id), ["Demo City Hospital"]);
+    assert.deepEqual(filterHospitals(list, "cardio").map((x) => x.id), ["Demo City Hospital"]);
+    assert.deepEqual(filterHospitals(list, "test lane").map((x) => x.id), ["Example Clinic"]);
+    assert.equal(filterHospitals(list, "zzz").length, 0);
+  });
+
+  it("groups upcoming confirmed appointments soonest first, and the rest newest first", () => {
+    const now = new Date(2026, 9, 14, 12, 0);
+    const a = (id: string, status: Appointment["status"], d: Date): Appointment => ({ id, slotId: id, status, slot: { startsAt: d.toISOString(), endsAt: d.toISOString() } });
+    const g = groupAppointments(
+      [
+        a("later", "confirmed", new Date(2026, 9, 20)),
+        a("soon", "confirmed", new Date(2026, 9, 15)),
+        a("cancelled-future", "cancelled", new Date(2026, 9, 16)),
+        a("past", "confirmed", new Date(2026, 9, 10)),
+        a("older", "confirmed", new Date(2026, 9, 1)),
+      ],
+      now,
+    );
+    assert.deepEqual(g.upcoming.map((x) => x.id), ["soon", "later"]);
+    assert.deepEqual(g.past.map((x) => x.id), ["cancelled-future", "past", "older"]);
   });
 });

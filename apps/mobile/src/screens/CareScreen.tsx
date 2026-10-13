@@ -8,9 +8,10 @@ import { describeError } from "../api/errors";
 import type { Appointment } from "../api/types";
 import { useResource } from "../hooks/useResource";
 import { appointmentHospitalName, appointmentStart } from "../lib/appointments";
+import { filterHospitals, groupAppointments } from "../lib/filter";
 import { formatDateTime } from "../lib/format";
 import type { RootStackParamList } from "../navigation/types";
-import { AppText, Badge, Banner, Button, Card, Chip, DemoTag, ListRow, Row, Screen, Stack } from "../ui/components";
+import { AppText, Badge, Banner, Button, Card, Chip, DemoTag, ListRow, Row, Screen, Stack, TextField } from "../ui/components";
 import { EmptyState, ErrorState, LoadingState } from "../ui/states";
 
 export function CareScreen() {
@@ -31,14 +32,18 @@ export function CareScreen() {
 function HospitalList() {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const res = useResource((signal) => hospitalApi.list(signal));
+  const [query, setQuery] = useState("");
   if (res.loading) return <LoadingState label="Loading hospitals…" />;
   if (res.error && !res.data) return <ErrorState error={res.error} onRetry={res.reload} />;
   const items = (res.data?.items ?? []).filter((h) => h.isActive !== false);
   if (items.length === 0) return <EmptyState icon="map-pin" title="No hospitals listed" body="The hospital directory is empty right now." />;
+  const shown = filterHospitals(items, query);
   return (
     <Stack gap={0}>
       {items.some((h) => h.isDemo) ? <Banner tone="demo" title="Demo directory" icon="info">Hospitals marked "Demo data" are sample entries, not real providers.</Banner> : null}
-      {items.map((h) => (
+      <TextField label="Search hospitals" value={query} onChangeText={setQuery} hint="Search by name, city or specialty" autoCapitalize="none" autoCorrect={false} returnKeyType="search" clearButtonMode="while-editing" />
+      {shown.length === 0 ? <EmptyState icon="search" title="No matches" body={`No hospitals match "${query.trim()}". Try a different name, city or specialty.`} action={{ label: "Clear search", onPress: () => setQuery("") }} /> : null}
+      {shown.map((h) => (
         <Card key={h.id} style={{ marginTop: 12 }}>
           <ListRow
             title={h.name}
@@ -85,10 +90,8 @@ function AppointmentList() {
     }
   }
 
-  return (
-    <Stack>
-      {error ? <Banner tone="danger" title={error} icon="alert-circle" /> : null}
-      {items.map((a) => (
+  const { upcoming, past } = groupAppointments(items);
+  const renderAppt = (a: Appointment) => (
         <Card key={a.id}>
           <AppText variant="label">{appointmentHospitalName(a)}</AppText>
           <AppText>{appointmentStart(a) ? formatDateTime(appointmentStart(a)) : "Time not provided"}</AppText>
@@ -96,9 +99,16 @@ function AppointmentList() {
             <Badge label={a.status === "confirmed" ? "Confirmed" : "Cancelled"} tone={a.status === "confirmed" ? "success" : "neutral"} icon={a.status === "confirmed" ? "check-circle" : "x-circle"} />
             {a.hospital?.isDemo ? <DemoTag /> : null}
           </Row>
-          {a.status === "confirmed" ? <Button label="Cancel appointment" variant="danger" onPress={() => confirmCancel(a)} loading={busy === a.id} /> : null}
+          {a.status === "confirmed" && upcoming.includes(a) ? <Button label="Cancel appointment" variant="danger" onPress={() => confirmCancel(a)} loading={busy === a.id} /> : null}
         </Card>
-      ))}
+  );
+  return (
+    <Stack>
+      {error ? <Banner tone="danger" title={error} icon="alert-circle" /> : null}
+      <AppText variant="heading" accessibilityRole="header">Upcoming</AppText>
+      {upcoming.length === 0 ? <AppText muted>No upcoming appointments. Choose a hospital to book one.</AppText> : upcoming.map(renderAppt)}
+      {past.length > 0 ? <AppText variant="heading" accessibilityRole="header">Past and cancelled</AppText> : null}
+      {past.map(renderAppt)}
     </Stack>
   );
 }

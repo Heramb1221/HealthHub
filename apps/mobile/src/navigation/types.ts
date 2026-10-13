@@ -20,5 +20,6 @@ export type RootStackParamList = {
   PrescriptionDetail: { id: string };
   History: undefined;
   HealthCard: undefined;
+  Sharing: undefined;
   Hospital: { id: string };
 };

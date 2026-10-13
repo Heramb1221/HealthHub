@@ -12,6 +12,8 @@ export interface HttpConfig {
   getToken: () => string | null;
   /** Called once when an authenticated request is rejected with 401. */
   onUnauthorized: () => void;
+  /** Replaces the global fetch. Used only by labelled demo mode (src/demo) and tests. */
+  fetchImpl?: typeof fetch;
 }
 
 let config: HttpConfig = { baseUrl: null, getToken: () => null, onUnauthorized: () => {} };
@@ -106,7 +108,7 @@ async function send(path: string, options: RequestOptions): Promise<RawResult> {
   try {
     let response: Response;
     try {
-      response = await fetch(url, { method, headers, body, signal: controller.signal });
+      response = await (config.fetchImpl ?? fetch)(url, { method, headers, body, signal: controller.signal });
     } catch (cause) {
       if (signal?.aborted) throw cause; // caller cancelled; let it propagate untouched
       if (timedOut) throw new ApiError({ code: "TIMEOUT", message: "The server did not respond in time.", status: 0 });

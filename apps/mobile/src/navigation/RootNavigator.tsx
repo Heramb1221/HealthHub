@@ -16,6 +16,7 @@ import { PrescriptionDetailScreen } from "../screens/PrescriptionDetailScreen";
 import { PrescriptionListScreen } from "../screens/PrescriptionListScreen";
 import { PrescriptionUploadScreen } from "../screens/PrescriptionUploadScreen";
 import { ProfileScreen } from "../screens/ProfileScreen";
+import { SharingScreen } from "../screens/SharingScreen";
 import { RegisterScreen, SignInScreen, WelcomeScreen } from "../screens/AuthScreens";
 import { AppText, Banner, Button, Screen, Stack } from "../ui/components";
 import { LoadingState } from "../ui/states";
@@ -33,17 +34,14 @@ const theme = {
 
 const headerOptions = { headerTintColor: colors.primary, headerTitleStyle: { color: colors.text }, headerStyle: { backgroundColor: colors.surface } };
 
-const tabIcon = (name: React.ComponentProps<typeof Feather>["name"]) =>
-  ({ color, size }: { color: string; size: number }) => <Feather name={name} color={color} size={size} />;
-
 function MainTabs() {
   return (
     <Tabs.Navigator screenOptions={{ ...headerOptions, tabBarActiveTintColor: colors.primary, tabBarInactiveTintColor: colors.textMuted, tabBarLabelStyle: { fontSize: 12 } }}>
-      <Tabs.Screen name="Home" component={DashboardScreen} options={{ title: "Home", tabBarIcon: tabIcon("home") }} />
-      <Tabs.Screen name="Prescriptions" component={PrescriptionListScreen} options={{ title: "Prescriptions", tabBarIcon: tabIcon("file-text") }} />
-      <Tabs.Screen name="Medicines" component={MedicationScreen} options={{ title: "Medicines", tabBarIcon: tabIcon("clock") }} />
-      <Tabs.Screen name="Care" component={CareScreen} options={{ title: "Care", tabBarIcon: tabIcon("map-pin") }} />
-      <Tabs.Screen name="Profile" component={ProfileScreen} options={{ title: "Profile", tabBarIcon: tabIcon("user") }} />
+      <Tabs.Screen name="Home" component={DashboardScreen} options={{ title: "Home", tabBarIcon: ({ color, size }) => <Feather name="home" color={color} size={size} /> }} />
+      <Tabs.Screen name="Prescriptions" component={PrescriptionListScreen} options={{ title: "Prescriptions", tabBarIcon: ({ color, size }) => <Feather name="file-text" color={color} size={size} /> }} />
+      <Tabs.Screen name="Medicines" component={MedicationScreen} options={{ title: "Medicines", tabBarIcon: ({ color, size }) => <Feather name="clock" color={color} size={size} /> }} />
+      <Tabs.Screen name="Care" component={CareScreen} options={{ title: "Care", tabBarIcon: ({ color, size }) => <Feather name="map-pin" color={color} size={size} /> }} />
+      <Tabs.Screen name="Profile" component={ProfileScreen} options={{ title: "Profile", tabBarIcon: ({ color, size }) => <Feather name="user" color={color} size={size} /> }} />
     </Tabs.Navigator>
   );
 }
@@ -100,6 +98,7 @@ export function RootNavigator() {
         <RootStack.Screen name="PrescriptionDetail" component={PrescriptionDetailScreen} options={{ title: "Prescription" }} />
         <RootStack.Screen name="History" component={HistoryScreen} options={{ title: "Medical history" }} />
         <RootStack.Screen name="HealthCard" component={HealthCardScreen} options={{ title: "Health card" }} />
+        <RootStack.Screen name="Sharing" component={SharingScreen} options={{ title: "Sharing and access" }} />
         <RootStack.Screen name="Hospital" component={HospitalScreen} options={{ title: "Hospital" }} />
       </RootStack.Navigator>
     </NavigationContainer>

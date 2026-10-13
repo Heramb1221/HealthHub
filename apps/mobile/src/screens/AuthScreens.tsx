@@ -8,6 +8,7 @@ import { useAuth } from "../auth/AuthContext";
 import type { AuthStackParamList } from "../navigation/types";
 import { AppText, Banner, Button, Screen, Stack, TextField } from "../ui/components";
 import { colors, space } from "../ui/theme";
+import { IS_DEMO } from "../config";
 import { isValidEmail, passwordProblem } from "../lib/validation";
 
 type Props<T extends keyof AuthStackParamList> = NativeStackScreenProps<AuthStackParamList, T>;
@@ -26,6 +27,11 @@ export function WelcomeScreen({ navigation }: Props<"Welcome">) {
           </AppText>
         </View>
         {notice ? <Banner tone="info" title={notice} icon="info" /> : null}
+        {IS_DEMO ? (
+          <Banner tone="demo" title="Running in demo mode" icon="info">
+            No server is connected. You will see sample data, and sign-in is not a real account.
+          </Banner>
+        ) : null}
         <Banner tone="warning" title="Prototype for testing" icon="alert-triangle">
           HealthHub is an MVP, not a medical device. Use made-up test data only. It does not give medical advice or change treatment.
         </Banner>
@@ -81,6 +87,11 @@ function AuthForm({ mode, navigation }: { mode: "signIn" | "register"; navigatio
         <AppText variant="title" accessibilityRole="header">
           {isRegister ? "Create your account" : "Sign in"}
         </AppText>
+        {IS_DEMO ? (
+          <Banner tone="demo" title="Demo sign-in" icon="info">
+            Use any email and a password of at least 10 characters. No account is created and nothing is stored.
+          </Banner>
+        ) : null}
         {isRegister ? (
           <Banner tone="warning" title="Use test data only" icon="alert-triangle">
             This prototype is not approved for real patient records.

@@ -4,6 +4,7 @@ import type {
   AddConditionBody,
   Appointment,
   AuthSession,
+  Consent,
   AvailabilitySlot,
   CreateAppointmentBody,
   CreateQrSessionBody,
@@ -54,11 +55,18 @@ export const prescriptionApi = {
     form.append("file", { uri: file.uri, name: file.name, type: file.mimeType } as unknown as Blob);
     return request<Prescription>("/prescriptions", { method: "POST", formData: form, timeoutMs: 90_000 });
   },
-  process: (id: string) => request<Prescription>(`/prescriptions/${enc(id)}/process`, { method: "POST" }),
+  // The server reads the file inside this request (up to 30 s, backend note I5), so allow longer than the default.
+  process: (id: string) => request<Prescription>(`/prescriptions/${enc(id)}/process`, { method: "POST", timeoutMs: 45_000 }),
   correct: (id: string, body: ExtractedFieldsUpdate) =>
     request<Prescription>(`/prescriptions/${enc(id)}/extracted-fields`, { method: "PATCH", json: body }),
   /** URL + auth header for a native download; the bearer token is never put in the URL. */
   pdfRequest: (id: string) => ({ url: apiUrl(`/prescriptions/${enc(id)}/pdf`), headers: authHeaders() }),
+};
+
+export const consentApi = {
+  list: (signal?: AbortSignal) => requestList<Consent>("/consents", opts(signal)),
+  /** Revokes future access (backend F3). Returns the consent with `revokedAt` set; repeating is a no-op. */
+  revoke: (id: string) => request<Consent>(`/consents/${enc(id)}`, { method: "DELETE" }),
 };
 
 export const qrApi = {

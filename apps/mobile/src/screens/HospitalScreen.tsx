@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Alert, Linking } from "react-native";
 
 import { appointmentApi, hospitalApi } from "../api/endpoints";
@@ -17,14 +17,16 @@ type Props = NativeStackScreenProps<RootStackParamList, "Hospital">;
 export function HospitalScreen({ route, navigation }: Props) {
   const { id } = route.params;
   const hospital = useResource((signal) => hospitalApi.get(id, signal));
-  const slots = useResource((signal) => hospitalApi.availability(id, signal));
+  // Capture "now" when the data is fetched (not during render) so past slots can be hidden purely.
+  const slots = useResource(async (signal) => ({ page: await hospitalApi.availability(id, signal), fetchedAt: Date.now() }));
   const [selected, setSelected] = useState<string | null>(null);
   const [booking, setBooking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [booked, setBooked] = useState<Appointment | null>(null);
 
   const grouped = useMemo(() => {
-    const open = (slots.data?.items ?? []).filter((s) => s.status === "open" && new Date(s.startsAt).getTime() > Date.now());
+    const fetchedAt = slots.data?.fetchedAt ?? 0;
+    const open = (slots.data?.page.items ?? []).filter((s) => s.status === "open" && new Date(s.startsAt).getTime() > fetchedAt);
     const map = new Map<string, AvailabilitySlot[]>();
     for (const s of open.sort((a, b) => a.startsAt.localeCompare(b.startsAt))) {
       const key = localDayKey(s.startsAt);
@@ -33,16 +35,12 @@ export function HospitalScreen({ route, navigation }: Props) {
     return [...map.entries()];
   }, [slots.data]);
 
-  // Drop a selection that is no longer offered after a refresh.
-  useEffect(() => {
-    if (selected && !(slots.data?.items ?? []).some((s) => s.id === selected && s.status === "open")) setSelected(null);
-  }, [slots.data, selected]);
-
   if (hospital.loading) return <Screen><LoadingState label="Loading hospital…" /></Screen>;
   if (hospital.error && !hospital.data) return <Screen><ErrorState error={hospital.error} onRetry={hospital.reload} /></Screen>;
   const h = hospital.data;
   if (!h) return null;
-  const chosen = (slots.data?.items ?? []).find((s) => s.id === selected);
+  // A selection that is no longer open after a refresh simply stops matching.
+  const chosen = (slots.data?.page.items ?? []).find((s) => s.id === selected && s.status === "open");
 
   function confirmBooking() {
     if (!chosen) return;

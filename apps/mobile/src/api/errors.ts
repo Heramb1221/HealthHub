@@ -88,7 +88,7 @@ export function describeError(error: unknown): ErrorDescription {
     case "PAYLOAD_TOO_LARGE":
       return { title: "File too large", detail: "Choose a smaller file or a lower-resolution photo.", retryable: false, ...withId };
     case "UNSUPPORTED_MEDIA_TYPE":
-      return { title: "File type not supported", detail: "Choose a photo (JPEG or PNG) or a PDF.", retryable: false, ...withId };
+      return { title: "File type not supported", detail: "Choose a JPEG, PNG or WebP photo, or a PDF.", retryable: false, ...withId };
     case "PROVIDER_DISABLED":
       return {
         title: "Automatic reading is turned off",

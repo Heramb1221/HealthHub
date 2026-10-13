@@ -30,54 +30,80 @@ export interface AuthSession {
 }
 
 // ---------- Patient ----------
-/** SCHEMA (Patient model). healthId is a random display identifier, not meaningful. */
+export type Gender = "female" | "male" | "other" | "prefer_not_to_say"; // BACKEND G3
+export type BloodGroup = "A+" | "A-" | "B+" | "B-" | "AB+" | "AB-" | "O+" | "O-"; // BACKEND G3
+
+/** BACKEND G2 (implemented; integrator confirmation pending). Unset values are null, lists empty. healthId is random. */
 export interface Patient {
   id: string;
   healthId: string;
+  fullName: string | null;
+  /** Date only, YYYY-MM-DD. */
+  dateOfBirth: string | null;
+  gender: Gender | null;
+  bloodGroup: BloodGroup | null;
+  phone: string | null;
+  emergencyContact: { name: string | null; phone: string | null };
+  allergies: string[];
+  existingConditions: string[];
+  /** Self-reported (BACKEND G4). Never verified, never used for dose instructions. */
+  currentMedications: string[];
+  address: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
+ * BACKEND G3: partial update; `null` clears a nullable field, a list replaces the stored list,
+ * `emergencyContact` merges by sub-field. Unknown fields (healthId, role, ...) are rejected, so only these are sent.
+ */
+export interface PatientUpdate {
   fullName?: string | null;
-  /** ISO date or date-time; render only the date part. */
   dateOfBirth?: string | null;
-  gender?: string | null;
-  bloodGroup?: string | null;
+  gender?: Gender | null;
+  bloodGroup?: BloodGroup | null;
   phone?: string | null;
-  emergencyContactName?: string | null;
-  emergencyContactPhone?: string | null;
+  emergencyContact?: { name?: string | null; phone?: string | null };
   allergies?: string[];
   existingConditions?: string[];
   currentMedications?: string[];
   address?: string | null;
 }
 
-/** ASSUMED: PATCH /patients/me accepts a partial of the editable profile fields. Server validates. */
-export type PatientUpdate = Partial<
-  Pick<
-    Patient,
-    | "fullName"
-    | "dateOfBirth"
-    | "gender"
-    | "bloodGroup"
-    | "phone"
-    | "emergencyContactName"
-    | "emergencyContactPhone"
-    | "allergies"
-    | "existingConditions"
-    | "currentMedications"
-    | "address"
-  >
->;
+/** BACKEND G6: identity fields only. No allergies, conditions, medications, phone, address or emergency contact. */
+export interface HealthCard {
+  healthId: string;
+  fullName: string | null;
+  dateOfBirth: string | null;
+  bloodGroup: BloodGroup | null;
+  issuer?: string;
+  /** Server-written statement that the health ID is a HealthHub identifier, not an official national ID. */
+  notice?: string;
+  generatedAt?: string;
+}
 
-/** ASSUMED: GET /patients/me/health-card returns identity/emergency fields only. Renders whatever is present. */
-export type HealthCard = Partial<
-  Pick<Patient, "healthId" | "fullName" | "dateOfBirth" | "gender" | "bloodGroup" | "emergencyContactName" | "emergencyContactPhone" | "allergies">
-> & { demo?: boolean };
-
-/** SCHEMA (AuditEvent). Field names only; the server must never include medical values here. */
+/** BACKEND G7. `details` carries only: resourceScope, reason, changedFields, consentId, granteeUserId. */
 export interface AccessEvent {
   id: string;
   occurredAt: string;
   action: string;
   outcome?: "success" | "denied" | "failure";
+  actor?: { type: "self" } | { type: "provider"; userId: string } | { type: "other" };
   resourceType?: string | null;
+  resourceId?: string | null;
+  details?: { resourceScope?: string; reason?: string; changedFields?: string[]; consentId?: string; granteeUserId?: string };
+}
+
+/** BACKEND F3: consent object. Timestamps are ISO 8601 UTC. */
+export interface Consent {
+  id: string;
+  patientId: string;
+  granteeUserId: string;
+  resourceScope: string;
+  purpose: string;
+  expiresAt: string | null;
+  revokedAt: string | null;
+  createdAt: string;
 }
 
 // ---------- Prescriptions ----------
@@ -111,12 +137,13 @@ export interface Prescription {
   updatedAt: string;
 }
 
-/** SCHEMA (PrescriptionVersion). Names only; values are not needed on the version list. */
+/** BACKEND I8 (owner only). Only the fields the app displays are typed. */
 export interface PrescriptionVersionSummary {
   id: string;
   versionNumber: number;
   kind?: "extraction" | "patient_correction";
   verificationStatus?: VerificationStatus;
+  extractionProvider?: string | null;
   changedFields?: string[];
   createdAt: string;
 }
