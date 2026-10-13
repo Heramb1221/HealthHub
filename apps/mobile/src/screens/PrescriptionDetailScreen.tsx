@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { medicationApi, prescriptionApi } from "../api/endpoints";
 import { describeError } from "../api/errors";
 import type { MedicationInput, Prescription, PrescriptionMedication } from "../api/types";
+import { IS_DEMO } from "../config";
 import { useResource } from "../hooks/useResource";
 import { useServerValue } from "../hooks/useServerValue";
 import { formatDateOnly, formatDateTime, orDash, toDateInput } from "../lib/format";
@@ -322,7 +323,8 @@ export function PrescriptionDetailScreen({ route }: Props) {
 
         <Stack gap={space.sm}>
           {canEdit ? <Button label={rx.processingStatus === "failed" ? "Enter details yourself" : "Review and correct details"} icon="edit-3" onPress={() => beginEdit(rx)} /> : null}
-          <Button label="Share or save as PDF" icon="share" variant="secondary" onPress={() => void sharePdf()} loading={pdfBusy} disabled={rx.processingStatus !== "completed"} />
+          <Button label="Share or save as PDF" icon="share" variant="secondary" onPress={() => void sharePdf()} loading={pdfBusy} disabled={rx.processingStatus !== "completed" || IS_DEMO} />
+          {IS_DEMO ? <AppText variant="caption" muted>PDF export is not available in demo mode.</AppText> : null}
           {pdfMsg ? <Banner tone="danger" title={pdfMsg} icon="alert-circle" /> : null}
         </Stack>
 

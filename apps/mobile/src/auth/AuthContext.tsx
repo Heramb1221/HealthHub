@@ -4,7 +4,8 @@ import { authApi } from "../api/endpoints";
 import { isApiError } from "../api/errors";
 import { configureHttp } from "../api/http";
 import type { AuthUser } from "../api/types";
-import { API_CONFIG } from "../config";
+import { API_CONFIG, IS_DEMO } from "../config";
+import { demoFetch, resetDemo } from "../demo/demoFetch";
 import { cancelLocalReminders } from "../lib/reminders";
 import { clearSession, loadSession, saveSession } from "./storage";
 
@@ -29,6 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const endLocally = useCallback(async (notice: string | null) => {
     tokenRef.current = null;
+    if (IS_DEMO) resetDemo();
     await clearSession();
     await cancelLocalReminders();
     setState({ status: "signedOut", notice });
@@ -38,6 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     configureHttp({
       baseUrl: API_CONFIG.baseUrl,
+      ...(IS_DEMO ? { fetchImpl: demoFetch as typeof fetch } : {}),
       getToken: () => tokenRef.current,
       onUnauthorized: () => {
         if (tokenRef.current) void endLocally("Your session has ended. Sign in again to continue.");
@@ -49,7 +52,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const stored = await loadSession();
+      // Demo sessions are never persisted: the in-memory demo data would not survive a restart anyway.
+      const stored = IS_DEMO ? null : await loadSession();
       if (cancelled) return;
       if (stored && new Date(stored.expiresAt).getTime() > Date.now()) {
         tokenRef.current = stored.accessToken;
@@ -79,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error("Unexpected sign-in response");
     }
     tokenRef.current = session.accessToken;
-    await saveSession({ accessToken: session.accessToken, expiresAt: session.expiresAt, user: session.user });
+    if (!IS_DEMO) await saveSession({ accessToken: session.accessToken, expiresAt: session.expiresAt, user: session.user });
     setState({ status: "signedIn", user: session.user, expiresAt: session.expiresAt });
   }, []);
 

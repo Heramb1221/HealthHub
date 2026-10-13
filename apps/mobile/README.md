@@ -4,14 +4,22 @@ Patient app for Android and iOS. It talks to the same Express API as the web app
 `docs/API_CONTRACT.md`. Read `docs/MOBILE_CONTRACT_ASSUMPTIONS.md` first: it records which payload shapes the backend has confirmed
 (auth, patients, prescription upload/read/process) and which are still assumptions (schedules, history, QR, hospitals, appointments, corrections, PDF).
 
-> Prototype / MVP. Not a medical device. Use synthetic test data only. There is no demo or mock mode: if the
-> API is missing or unreachable the app shows that, and no action reports success unless the server confirmed it.
+> Prototype / MVP. Not a medical device. Use synthetic test data only. In LIVE mode no action reports success unless
+> the server confirmed it. In DEMO mode (below) everything is built-in sample data and is labelled as such.
+
+## Modes
+- **Demo (default when `EXPO_PUBLIC_API_URL` is not set):** `npm install && npm start` just works. An in-memory synthetic API
+  (`src/demo/demoFetch.ts`) runs inside the app and follows the backend's real rules (needs-review gating, no double booking,
+  rejected unknown fields). A "Demo mode" bar is always visible. Nothing is sent or saved, sign-in accepts any email with a
+  10+ character password and creates no account, and uploaded files are **not read**: processing returns a fixed synthetic result
+  chosen by file name (`illegible` fails, `ambiguous` needs review, anything else reads as a clear sample). PDF export is off.
+- **Live:** set `EXPO_PUBLIC_API_URL` (see `.env.example`) to use the real HealthHub API.
 
 ## Run
 
 ```bash
 cd apps/mobile
-cp .env.example .env        # set EXPO_PUBLIC_API_URL (see below)
+cp .env.example .env        # optional: set EXPO_PUBLIC_API_URL for live mode; leave unset for demo
 npm install
 npm start                   # then press a / i, or scan the QR with Expo Go
 ```
