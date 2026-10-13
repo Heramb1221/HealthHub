@@ -1,0 +1,300 @@
+// HealthHub API schema. Contract: docs/API_CONTRACT.md v0.1.
+// Decisions: apps/api/docs/CONTRACT_DECISIONS.md
+//
+// Conventions
+// - Timestamps are timestamptz (UTC instants).
+// - Enum values match the contract's wire strings exactly.
+// - Extra integrity rules Prisma cannot express (CHECK constraints, append-only
+//   triggers) live in prisma/migrations/*_integrity_constraints.
+// - AuditEvent.metadata must hold ids and field NAMES only, never field values,
+//   medical content, credentials, or tokens.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  patient
+  admin
+  provider
+}
+
+enum AuditOutcome {
+  success
+  denied
+  failure
+}
+
+enum SourceType {
+  uploaded_physical
+  clinician_issued
+}
+
+enum ProcessingStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
+enum VerificationStatus {
+  unverified
+  needs_review
+  patient_corrected
+  verified_by_authorized_clinician
+}
+
+enum VersionKind {
+  extraction
+  patient_correction
+}
+
+enum AppointmentStatus {
+  confirmed
+  cancelled
+}
+
+model User {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email        String   @unique
+  passwordHash String
+  role         UserRole @default(patient)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+
+  patient              Patient?
+  sessions             Session[]
+  consentsReceived     Consent[]             @relation("ConsentGrantee")
+  auditEvents          AuditEvent[]
+  versionsAuthored     PrescriptionVersion[]
+}
+
+// Server-side session so logout can revoke a token (id is the token's jti).
+model Session {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @db.Uuid
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  expiresAt DateTime  @db.Timestamptz(3)
+  revokedAt DateTime? @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// One patient row per patient user, created at registration; profile fields
+// are filled in later through PATCH /patients/me.
+model Patient {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                String    @unique @db.Uuid
+  healthId              String    @unique
+  fullName              String?
+  dateOfBirth           DateTime? @db.Date
+  gender                String?
+  bloodGroup            String?
+  phone                 String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  allergies             String[]  @default([])
+  existingConditions    String[]  @default([])
+  currentMedications    String[]  @default([])
+  address               String?
+  // Private storage key, never a public URL.
+  photoStorageKey       String?
+  createdAt             DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime  @updatedAt @db.Timestamptz(3)
+
+  user          User                 @relation(fields: [userId], references: [id], onDelete: Restrict)
+  consents      Consent[]
+  auditEvents   AuditEvent[]
+  prescriptions PrescriptionRecord[]
+  schedules     MedicationSchedule[]
+  appointments  Appointment[]
+}
+
+model Consent {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId     String    @db.Uuid
+  granteeUserId String    @db.Uuid
+  // One of: profile:read, prescriptions:read, health_history:read,
+  // medication_schedules:read (enforced by a CHECK constraint).
+  resourceScope String
+  purpose       String
+  expiresAt     DateTime? @db.Timestamptz(3)
+  revokedAt     DateTime? @db.Timestamptz(3)
+  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  grantee User    @relation("ConsentGrantee", fields: [granteeUserId], references: [id], onDelete: Restrict)
+
+  @@index([patientId])
+  @@index([granteeUserId, resourceScope])
+}
+
+// Append-only (enforced by trigger).
+model AuditEvent {
+  id           String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  occurredAt   DateTime     @default(now()) @db.Timestamptz(3)
+  actorUserId  String?      @db.Uuid
+  patientId    String?      @db.Uuid
+  action       String
+  resourceType String?
+  resourceId   String?
+  outcome      AuditOutcome
+  requestId    String?
+  metadata     Json?
+
+  actor   User?    @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+  patient Patient? @relation(fields: [patientId], references: [id], onDelete: Restrict)
+
+  @@index([patientId, occurredAt])
+  @@index([actorUserId, occurredAt])
+}
+
+// Identity, patient and original-file reference of one prescription. The
+// original* columns are written once and never change (enforced by trigger).
+// Extracted content lives in immutable PrescriptionVersion rows.
+model PrescriptionRecord {
+  id                String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId         String           @db.Uuid
+  sourceType        SourceType       @default(uploaded_physical)
+  processingStatus  ProcessingStatus @default(pending)
+  // Private storage key, never a public URL.
+  originalStorageKey String          @unique
+  originalFileName  String
+  originalMimeType  String
+  originalSizeBytes Int
+  originalSha256    String
+  createdAt         DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime         @updatedAt @db.Timestamptz(3)
+
+  patient  Patient               @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  versions PrescriptionVersion[]
+
+  @@index([patientId, createdAt])
+}
+
+// Append-only (enforced by trigger). A new extraction run or patient correction
+// always creates a new version; earlier versions are never edited or removed.
+model PrescriptionVersion {
+  id                   String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  prescriptionId       String             @db.Uuid
+  versionNumber        Int
+  kind                 VersionKind
+  verificationStatus   VerificationStatus
+  extractionProvider   String?
+  extractionConfidence Float?
+  prescriptionDate     DateTime?          @db.Date
+  prescriberName       String?
+  // Names of fields changed relative to the previous version (names only).
+  changedFields        String[]           @default([])
+  createdByUserId      String?            @db.Uuid
+  createdAt            DateTime           @default(now()) @db.Timestamptz(3)
+
+  prescription PrescriptionRecord       @relation(fields: [prescriptionId], references: [id], onDelete: Restrict)
+  createdBy    User?                    @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+  medications  PrescriptionMedication[]
+
+  @@unique([prescriptionId, versionNumber])
+}
+
+// Append-only (enforced by trigger). Field names follow the contract.
+model PrescriptionMedication {
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  versionId    String  @db.Uuid
+  position     Int
+  name         String?
+  strength     String?
+  dose         String?
+  route        String?
+  frequency    String?
+  duration     String?
+  instructions String?
+  confidence   Float
+
+  version   PrescriptionVersion  @relation(fields: [versionId], references: [id], onDelete: Restrict)
+  schedules MedicationSchedule[]
+
+  @@unique([versionId, position])
+}
+
+// PROVISIONAL: the contract defines no schedule fields. The final shape is
+// fixed in the decision note for Milestone 8, before any endpoint uses it.
+model MedicationSchedule {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId          String    @db.Uuid
+  sourceMedicationId String?   @db.Uuid
+  medicationName     String
+  dose               String
+  frequency          String
+  startDate          DateTime  @db.Date
+  endDate            DateTime? @db.Date
+  reminderTimes      String[]  @default([])
+  remindersEnabled   Boolean   @default(false)
+  timezone           String
+  isActive           Boolean   @default(true)
+  createdAt          DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime  @updatedAt @db.Timestamptz(3)
+
+  patient          Patient                 @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  sourceMedication PrescriptionMedication? @relation(fields: [sourceMedicationId], references: [id], onDelete: Restrict)
+
+  @@index([patientId, isActive])
+}
+
+// PROVISIONAL fields: the contract defines no hospital fields. The final shape
+// is fixed in the decision note for Milestone 9.
+model Hospital {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  address     String?
+  city        String?
+  phone       String?
+  specialties String[] @default([])
+  isActive    Boolean  @default(true)
+  // Seeded demo rows are labelled so they are never presented as real data.
+  isDemo      Boolean  @default(false)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  slots AvailabilitySlot[]
+}
+
+model AvailabilitySlot {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  hospitalId String   @db.Uuid
+  startsAt   DateTime @db.Timestamptz(3)
+  endsAt     DateTime @db.Timestamptz(3)
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  hospital     Hospital      @relation(fields: [hospitalId], references: [id], onDelete: Restrict)
+  appointments Appointment[]
+
+  @@unique([hospitalId, startsAt])
+}
+
+// activeSlotId equals slotId while status is confirmed and is NULL otherwise
+// (CHECK constraint). Its unique index guarantees at most one confirmed
+// appointment per slot, even under concurrent requests.
+model Appointment {
+  id           String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId    String            @db.Uuid
+  slotId       String            @db.Uuid
+  status       AppointmentStatus @default(confirmed)
+  activeSlotId String?           @unique @db.Uuid
+  cancelledAt  DateTime?         @db.Timestamptz(3)
+  createdAt    DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime          @updatedAt @db.Timestamptz(3)
+
+  patient Patient          @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  slot    AvailabilitySlot @relation(fields: [slotId], references: [id], onDelete: Restrict)
+
+  @@index([patientId, createdAt])
+  @@index([slotId])
+}
