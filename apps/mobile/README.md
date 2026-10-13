@@ -1,8 +1,8 @@
 # HealthHub mobile (Expo + React Native + TypeScript)
 
 Patient app for Android and iOS. It talks to the same Express API as the web app (`/api/v1`) and follows
-`docs/API_CONTRACT.md`. Read `docs/MOBILE_CONTRACT_ASSUMPTIONS.md` first: the backend does not yet implement
-most patient routes, and several payload shapes are assumptions awaiting confirmation.
+`docs/API_CONTRACT.md`. Read `docs/MOBILE_CONTRACT_ASSUMPTIONS.md` first: it records which payload shapes the backend has confirmed
+(auth, patients, prescription upload/read/process) and which are still assumptions (schedules, history, QR, hospitals, appointments, corrections, PDF).
 
 > Prototype / MVP. Not a medical device. Use synthetic test data only. There is no demo or mock mode: if the
 > API is missing or unreachable the app shows that, and no action reports success unless the server confirmed it.

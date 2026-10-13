@@ -54,7 +54,8 @@ export const prescriptionApi = {
     form.append("file", { uri: file.uri, name: file.name, type: file.mimeType } as unknown as Blob);
     return request<Prescription>("/prescriptions", { method: "POST", formData: form, timeoutMs: 90_000 });
   },
-  process: (id: string) => request<Prescription>(`/prescriptions/${enc(id)}/process`, { method: "POST" }),
+  // The server reads the file inside this request (up to 30 s, backend note I5), so allow longer than the default.
+  process: (id: string) => request<Prescription>(`/prescriptions/${enc(id)}/process`, { method: "POST", timeoutMs: 45_000 }),
   correct: (id: string, body: ExtractedFieldsUpdate) =>
     request<Prescription>(`/prescriptions/${enc(id)}/extracted-fields`, { method: "PATCH", json: body }),
   /** URL + auth header for a native download; the bearer token is never put in the URL. */

@@ -2,13 +2,14 @@ import { useState } from "react";
 
 import { patientApi } from "../api/endpoints";
 import { describeError } from "../api/errors";
-import type { Patient, PatientUpdate } from "../api/types";
+import type { BloodGroup, Gender, Patient, PatientUpdate } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import { useResource } from "../hooks/useResource";
 import { useServerValue } from "../hooks/useServerValue";
-import { formatDateOnly, orDash, toDateInput } from "../lib/format";
-import { blankToNull, isFutureDateOnly, isValidDateOnly, listToText, parseList } from "../lib/validation";
-import { AppText, Banner, Button, Card, Divider, Field, Screen, Stack, TextField } from "../ui/components";
+import { formatDateOnly, orDash } from "../lib/format";
+import { BLOOD_GROUPS, GENDER_OPTIONS, genderLabel } from "../lib/profileOptions";
+import { blankToNull, dateOfBirthProblem, listProblem, listToText, parseList, phoneProblem } from "../lib/validation";
+import { AppText, Banner, Button, Card, Chip, Divider, Field, Row, Screen, Stack, TextField } from "../ui/components";
 import { ErrorState, LoadingState } from "../ui/states";
 import { space } from "../ui/theme";
 
@@ -29,12 +30,12 @@ interface Form {
 function toForm(p: Patient): Form {
   return {
     fullName: p.fullName ?? "",
-    dateOfBirth: toDateInput(p.dateOfBirth),
+    dateOfBirth: p.dateOfBirth ?? "",
     gender: p.gender ?? "",
     bloodGroup: p.bloodGroup ?? "",
     phone: p.phone ?? "",
-    emergencyContactName: p.emergencyContactName ?? "",
-    emergencyContactPhone: p.emergencyContactPhone ?? "",
+    emergencyContactName: p.emergencyContact?.name ?? "",
+    emergencyContactPhone: p.emergencyContact?.phone ?? "",
     allergies: listToText(p.allergies),
     existingConditions: listToText(p.existingConditions),
     currentMedications: listToText(p.currentMedications),
@@ -60,27 +61,29 @@ export function ProfileScreen() {
   if (!patient) return null;
 
   const set = (key: keyof Form) => (value: string) => setForm((f) => (f ? { ...f, [key]: value } : f));
-  const dobError =
-    form && form.dateOfBirth
-      ? !isValidDateOnly(form.dateOfBirth)
-        ? "Use the format YYYY-MM-DD, for example 1998-04-23."
-        : isFutureDateOnly(form.dateOfBirth)
-          ? "Date of birth can't be in the future."
-          : null
-      : null;
+  const dobError = form ? dateOfBirthProblem(form.dateOfBirth) : null;
+  const phoneError = form ? phoneProblem(form.phone) : null;
+  const emergencyPhoneError = form ? phoneProblem(form.emergencyContactPhone) : null;
+  const listErrors = form
+    ? {
+        allergies: listProblem(parseList(form.allergies)),
+        existingConditions: listProblem(parseList(form.existingConditions)),
+        currentMedications: listProblem(parseList(form.currentMedications)),
+      }
+    : null;
+  const hasErrors = Boolean(dobError || phoneError || emergencyPhoneError || (listErrors && Object.values(listErrors).some(Boolean)));
 
   async function save() {
-    if (!form || dobError) return;
+    if (!form || hasErrors) return;
     setSaving(true);
     setSaveError(null);
     const body: PatientUpdate = {
       fullName: blankToNull(form.fullName),
       dateOfBirth: blankToNull(form.dateOfBirth),
-      gender: blankToNull(form.gender),
-      bloodGroup: blankToNull(form.bloodGroup),
+      gender: (form.gender || null) as Gender | null,
+      bloodGroup: (form.bloodGroup || null) as BloodGroup | null,
       phone: blankToNull(form.phone),
-      emergencyContactName: blankToNull(form.emergencyContactName),
-      emergencyContactPhone: blankToNull(form.emergencyContactPhone),
+      emergencyContact: { name: blankToNull(form.emergencyContactName), phone: blankToNull(form.emergencyContactPhone) },
       allergies: parseList(form.allergies),
       existingConditions: parseList(form.existingConditions),
       currentMedications: parseList(form.currentMedications),
@@ -114,16 +117,31 @@ export function ProfileScreen() {
           </Banner>
           <TextField label="Full name" value={form.fullName} onChangeText={set("fullName")} autoComplete="name" />
           <TextField label="Date of birth" value={form.dateOfBirth} onChangeText={set("dateOfBirth")} error={dobError} hint="YYYY-MM-DD, for example 1998-04-23" keyboardType="numbers-and-punctuation" />
-          <TextField label="Gender" value={form.gender} onChangeText={set("gender")} />
-          <TextField label="Blood group" value={form.bloodGroup} onChangeText={set("bloodGroup")} hint="For example: B+" autoCapitalize="characters" />
-          <TextField label="Phone" value={form.phone} onChangeText={set("phone")} keyboardType="phone-pad" autoComplete="tel" />
+          <Stack gap={8}>
+            <AppText variant="label">Gender</AppText>
+            <Row style={{ flexWrap: "wrap" }}>
+              {GENDER_OPTIONS.map((g) => (
+                <Chip key={g.value} label={g.label} selected={form.gender === g.value} onPress={() => set("gender")(form.gender === g.value ? "" : g.value)} />
+              ))}
+            </Row>
+          </Stack>
+          <Stack gap={8}>
+            <AppText variant="label">Blood group</AppText>
+            <Row style={{ flexWrap: "wrap" }}>
+              {BLOOD_GROUPS.map((b) => (
+                <Chip key={b} label={b} selected={form.bloodGroup === b} onPress={() => set("bloodGroup")(form.bloodGroup === b ? "" : b)} />
+              ))}
+            </Row>
+            <AppText variant="caption" muted>Tap a selected option again to clear it.</AppText>
+          </Stack>
+          <TextField label="Phone" value={form.phone} onChangeText={set("phone")} error={phoneError} hint="For example: +91 98765 43210" keyboardType="phone-pad" autoComplete="tel" />
           <TextField label="Emergency contact name" value={form.emergencyContactName} onChangeText={set("emergencyContactName")} />
-          <TextField label="Emergency contact phone" value={form.emergencyContactPhone} onChangeText={set("emergencyContactPhone")} keyboardType="phone-pad" />
-          <TextField label="Allergies" value={form.allergies} onChangeText={set("allergies")} hint="Separate with commas" multiline />
-          <TextField label="Existing conditions" value={form.existingConditions} onChangeText={set("existingConditions")} hint="Separate with commas" multiline />
-          <TextField label="Current medications" value={form.currentMedications} onChangeText={set("currentMedications")} hint="Separate with commas" multiline />
+          <TextField label="Emergency contact phone" value={form.emergencyContactPhone} onChangeText={set("emergencyContactPhone")} error={emergencyPhoneError} keyboardType="phone-pad" />
+          <TextField label="Allergies" value={form.allergies} onChangeText={set("allergies")} error={listErrors?.allergies ?? null} hint="Separate with commas" multiline />
+          <TextField label="Existing conditions" value={form.existingConditions} onChangeText={set("existingConditions")} error={listErrors?.existingConditions ?? null} hint="Separate with commas" multiline />
+          <TextField label="Current medications" value={form.currentMedications} onChangeText={set("currentMedications")} error={listErrors?.currentMedications ?? null} hint="Separate with commas. Self-reported; not used for dose instructions." multiline />
           <TextField label="Address" value={form.address} onChangeText={set("address")} multiline />
-          <Button label="Save changes" onPress={() => void save()} loading={saving} disabled={Boolean(dobError)} />
+          <Button label="Save changes" onPress={() => void save()} loading={saving} disabled={hasErrors} />
           <Button label="Cancel" variant="ghost" onPress={() => { setEditing(false); setSaveError(null); }} disabled={saving} />
         </Stack>
       </Screen>
@@ -142,18 +160,18 @@ export function ProfileScreen() {
           <AppText variant="heading" accessibilityRole="header">Personal details</AppText>
           <Field label="Full name" value={orDash(patient.fullName)} />
           <Field label="Date of birth" value={formatDateOnly(patient.dateOfBirth)} />
-          <Field label="Gender" value={orDash(patient.gender)} />
+          <Field label="Gender" value={genderLabel(patient.gender)} />
           <Field label="Blood group" value={orDash(patient.bloodGroup)} />
           <Field label="Phone" value={orDash(patient.phone)} />
           <Field label="Address" value={orDash(patient.address)} />
           <Divider />
-          <Field label="Emergency contact" value={[patient.emergencyContactName, patient.emergencyContactPhone].filter(Boolean).join(" · ") || "Not provided"} />
+          <Field label="Emergency contact" value={[patient.emergencyContact?.name, patient.emergencyContact?.phone].filter(Boolean).join(" · ") || "Not provided"} />
         </Card>
         <Card>
           <AppText variant="heading" accessibilityRole="header">Health information (self-reported)</AppText>
-          <Field label="Allergies" value={patient.allergies?.length ? patient.allergies.join(", ") : "None listed"} />
-          <Field label="Existing conditions" value={patient.existingConditions?.length ? patient.existingConditions.join(", ") : "None listed"} />
-          <Field label="Current medications" value={patient.currentMedications?.length ? patient.currentMedications.join(", ") : "None listed"} />
+          <Field label="Allergies" value={patient.allergies.length ? patient.allergies.join(", ") : "None listed"} />
+          <Field label="Existing conditions" value={patient.existingConditions.length ? patient.existingConditions.join(", ") : "None listed"} />
+          <Field label="Current medications" value={patient.currentMedications.length ? patient.currentMedications.join(", ") : "None listed"} />
         </Card>
         <Button label="Edit profile" icon="edit-2" onPress={() => { setForm(toForm(patient)); setSaved(false); setEditing(true); }} />
         <Button label="Sign out" variant="danger" icon="log-out" loading={signingOut} onPress={() => void doSignOut()} />

@@ -6,8 +6,9 @@ import { patientApi, prescriptionApi, qrApi } from "../api/endpoints";
 import { describeError } from "../api/errors";
 import type { QrLookup, QrSession } from "../api/types";
 import { useResource } from "../hooks/useResource";
+import { describeAccessEvent } from "../lib/access";
 import { formatCountdown, formatDateOnly, formatDateTime, formatDateTime as fmt, orDash } from "../lib/format";
-import { AppText, Banner, Button, Card, Chip, DemoTag, Field, Row, Screen, Stack } from "../ui/components";
+import { AppText, Banner, Button, Card, Chip, Field, Row, Screen, Stack } from "../ui/components";
 import { ErrorState, LoadingState } from "../ui/states";
 import { colors, space } from "../ui/theme";
 
@@ -34,7 +35,8 @@ export function HealthCardScreen() {
 
   if (card.loading) return <Screen><LoadingState label="Loading your health card…" /></Screen>;
   if (card.error && !card.data) return <Screen><ErrorState error={card.error} onRetry={card.reload} /></Screen>;
-  const c = card.data ?? {};
+  const c = card.data;
+  if (!c) return null;
 
   const readable = (list.data?.items ?? []).filter((p) => p.processingStatus === "completed");
   const expired = session ? new Date(session.expiresAt).getTime() <= now.getTime() : false;
@@ -79,7 +81,6 @@ export function HealthCardScreen() {
         <Card style={{ backgroundColor: colors.primary, borderColor: colors.primary }} >
           <Row style={{ justifyContent: "space-between" }}>
             <AppText variant="caption" color="#c9d6e4">HEALTHHUB HEALTH CARD</AppText>
-            {c.demo ? <DemoTag /> : null}
           </Row>
           <AppText variant="title" color={colors.onPrimary} selectable>{orDash(c.healthId)}</AppText>
           <AppText color={colors.onPrimary}>{orDash(c.fullName)}</AppText>
@@ -89,9 +90,13 @@ export function HealthCardScreen() {
           </Row>
         </Card>
         <Card>
-          <Field label="Emergency contact" value={[c.emergencyContactName, c.emergencyContactPhone].filter(Boolean).join(" · ") || "Not provided"} />
-          <Field label="Allergies (self-reported)" value={c.allergies?.length ? c.allergies.join(", ") : "None listed"} />
-          <AppText variant="caption" muted>This card shows details you entered. It is not an official or national health ID.</AppText>
+          <AppText variant="small" muted>
+            {c.notice ?? "This is a HealthHub identifier. It is not an official or national health ID."}
+          </AppText>
+          <AppText variant="caption" muted>
+            The card shows identity details only. Allergies, conditions and your emergency contact are in Profile.
+            {c.generatedAt ? ` Generated ${formatDateTime(c.generatedAt)}.` : ""}
+          </AppText>
         </Card>
 
         <AppText variant="heading" accessibilityRole="header">Share a prescription with a QR code</AppText>
@@ -149,7 +154,7 @@ export function HealthCardScreen() {
         ) : (
           <Card>
             {access.data?.items.map((e) => (
-              <Field key={e.id} label={formatDateTime(e.occurredAt)} value={`${e.action.replace(/[._]/g, " ")}${e.outcome ? ` · ${e.outcome}` : ""}`} />
+              <Field key={e.id} label={formatDateTime(e.occurredAt)} value={describeAccessEvent(e).text} />
             ))}
           </Card>
         )}

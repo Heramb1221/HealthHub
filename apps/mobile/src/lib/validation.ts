@@ -56,3 +56,29 @@ export function blankToNull(value: string): string | null {
   const trimmed = value.trim();
   return trimmed === "" ? null : trimmed;
 }
+
+/** Backend note G3: 7 to 20 characters of digits, spaces, parentheses, hyphens, with an optional leading "+". */
+export function phoneProblem(value: string): string | null {
+  const v = value.trim();
+  if (v === "") return null;
+  if (v.length < 7 || v.length > 20 || !/^\+?[0-9\s()-]+$/.test(v)) {
+    return "Use 7 to 20 characters: digits, spaces, brackets or hyphens, with an optional leading +.";
+  }
+  return null;
+}
+
+/** Backend note G3: a real calendar date from 1900-01-01 up to today. */
+export function dateOfBirthProblem(value: string, now: Date = new Date()): string | null {
+  if (value === "") return null;
+  if (!isValidDateOnly(value)) return "Use the format YYYY-MM-DD, for example 1998-04-23.";
+  if (value < "1900-01-01") return "Date of birth can't be before 1900.";
+  if (isFutureDateOnly(value, now)) return "Date of birth can't be in the future.";
+  return null;
+}
+
+/** Backend note G3: at most 30 items of 100 characters each. */
+export function listProblem(items: string[]): string | null {
+  if (items.length > 30) return "Use at most 30 items.";
+  if (items.some((i) => i.length > 100)) return "Keep each item under 100 characters.";
+  return null;
+}
