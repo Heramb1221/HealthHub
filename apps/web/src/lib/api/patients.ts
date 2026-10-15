@@ -1,7 +1,5 @@
-import { demoPatientsApi } from "@/lib/demo/records";
 
 import { request } from "./http";
-import { pick } from "./mode";
 import type { Patient, UpdatePatientInput } from "./types";
 
 export interface PatientsApi {
@@ -14,4 +12,9 @@ const livePatientsApi: PatientsApi = {
   updateMe: (input) => request<Patient>("/patients/me", { method: "PATCH", json: input }),
 };
 
-export const patientsApi: PatientsApi = pick(livePatientsApi, demoPatientsApi);
+export const patientsApi: PatientsApi =
+  process.env.NEXT_PUBLIC_API_MODE === "live"
+    ? livePatientsApi
+    : // Required only in demo builds, so demo accounts and sample data never ship in a live bundle (see README).
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      (require("@/lib/demo/records") as typeof import("@/lib/demo/records")).demoPatientsApi;

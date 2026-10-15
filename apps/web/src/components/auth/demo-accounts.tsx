@@ -2,11 +2,16 @@ import { FlaskConical } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { IS_DEMO } from "@/lib/api/config";
-import { DEMO_ACCOUNTS } from "@/lib/demo/auth";
 
 /** Shown only in demo mode. These are synthetic accounts that exist only in this browser. */
 export function DemoAccounts() {
   if (!IS_DEMO) return null;
+  // Required only in demo builds, so the demo credentials never exist in a live build's code.
+  const DEMO_ACCOUNTS =
+    process.env.NEXT_PUBLIC_API_MODE === "live"
+      ? []
+      : // eslint-disable-next-line @typescript-eslint/no-require-imports
+        (require("@/lib/demo/auth") as typeof import("@/lib/demo/auth")).DEMO_ACCOUNTS;
   return (
     <Alert tone="demo">
       <FlaskConical aria-hidden="true" />

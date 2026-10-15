@@ -1,7 +1,5 @@
-import { demoPrescriptionsApi } from "@/lib/demo/prescriptions";
 
 import { asList, request, requestBlob } from "./http";
-import { pick } from "./mode";
 import type { CorrectionInput, Prescription, PrescriptionVersion, UploadInput, UploadResult } from "./types";
 
 export interface PrescriptionsApi {
@@ -44,4 +42,9 @@ const livePrescriptionsApi: PrescriptionsApi = {
   downloadPdf: (id) => requestBlob(`${path(id)}/pdf`),
 };
 
-export const prescriptionsApi: PrescriptionsApi = pick(livePrescriptionsApi, demoPrescriptionsApi);
+export const prescriptionsApi: PrescriptionsApi =
+  process.env.NEXT_PUBLIC_API_MODE === "live"
+    ? livePrescriptionsApi
+    : // Required only in demo builds, so demo accounts and sample data never ship in a live bundle (see README).
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      (require("@/lib/demo/prescriptions") as typeof import("@/lib/demo/prescriptions")).demoPrescriptionsApi;

@@ -1,7 +1,5 @@
-import { demoAppointmentsApi } from "@/lib/demo/hospitals";
 
 import { asList, request } from "./http";
-import { pick } from "./mode";
 import type { Appointment, BookAppointmentInput } from "./types";
 
 export interface AppointmentsApi {
@@ -24,4 +22,9 @@ const liveAppointmentsApi: AppointmentsApi = {
   cancel: (id) => request<Appointment>(`/appointments/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
 };
 
-export const appointmentsApi: AppointmentsApi = pick(liveAppointmentsApi, demoAppointmentsApi);
+export const appointmentsApi: AppointmentsApi =
+  process.env.NEXT_PUBLIC_API_MODE === "live"
+    ? liveAppointmentsApi
+    : // Required only in demo builds, so demo accounts and sample data never ship in a live bundle (see README).
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      (require("@/lib/demo/hospitals") as typeof import("@/lib/demo/hospitals")).demoAppointmentsApi;

@@ -1,8 +1,6 @@
-import { demoAuthApi } from "@/lib/demo/auth";
 
 import { isApiError } from "./errors";
 import { request } from "./http";
-import { pick } from "./mode";
 import type { AuthUser, LoginInput, RegisterInput } from "./types";
 
 export interface AuthApi {
@@ -39,4 +37,9 @@ const liveAuthApi: AuthApi = {
   },
 };
 
-export const authApi: AuthApi = pick(liveAuthApi, demoAuthApi);
+export const authApi: AuthApi =
+  process.env.NEXT_PUBLIC_API_MODE === "live"
+    ? liveAuthApi
+    : // Required only in demo builds, so demo accounts and sample data never ship in a live bundle (see README).
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      (require("@/lib/demo/auth") as typeof import("@/lib/demo/auth")).demoAuthApi;

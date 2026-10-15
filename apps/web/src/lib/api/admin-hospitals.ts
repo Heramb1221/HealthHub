@@ -1,7 +1,5 @@
-import { demoAdminHospitalsApi } from "@/lib/demo/hospitals";
 
 import { request } from "./http";
-import { pick } from "./mode";
 import type { Hospital, HospitalInput, UpdateHospitalInput } from "./types";
 
 export interface AdminHospitalsApi {
@@ -19,4 +17,9 @@ const liveAdminHospitalsApi: AdminHospitalsApi = {
   deactivate: (id) => request<Hospital>(`${path(id)}/deactivate`, { method: "POST" }),
 };
 
-export const adminHospitalsApi: AdminHospitalsApi = pick(liveAdminHospitalsApi, demoAdminHospitalsApi);
+export const adminHospitalsApi: AdminHospitalsApi =
+  process.env.NEXT_PUBLIC_API_MODE === "live"
+    ? liveAdminHospitalsApi
+    : // Required only in demo builds, so demo accounts and sample data never ship in a live bundle (see README).
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      (require("@/lib/demo/hospitals") as typeof import("@/lib/demo/hospitals")).demoAdminHospitalsApi;

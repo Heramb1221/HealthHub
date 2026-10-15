@@ -1,7 +1,5 @@
-import { demoHistoryApi } from "@/lib/demo/history";
 
 import { asList, request } from "./http";
-import { pick } from "./mode";
 import type { AddConditionInput, HistoryEntry } from "./types";
 
 export interface HistoryApi {
@@ -18,4 +16,9 @@ const liveHistoryApi: HistoryApi = {
   addCondition: (input) => request<HistoryEntry>("/health-history/conditions", { method: "POST", json: input }),
 };
 
-export const historyApi: HistoryApi = pick(liveHistoryApi, demoHistoryApi);
+export const historyApi: HistoryApi =
+  process.env.NEXT_PUBLIC_API_MODE === "live"
+    ? liveHistoryApi
+    : // Required only in demo builds, so demo accounts and sample data never ship in a live bundle (see README).
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      (require("@/lib/demo/history") as typeof import("@/lib/demo/history")).demoHistoryApi;

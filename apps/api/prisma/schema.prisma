@@ -59,6 +59,19 @@ enum AppointmentStatus {
   cancelled
 }
 
+enum DoseStatus {
+  taken
+  skipped
+}
+
+enum HistoryKind {
+  condition
+}
+
+enum HistorySource {
+  patient_reported
+}
+
 model User {
   id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email        String   @unique
@@ -73,6 +86,7 @@ model User {
   consentsReceived     Consent[]             @relation("ConsentGrantee")
   auditEvents          AuditEvent[]
   versionsAuthored     PrescriptionVersion[]
+  qrSessionsCreated    QrAccessSession[]
 }
 
 // Server-side session so logout can revoke a token (id is the token's jti).
@@ -82,6 +96,9 @@ model Session {
   createdAt DateTime  @default(now()) @db.Timestamptz(3)
   expiresAt DateTime  @db.Timestamptz(3)
   revokedAt DateTime? @db.Timestamptz(3)
+  // When the login that started this chain of refreshed sessions happened. It is copied
+  // across refreshes, so a session can never be extended past an absolute maximum age.
+  originAt  DateTime  @default(now()) @db.Timestamptz(3)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -116,6 +133,8 @@ model Patient {
   prescriptions PrescriptionRecord[]
   schedules     MedicationSchedule[]
   appointments  Appointment[]
+  qrSessions    QrAccessSession[]
+  historyEntries HealthHistoryEntry[]
 }
 
 model Consent {
@@ -174,8 +193,9 @@ model PrescriptionRecord {
   createdAt         DateTime         @default(now()) @db.Timestamptz(3)
   updatedAt         DateTime         @updatedAt @db.Timestamptz(3)
 
-  patient  Patient               @relation(fields: [patientId], references: [id], onDelete: Restrict)
-  versions PrescriptionVersion[]
+  patient    Patient               @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  versions   PrescriptionVersion[]
+  qrSessions QrAccessSession[]
 
   @@index([patientId, createdAt])
 }
@@ -224,17 +244,27 @@ model PrescriptionMedication {
   @@unique([versionId, position])
 }
 
-// PROVISIONAL: the contract defines no schedule fields. The final shape is
-// fixed in the decision note for Milestone 8, before any endpoint uses it.
+// A reminder plan the patient creates from ONE medication row of a reviewed
+// prescription version. The medication text (name .. instructions) is copied
+// from that row and can never be edited on the schedule: changing a dose means
+// correcting the prescription and creating a new schedule. Nothing here is a
+// dosing instruction; it is the record's own text plus the patient's reminder
+// choices. Integrity rules (time format, reminder limits) live in
+// prisma/migrations/*_schedules_and_dose_events.
 model MedicationSchedule {
   id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   patientId          String    @db.Uuid
-  sourceMedicationId String?   @db.Uuid
+  sourceMedicationId String    @db.Uuid
   medicationName     String
+  strength           String
   dose               String
+  route              String?
   frequency          String
+  duration           String?
+  instructions       String?
   startDate          DateTime  @db.Date
   endDate            DateTime? @db.Date
+  // Local times as HH:MM (24 hour), interpreted in `timezone`.
   reminderTimes      String[]  @default([])
   remindersEnabled   Boolean   @default(false)
   timezone           String
@@ -242,10 +272,25 @@ model MedicationSchedule {
   createdAt          DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt          DateTime  @updatedAt @db.Timestamptz(3)
 
-  patient          Patient                 @relation(fields: [patientId], references: [id], onDelete: Restrict)
-  sourceMedication PrescriptionMedication? @relation(fields: [sourceMedicationId], references: [id], onDelete: Restrict)
+  patient          Patient                @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  sourceMedication PrescriptionMedication @relation(fields: [sourceMedicationId], references: [id], onDelete: Restrict)
+  doseEvents       DoseEvent[]
 
   @@index([patientId, isActive])
+}
+
+// Self-reported by the patient. Append-only (trigger): events are never edited
+// or deleted. One event per schedule and scheduled time.
+model DoseEvent {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  scheduleId   String     @db.Uuid
+  scheduledFor DateTime   @db.Timestamptz(3)
+  status       DoseStatus
+  recordedAt   DateTime   @default(now()) @db.Timestamptz(3)
+
+  schedule MedicationSchedule @relation(fields: [scheduleId], references: [id], onDelete: Restrict)
+
+  @@unique([scheduleId, scheduledFor])
 }
 
 // PROVISIONAL fields: the contract defines no hospital fields. The final shape
@@ -297,4 +342,45 @@ model Appointment {
 
   @@index([patientId, createdAt])
   @@index([slotId])
+}
+
+// A short-lived pointer to one prescription record, shown as a QR code. The id
+// is random and is the only thing in the QR: it carries no medical data and
+// grants nothing by itself. Reading through it still requires a logged-in user
+// who passes the normal consent check, and it stops working at expiresAt or
+// once revokedAt is set (CHECK: expiresAt is after createdAt).
+model QrAccessSession {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId       String    @db.Uuid
+  prescriptionId  String    @db.Uuid
+  createdByUserId String    @db.Uuid
+  expiresAt       DateTime  @db.Timestamptz(3)
+  revokedAt       DateTime? @db.Timestamptz(3)
+  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
+
+  patient      Patient            @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  prescription PrescriptionRecord @relation(fields: [prescriptionId], references: [id], onDelete: Restrict)
+  createdBy    User               @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@index([patientId, createdAt])
+  @@index([prescriptionId])
+}
+
+// A patient-reported entry in their medical history (currently conditions). It
+// is always labelled with its source and is never verified by this system.
+// Append-only (trigger): entries are not edited or deleted.
+model HealthHistoryEntry {
+  id                 String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId          String             @db.Uuid
+  kind               HistoryKind        @default(condition)
+  title              String
+  notes              String?
+  diagnosedOn        DateTime?          @db.Date
+  source             HistorySource      @default(patient_reported)
+  verificationStatus VerificationStatus @default(unverified)
+  createdAt          DateTime           @default(now()) @db.Timestamptz(3)
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Restrict)
+
+  @@index([patientId, createdAt])
 }

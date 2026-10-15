@@ -21,6 +21,8 @@ const schema = z
     .refine((value) => /^postgres(ql)?:\/\//.test(value), { message: "must be a postgres connection string" }),
   JWT_SECRET: z.string().min(32, "must be at least 32 characters"),
   ACCESS_TOKEN_TTL_MINUTES: z.coerce.number().int().min(1).max(1440).default(60),
+  // Absolute limit on how long refreshing can keep a login alive, counted from the original login.
+  SESSION_MAX_HOURS: z.coerce.number().int().min(1).max(720).default(168),
   // Development-only login shortcut. Refused when NODE_ENV=production.
   DEV_AUTH_ENABLED: z
     .enum(["true", "false"])
@@ -37,6 +39,16 @@ const schema = z
   // not available until their terms and clinical suitability are confirmed.
   EXTRACTION_PROVIDER: z.enum(["disabled", "mock"]).default("disabled"),
   PROCESS_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(10),
+  // Base for QR payloads, e.g. "healthhub://" or "https://app.example.com/". Payloads are
+  // this base plus a random id; they never contain medical data.
+  QR_LINK_BASE: z
+    .string()
+    .default("healthhub://")
+    .refine((value) => /^[a-z][a-z0-9+.-]*:\/\/[^\s?#]*$/i.test(value) && value.endsWith("/"), {
+      message: "must look like scheme://host/ and end with a slash",
+    }),
+  QR_SESSION_TTL_MINUTES: z.coerce.number().int().min(1).max(60).default(15),
+  QR_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(30),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).default(60_000),
   RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(120),
   })

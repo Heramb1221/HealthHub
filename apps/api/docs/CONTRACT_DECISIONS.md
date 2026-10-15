@@ -420,3 +420,252 @@ other lists.
 
 I9. **Not covered by tests.** The 30 second provider timeout path is not
 exercised; waiting that long in a test was not worthwhile.
+
+## J. Corrections, PDF, QR sessions (Milestone 7)
+
+Endpoints: `PATCH /prescriptions/:id/extracted-fields`, `GET /prescriptions/:id/pdf`,
+`POST /qr/access-sessions`, `GET /qr/access-sessions/:sessionId`, and
+`DELETE /qr/access-sessions/:sessionId` (a contract addition, see J6). B5 from
+section B is implemented with the changes described here. Everything below is
+my choice where the contract is silent and needs confirmation.
+
+J1. **Corrections.** Owner patient only. Body:
+`{ baseVersionNumber, prescriptionDate?, prescriberName?, medications? }`.
+- `baseVersionNumber` is the version the client was looking at. If it is not
+  the newest version the request fails with 409 and nothing is written. Use `0`
+  when no version exists yet, which lets a patient enter data by hand for an
+  illegible or unprocessed document (this works once).
+- Omitted fields keep their current value. `medications`, when sent, replaces
+  the whole list (each row: name, strength, dose, route, frequency, duration,
+  instructions; at least one must be non-empty; at most 30 rows). Dates must be
+  real, from 1900-01-01 to today. Unknown fields, including any status, are
+  rejected.
+- The result is a NEW version (201, the version object) with
+  `kind: "patient_correction"` and `verificationStatus: "patient_corrected"`.
+  Earlier versions and the original file are never changed. This is the
+  patient's own entry or confirmation. It is not verification by a clinician,
+  and no endpoint can produce `verified_by_authorized_clinician`.
+- Sending the current values unchanged is recorded as a version with empty
+  `changedFields`, because it documents that the patient reviewed the record.
+- `changedFields` lists names only: `prescriptionDate`, `prescriberName`,
+  `medications.<row>.<field>`, `medications.<row>.added`,
+  `medications.<row>.removed` (rows compared by position). The audit event holds
+  the version numbers and these names, never values.
+- **Confidence (resolves E5, needs confirmation).** A row whose text is
+  unchanged keeps its previous confidence. A row the patient edited or added
+  gets 1, meaning "stated by a person", not "read with certainty".
+  `verificationStatus`, not confidence, says how far the data can be trusted.
+- Once a patient-entered version exists, `process` returns 409, so automatic
+  extraction can never become the latest version over what the patient entered.
+  Corrections are refused with 409 while a (non-stale) extraction run is active.
+  Corrections for one record are serialized with a row lock.
+
+J2. **PDF.** Owner patient only; providers are refused even with a consent. A
+file download, not a `{ data }` response, with `Content-Type: application/pdf`,
+`Content-Disposition: attachment; filename="healthhub-prescription-<8 hex>.pdf"`
+(no personal data in the name), and `Cache-Control: private, no-store`. Returns
+404 until a version exists. Each download writes a
+`prescription.pdf_downloaded` audit event with the version number.
+- Contents: HealthHub patient ID, prescription record ID, source label,
+  verification status, version, prescriber, date, and the stored medication
+  fields exactly as stored, plus a QR code. Every status has a visible warning
+  (needs review, unverified, corrected by patient and not clinician-verified).
+  Uncertain extracted rows are marked "NEEDS CHECKING". The document never
+  composes a dosing instruction, and states it is not a prescription and the
+  HealthHub ID is not an official national health ID.
+- The PDF's QR contains `QR_LINK_BASE` + `prescription/<record id>` and nothing
+  else. It does not expire, but it is not a credential: opening it still
+  requires login and consent. Please confirm the link format with the web and
+  mobile code (`QR_LINK_BASE`, default `healthhub://`).
+- **Limitation:** only standard Latin-1 fonts are used, so other scripts
+  (for example Devanagari) are printed as "?". Names and drug names in such
+  scripts need an embedded font, which is not included.
+
+J3. **QR sessions.** Created by the owning patient for one of their
+prescriptions. Response: `{ id, prescriptionId, qrPayload, expiresAt, revokedAt,
+createdAt }` where `qrPayload` is `QR_LINK_BASE` + `qr/<random id>`.
+- **Lifetime:** `QR_SESSION_TTL_MINUTES`, default 15, allowed 1 to 60. Creation
+  is rate-limited (`QR_RATE_LIMIT_MAX`, default 30 per window per IP).
+- **Reading:** any logged-in user may try. The session id alone grants nothing.
+  The reader must pass the normal consent check (owner, or provider with a live
+  `prescriptions:read` consent), on every read. The response is only
+  `{ session: { id, expiresAt }, prescription }`: the prescription as it is now
+  (latest version, with its verification status), with no profile data. Admins
+  are never allowed. Responses are `Cache-Control: private, no-store`.
+- **Expiry and revocation:** an unknown, expired, or revoked session returns the
+  same 404, so they cannot be told apart. Revoking a consent ends provider
+  access through every session at once (the consent is checked on each read).
+- **Audit:** `qr.session_created`, `qr.session_revoked`, and, for provider reads,
+  `access.granted` or `access.denied` with resource type `qr_session`.
+- **Open product question:** a QR scan does NOT create access by itself. A
+  provider still needs a consent. If you want "showing the QR" to be the
+  patient's consent for that provider, that is a different model and needs a
+  decision before it is built.
+
+J4. **Access history** now also lists `prescription.corrected`,
+`qr.session_created`, and `qr.session_revoked`, and may show `versionNumber`
+in `details`. This extends G7.
+
+J5. **Request logging changed.** Logs now record the route pattern
+(`/api/v1/qr/access-sessions/:sessionId`) instead of the real URL. Record ids,
+session ids, and query strings never appear in logs. I made this change after a
+live check showed QR session ids in the request log.
+
+J6. **Contract additions needing confirmation:** `DELETE
+/qr/access-sessions/:sessionId`, because the contract requires explicit
+revocation behavior but lists no endpoint for it (see also F2 for dev-login).
+
+J7. **Known gaps.** Expired sessions are not deleted (a cleanup job is not
+built). A version-number collision between simultaneous corrections is mapped
+to 409 as a safeguard, but with the row lock in place it cannot be triggered, so
+that mapping is untested. The simultaneous-corrections test does not truly
+overlap in the database; the lock itself is verified separately by a test that
+holds a conflicting lock.
+
+## K. Medication schedules and dose events (Milestone 8)
+
+Endpoints: `GET /medication-schedules`, `POST /medication-schedules`,
+`PATCH /medication-schedules/:scheduleId`,
+`POST /medication-schedules/:scheduleId/dose-events`. Patients only: providers
+and admins are refused, even with a `medication_schedules:read` consent (that
+scope exists but no endpoint uses it yet). The contract defines no fields, so
+everything below is my choice and needs confirmation. Not built: the contract's
+two health-history endpoints (see K8).
+
+K1. **What a schedule is.** A reminder plan the patient makes from ONE medication
+row of a prescription. The row's text (name, strength, dose, route, frequency,
+duration, instructions) is copied and can never be edited on the schedule.
+Changing a dose means correcting the prescription and making a new schedule. The
+system never composes or derives a dosing instruction; it shows the record's own
+words plus the patient's reminder choices. Every schedule carries a `notice`
+saying it is a reminder plan, not medical advice.
+
+K2. **Create** (`POST`, 201). Body: `{ prescriptionId, versionNumber,
+medicationPosition, startDate, endDate?, reminderTimes?, remindersEnabled?,
+timezone }`. It is refused with 409 unless ALL of these hold:
+- the newest version has been reviewed by a person: `patient_corrected` or
+  `verified_by_authorized_clinician`. `unverified` and `needs_review` are never
+  enough, however confident the automatic reading;
+- the row has a name, strength, dose, and frequency, each containing a letter or
+  digit (so "???" does not count);
+- the row's confidence is at least 0.85. For a patient-reviewed version that
+  means the row was edited, added, confirmed, or read confidently and left alone;
+- `versionNumber` is the newest version, so a patient can only schedule the row
+  they actually saw (a stale version is refused);
+- the medication does not already have an active schedule, and the patient has
+  fewer than 50 active schedules. Changes are serialized per patient with a row
+  lock.
+Each refusal writes a `schedule.refused` audit event with a reason code
+(`not_reviewed`, `incomplete`, `low_confidence`, `version_changed`, `no_version`)
+and no medical content.
+
+K3. **Change to Milestone 7 (corrections).** A medication row in a correction may
+carry `confirmed: true`: "I checked this row against the original prescription".
+It raises an unchanged row to confidence 1 and is recorded in `changedFields` as
+`medications.<row>.confirmed`. Without it, an unreadable row the patient
+re-submits unchanged would keep its low confidence and could never become
+schedulable. This amends J1.
+
+K4. **Input rules.** Dates are real dates; `startDate` from 30 days ago to 365
+days ahead; `endDate` not before the start and within 10 years. `reminderTimes`
+are local `HH:MM`, at most 12, de-duplicated and sorted. Reminders cannot be
+enabled without at least one time. `timezone` must be an `Area/Location` IANA
+name or UTC (canonicalised). Abbreviations such as IST (India, Israel, and
+Ireland all use it) and legacy fixed-offset names such as EST are refused.
+
+K5. **Update** (`PATCH`, 200). Only `reminderTimes`, `remindersEnabled`,
+`timezone`, `endDate`, and `isActive` can change. Any other field, including any
+medication text or `startDate`, is rejected with 400 even when sent alongside a
+valid field. A request that changes nothing writes nothing. Updates write a
+`schedule.updated` audit event with field names only. A stopped schedule can be
+switched back on only if no other schedule is active for that medication and the
+prescription still says what the schedule was made from. Someone else's schedule
+returns 404.
+
+K6. **When the prescription changes.** Each schedule reports `sourceStatus`:
+`current`, `changed` (the medication differs now), or `removed`. An unrelated
+edit (such as the prescriber) leaves it `current`. The schedule keeps showing the
+text it was made from. `remindersActive` is the one flag clients should use to
+decide whether to remind: it is true only when the schedule is active, reminders
+are enabled, the source is `current`, and today (in the schedule's time zone) is
+within its dates. The backend sends no notifications itself.
+
+K7. **Dose events** (`POST .../dose-events`, 201). Body `{ scheduledFor, status }`
+with `scheduledFor` an ISO instant with an offset and `status` `taken` or
+`skipped`. They are self-reported and always labelled `selfReported: true`; nothing
+treats them as verified. One event per schedule and time (a repeat returns 409),
+and events cannot be edited or deleted (database trigger), so a mistaken entry
+cannot be corrected yet. The time must fall inside the schedule's dates (in its
+time zone) and no more than one hour in the future, and the schedule must be
+active. The contract has no read endpoint for events, so each schedule includes
+`recentDoseEvents` (last 14 days, at most 20). Dose events are not audited, to
+avoid log noise; each carries its own timestamp.
+
+K8. **Not built.** `GET /health-history` and `POST /health-history/conditions`
+are in the contract but not in this milestone. A schedule for a medication taken
+"as needed" gets no special handling: reminders are only what the patient sets.
+
+K9. **Logging note.** Error log lines show the route pattern without the
+`/api/v1` prefix (for example `/:scheduleId`), because the router has already
+unwound by then. No ids or content appear either way.
+
+## L. Hospitals, appointments, health history, refresh, demo seed (Milestones 9 and 10)
+
+L1. **`POST /auth/refresh` (amends A3).** Now implemented, because the contract lists
+it. There is no separate refresh token. A still-valid access token is exchanged for a
+fresh one: the old session is revoked in the same step (so a token refreshes once), the
+role is re-read from the database, and a deactivated user cannot refresh. Every
+refreshed session keeps the ORIGINAL login time, and no token outlives
+`SESSION_MAX_HOURS` (default 168, i.e. 7 days) from that login, so refreshing cannot
+keep a login alive forever. No body is accepted. It shares the login rate limit.
+
+L2. **Hospitals.** `GET /hospitals`, `GET /hospitals/:id`, and
+`GET /hospitals/:id/availability` are open to any signed-in user. Only active hospitals
+are visible; an admin can see inactive ones (`includeInactive=true`, which is 403 for
+anyone else). Filters: `q` (name contains), `city` (equals, any case), `specialty`
+(exact). `isDemo` is part of every hospital so clients can label demo data.
+Admin routes (`POST /admin/hospitals`, `PATCH /admin/hospitals/:id`,
+`POST /admin/hospitals/:id/deactivate`) are admin-only and audited with field names
+only. A client can never set `isDemo` (admin-created hospitals are never demo) and an
+admin has no access to any medical record. Deactivating stops new bookings and hides the
+hospital from non-admins, but does NOT cancel existing appointments. `PATCH` accepts
+`isActive` so a hospital can be reactivated (the contract has no activate endpoint).
+
+L3. **Availability.** The contract has no slot-creation endpoint, so slots exist only
+through the seed (the spec says "seeded slots"). The listing shows upcoming slots only,
+each as `open` or `booked`, never who booked it. Default window is the next 14 days,
+at most 31 days per request, paged.
+
+L4. **Appointments** (patients only). `POST /appointments` takes only `{ slotId }`. The
+patient comes from the session; status, price, and availability are never read from the
+client. Whether a slot is free is NOT checked and then acted on: the insert claims the
+slot through a unique database column, and a violation returns 409 ("no longer
+available"), so simultaneous bookings cannot both succeed. Also refused with 409: past
+slots, deactivated hospitals, a second appointment overlapping one the patient already
+has (back-to-back is fine), and more than 10 upcoming appointments (my limits).
+`GET /appointments` (own only, optional `status`) and `POST /appointments/:id/cancel`
+(frees the slot; repeating it changes nothing; past appointments cannot be cancelled;
+someone else's appointment is a 404). Appointments are the patient's own and are not
+visible to admins or providers.
+
+L5. **Health history.** `POST /health-history/conditions` (patient only) adds an entry
+`{ title, notes?, diagnosedOn? }`, always stored as `source: patient_reported` and
+`verificationStatus: unverified`. Entries cannot be edited or deleted (database trigger;
+the contract has no endpoint for it, so a mistaken entry cannot be corrected yet) and a
+patient is limited to 200. `GET /health-history` returns the owner's entries; a
+provider must pass `?patientId=` and hold a live `health_history:read` consent
+(checked and audited on every read). Admins never.
+
+L6. **Demo seed** (`npm run seed:demo`). Needs `DEMO_SEED_PASSWORD` (12+ characters) and
+refuses `NODE_ENV=production` unless `ALLOW_DEMO_SEED=true`. It creates four accounts at
+`@demo.healthhub.test` (admin, provider, patient1, patient2, all sharing that password),
+three hospitals flagged `isDemo` and named "(demo data)", 14 days of slots, two synthetic
+prescriptions (patient1 `unverified`, patient2 `needs_review`) made through the real
+upload and extraction code, a demo consent from patient1 to the provider, and one history
+entry. It is idempotent, never edits or removes existing data, and every fictional name is
+labelled "(synthetic)" or "(demo data)".
+
+L7. **Not built, on purpose.** Payments (`POST /payment-orders`,
+`POST /payments/webhooks/:provider`): the contract says they are not required for the core
+MVP, and no wallet or payment flow was to be built. External OCR/AI (Gemini) stays
+disabled.

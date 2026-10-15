@@ -31,12 +31,15 @@ describe.skipIf(!TEST_DATABASE_URL)("database schema integrity", () => {
       "AuditEvent",
       "AvailabilitySlot",
       "Consent",
+      "DoseEvent",
+      "HealthHistoryEntry",
       "Hospital",
       "MedicationSchedule",
       "Patient",
       "PrescriptionMedication",
       "PrescriptionRecord",
       "PrescriptionVersion",
+      "QrAccessSession",
       "Session",
       "User",
     ]);
@@ -172,6 +175,81 @@ describe.skipIf(!TEST_DATABASE_URL)("database schema integrity", () => {
       expect(
         await sqlState(h.pg.query(`UPDATE "PrescriptionRecord" SET "originalSha256" = 'other' WHERE "id" = $1`, [record.id])),
       ).toBe("55000");
+    });
+  });
+
+  describe("QR access sessions", () => {
+    it("must expire after they are created, and need real references", async () => {
+      const { patient, user } = await makePatient(h.db);
+      const record = await makePrescription(h.db, patient.id);
+      const base = { patientId: patient.id, prescriptionId: record.id, createdByUserId: user.id };
+      const ok = await h.db.qrAccessSession.create({ data: { ...base, expiresAt: new Date(Date.now() + 60_000) } });
+      expect(ok.revokedAt).toBeNull();
+      expect(ok.id).toMatch(/^[0-9a-f-]{36}$/);
+      // expiresAt before createdAt violates the CHECK constraint
+      expect(
+        await sqlState(
+          h.pg.query(
+            `INSERT INTO "QrAccessSession"("patientId","prescriptionId","createdByUserId","expiresAt") VALUES ($1,$2,$3, now() - interval '1 minute')`,
+            [patient.id, record.id, user.id],
+          ),
+        ),
+      ).toBe("23514");
+      // dangling references are refused
+      expect(
+        await sqlState(
+          h.pg.query(
+            `INSERT INTO "QrAccessSession"("patientId","prescriptionId","createdByUserId","expiresAt") VALUES ($1, gen_random_uuid(), $2, now() + interval '1 hour')`,
+            [patient.id, user.id],
+          ),
+        ),
+      ).toBe("23503");
+    });
+  });
+
+  describe("medication schedules and dose events", () => {
+    async function schedule() {
+      const { patient } = await makePatient(h.db);
+      const record = await makePrescription(h.db, patient.id);
+      const version = await h.db.prescriptionVersion.create({
+        data: { prescriptionId: record.id, versionNumber: 1, kind: "patient_correction", verificationStatus: "patient_corrected", medications: { create: [{ position: 0, name: "X", confidence: 1 }] } },
+        include: { medications: true },
+      });
+      return { patient, medicationId: version.medications[0]?.id as string };
+    }
+    const insert = (patientId: string, medicationId: string | null, extra = `'UTC'`, cols = `"timezone"`) =>
+      h.pg.query(
+        `INSERT INTO "MedicationSchedule"("patientId","sourceMedicationId","medicationName","strength","dose","frequency","startDate",${cols},"updatedAt")
+         VALUES ($1,$2,'n','s','d','f','2026-10-01',${extra}, now())`,
+        [patientId, medicationId],
+      );
+
+    it("refuses bad dates, bad reminder times, and reminders with no times", async () => {
+      const { patient, medicationId } = await schedule();
+      expect(await sqlState(insert(patient.id, medicationId))).toBeUndefined();
+      expect(await sqlState(insert(patient.id, medicationId, `'UTC','2026-09-30'`, `"timezone","endDate"`))).toBe("23514");
+      expect(await sqlState(insert(patient.id, medicationId, `'UTC',true`, `"timezone","remindersEnabled"`))).toBe("23514");
+      for (const bad of ["{24:00}", "{8:00}", "{12:60}", "{08:00:00}", "{08:00,bad}"]) {
+        expect(await sqlState(insert(patient.id, medicationId, `'UTC','${bad}'`, `"timezone","reminderTimes"`)), bad).toBe("23514");
+      }
+      const thirteen = `{${Array.from({ length: 13 }, (_, i) => `0${i % 10}:00`).join(",")}}`;
+      expect(await sqlState(insert(patient.id, medicationId, `'UTC','${thirteen}'`, `"timezone","reminderTimes"`))).toBe("23514");
+      expect(await sqlState(insert(patient.id, medicationId, `'UTC','{08:00,20:00}',true`, `"timezone","reminderTimes","remindersEnabled"`))).toBeUndefined();
+    });
+
+    it("requires a source medication", async () => {
+      const { patient } = await schedule();
+      expect(await sqlState(insert(patient.id, null))).toBe("23502");
+    });
+
+    it("keeps one dose event per schedule and time", async () => {
+      const { patient, medicationId } = await schedule();
+      const s = await h.db.medicationSchedule.create({
+        data: { patientId: patient.id, sourceMedicationId: medicationId, medicationName: "n", strength: "s", dose: "d", frequency: "f", startDate: new Date("2026-10-01"), timezone: "UTC" },
+      });
+      const when = new Date("2026-10-05T08:00:00Z");
+      await h.db.doseEvent.create({ data: { scheduleId: s.id, scheduledFor: when, status: "taken" } });
+      await expect(h.db.doseEvent.create({ data: { scheduleId: s.id, scheduledFor: when, status: "skipped" } })).rejects.toMatchObject({ code: "P2002" });
     });
   });
 
