@@ -3,10 +3,11 @@ import { rateLimit } from "express-rate-limit";
 import type { Env } from "../../config/env.js";
 import type { Db } from "../../db/client.js";
 import { AppError } from "../../lib/errors.js";
+import { z } from "zod";
 import { parse } from "../../lib/validate.js";
 import { authenticate, requireAuth } from "../../middleware/authenticate.js";
 import { devLoginSchema, loginSchema, registerSchema } from "./schemas.js";
-import { devLogin, login, logout, register } from "./service.js";
+import { devLogin, login, logout, refresh, register } from "./service.js";
 
 export function createAuthRouter(db: Db, env: Env): Router {
   const router = Router();
@@ -30,6 +31,14 @@ export function createAuthRouter(db: Db, env: Env): Router {
     const input = parse(loginSchema, req.body);
     const result = await login(db, env, input, { requestId: req.requestId });
     res.json({ data: result });
+  });
+
+  // No body: the bearer token is the only input. Strict, so junk is rejected rather than ignored.
+  router.post("/refresh", credentialLimiter, authenticate(db, env), async (req, res) => {
+    parse(z.strictObject({}), req.body ?? {});
+    const auth = requireAuth(req);
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ data: await refresh(db, env, auth, { requestId: req.requestId }) });
   });
 
   router.post("/logout", authenticate(db, env), async (req, res) => {

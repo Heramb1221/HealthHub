@@ -5,13 +5,19 @@ import helmet from "helmet";
 import type { Env } from "./config/env.js";
 import { AppError } from "./lib/errors.js";
 import { log } from "./lib/logger.js";
+import { routeLabel } from "./lib/routeLabel.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { notFound } from "./middleware/notFound.js";
 import { requestId } from "./middleware/requestId.js";
 import type { Db } from "./db/client.js";
 import { createAuthRouter } from "./modules/auth/routes.js";
 import { createConsentRouter } from "./modules/consents/routes.js";
+import { createAppointmentRouter } from "./modules/appointments/routes.js";
+import { createHistoryRouter } from "./modules/history/routes.js";
+import { createAdminHospitalRouter, createHospitalRouter } from "./modules/hospitals/routes.js";
 import { createPatientRouter } from "./modules/patients/routes.js";
+import { createQrRouter } from "./modules/qr/routes.js";
+import { createScheduleRouter } from "./modules/schedules/routes.js";
 import { createPrescriptionRouter } from "./modules/prescriptions/routes.js";
 import type { ExtractionProvider } from "./extraction/types.js";
 import type { PrivateFileStore } from "./storage/types.js";
@@ -56,7 +62,7 @@ export function createApp(env: Env, register?: (router: Router) => void, deps: A
       log("info", "request", {
         requestId: req.requestId,
         method: req.method,
-        path: req.originalUrl.split("?")[0] ?? "",
+        route: routeLabel(req),
         status: res.statusCode,
         ms: Date.now() - started,
       });
@@ -81,6 +87,12 @@ export function createApp(env: Env, register?: (router: Router) => void, deps: A
     api.use("/auth", createAuthRouter(deps.db, env));
     api.use("/consents", createConsentRouter(deps.db, env));
     api.use("/patients", createPatientRouter(deps.db, env));
+    api.use("/qr/access-sessions", createQrRouter(deps.db, env));
+    api.use("/medication-schedules", createScheduleRouter(deps.db, env));
+    api.use("/hospitals", createHospitalRouter(deps.db, env));
+    api.use("/admin/hospitals", createAdminHospitalRouter(deps.db, env));
+    api.use("/appointments", createAppointmentRouter(deps.db, env));
+    api.use("/health-history", createHistoryRouter(deps.db, env));
     if (deps.store) api.use("/prescriptions", createPrescriptionRouter(deps.db, env, deps.store, deps.extraction ?? null));
   }
   register?.(api);

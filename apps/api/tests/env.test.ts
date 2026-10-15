@@ -73,4 +73,10 @@ describe("loadEnv", () => {
     }
     expect(loadEnv({ ...DB, NODE_ENV: "production" }).NODE_ENV).toBe("production");
   });
+
+  it("bounds the absolute session age", () => {
+    expect(loadEnv({ ...DB }).SESSION_MAX_HOURS).toBe(168);
+    for (const bad of ["0", "721", "-1", "1.5", "abc"]) expect(() => loadEnv({ ...DB, SESSION_MAX_HOURS: bad }), bad).toThrow(EnvError);
+    expect(loadEnv({ ...DB, SESSION_MAX_HOURS: "720" }).SESSION_MAX_HOURS).toBe(720);
+  });
 });

@@ -20,6 +20,7 @@ export function testEnv(url: string, overrides: Record<string, string> = {}): En
     AUTH_RATE_LIMIT_MAX: "100000",
     UPLOAD_RATE_LIMIT_MAX: "100000",
     PROCESS_RATE_LIMIT_MAX: "100000",
+    QR_RATE_LIMIT_MAX: "100000",
     ...overrides,
   });
 }

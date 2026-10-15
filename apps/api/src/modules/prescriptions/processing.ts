@@ -16,6 +16,13 @@ interface Ctx {
 export const PROCESSING_STALE_MS = 5 * 60_000;
 const EXTRACTION_TIMEOUT_MS = 30_000;
 
+/** Raised when patient-entered data appears while a run is in flight; the run must release its claim. */
+class PatientEntriesExistError extends AppError {
+  constructor() {
+    super("CONFLICT", "This prescription already has patient-entered data");
+  }
+}
+
 type FailureReason = "original_file_missing" | "unrecognized_input" | "provider_error" | "invalid_output";
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -62,6 +69,10 @@ export async function processPrescription(
     throw new AppError("PROVIDER_DISABLED");
   }
 
+  // Automatic extraction would become the "latest" version and bury what the patient entered.
+  const patientEntries = await db.prescriptionVersion.count({ where: { prescriptionId, kind: "patient_correction" } });
+  if (patientEntries > 0) throw new PatientEntriesExistError();
+
   const claimed = await db.prescriptionRecord.updateMany({
     where: {
       id: prescriptionId,
@@ -104,50 +115,66 @@ export async function processPrescription(
   if (!gated.ok) return fail("invalid_output");
   const result = gated.value;
 
-  await db.$transaction(async (tx) => {
-    const latest = await tx.prescriptionVersion.aggregate({ where: { prescriptionId }, _max: { versionNumber: true } });
-    const versionNumber = (latest._max.versionNumber ?? 0) + 1;
+  try {
+    await db.$transaction(async (tx) => {
+      // Same lock corrections take, so the two can never interleave on one record.
+      await tx.$queryRaw`SELECT "id" FROM "PrescriptionRecord" WHERE "id" = ${prescriptionId}::uuid FOR UPDATE`;
+      const patientEntriesNow = await tx.prescriptionVersion.count({ where: { prescriptionId, kind: "patient_correction" } });
+      if (patientEntriesNow > 0) throw new PatientEntriesExistError();
 
-    await tx.prescriptionVersion.create({
-      data: {
-        prescriptionId,
-        versionNumber,
-        kind: "extraction",
-        verificationStatus: result.verificationStatus,
-        extractionProvider: provider.name,
-        extractionConfidence: result.overallConfidence,
-        prescriptionDate: result.prescriptionDate,
-        prescriberName: result.prescriberName,
-        changedFields: [],
-        createdByUserId: null,
-        medications: { create: result.medications.map((medication, position) => ({ position, ...medication })) },
-      },
-    });
+      const latest = await tx.prescriptionVersion.aggregate({ where: { prescriptionId }, _max: { versionNumber: true } });
+      const versionNumber = (latest._max.versionNumber ?? 0) + 1;
 
-    // Still our claim? If another call reclaimed a stale run, abandon this one.
-    const completed = await tx.prescriptionRecord.updateMany({
-      where: { id: prescriptionId, processingStatus: "processing" },
-      data: { processingStatus: "completed" },
-    });
-    if (completed.count !== 1) throw new AppError("CONFLICT", "Prescription cannot be processed in its current state");
+      await tx.prescriptionVersion.create({
+        data: {
+          prescriptionId,
+          versionNumber,
+          kind: "extraction",
+          verificationStatus: result.verificationStatus,
+          extractionProvider: provider.name,
+          extractionConfidence: result.overallConfidence,
+          prescriptionDate: result.prescriptionDate,
+          prescriberName: result.prescriberName,
+          changedFields: [],
+          createdByUserId: null,
+          medications: { create: result.medications.map((medication, position) => ({ position, ...medication })) },
+        },
+      });
 
-    await recordAudit(tx, {
-      action: "prescription.processed",
-      outcome: "success",
-      actorUserId: auth.userId,
-      patientId,
-      resourceType: "prescription",
-      resourceId: prescriptionId,
-      requestId: ctx.requestId,
-      // Provider, version, status, and reason CODES only. No medical content.
-      metadata: {
-        provider: provider.name,
-        versionNumber,
-        verificationStatus: result.verificationStatus,
-        reviewReasons: result.reviewReasons,
-      },
+      // Still our claim? If another call reclaimed a stale run, abandon this one.
+      const completed = await tx.prescriptionRecord.updateMany({
+        where: { id: prescriptionId, processingStatus: "processing" },
+        data: { processingStatus: "completed" },
+      });
+      if (completed.count !== 1) throw new AppError("CONFLICT", "Prescription cannot be processed in its current state");
+
+      await recordAudit(tx, {
+        action: "prescription.processed",
+        outcome: "success",
+        actorUserId: auth.userId,
+        patientId,
+        resourceType: "prescription",
+        resourceId: prescriptionId,
+        requestId: ctx.requestId,
+        // Provider, version, status, and reason CODES only. No medical content.
+        metadata: {
+          provider: provider.name,
+          versionNumber,
+          verificationStatus: result.verificationStatus,
+          reviewReasons: result.reviewReasons,
+        },
+      });
     });
-  });
+  } catch (err) {
+    // Patient data arrived mid-run: give the record back instead of leaving it "processing".
+    if (err instanceof PatientEntriesExistError) {
+      await db.prescriptionRecord.updateMany({
+        where: { id: prescriptionId, processingStatus: "processing" },
+        data: { processingStatus: "failed" },
+      });
+    }
+    throw err;
+  }
 
   return getPrescription(db, prescriptionId);
 }

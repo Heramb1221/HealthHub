@@ -175,10 +175,13 @@ const ACCESS_HISTORY_ACTIONS = [
   "consent.created",
   "consent.revoked",
   "patient.profile_updated",
+  "prescription.corrected",
+  "qr.session_created",
+  "qr.session_revoked",
 ];
 
 // Only these metadata keys are shown to the patient.
-const SHOWN_METADATA = ["resourceScope", "reason", "changedFields", "consentId", "granteeUserId"];
+const SHOWN_METADATA = ["resourceScope", "reason", "changedFields", "consentId", "granteeUserId", "versionNumber"];
 
 export interface AccessEventDto {
   id: string;
@@ -189,7 +192,7 @@ export interface AccessEventDto {
   actor: { type: "self" | "provider" | "other"; userId?: string };
   resourceType: string | null;
   resourceId: string | null;
-  details: Record<string, string | string[]>;
+  details: Record<string, string | number | string[]>;
 }
 
 export async function listAccessHistory(
@@ -226,12 +229,12 @@ export async function listAccessHistory(
     else if (row.actor?.role === "provider" && row.actorUserId) actor = { type: "provider", userId: row.actorUserId };
     else actor = { type: "other" };
 
-    const details: Record<string, string | string[]> = {};
+    const details: Record<string, string | number | string[]> = {};
     const meta = (row.metadata ?? {}) as Record<string, unknown>;
     for (const key of SHOWN_METADATA) {
       const value = meta[key];
-      if (typeof value === "string" || (Array.isArray(value) && value.every((v) => typeof v === "string"))) {
-        details[key] = value as string | string[];
+      if (typeof value === "string" || typeof value === "number" || (Array.isArray(value) && value.every((v) => typeof v === "string"))) {
+        details[key] = value as string | number | string[];
       }
     }
     return {

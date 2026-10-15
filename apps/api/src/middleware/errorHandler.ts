@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import { ZodError } from "zod";
 import { AppError, errorMessage, errorStatus, type ErrorCode } from "../lib/errors.js";
 import { log } from "../lib/logger.js";
+import { routeLabel } from "../lib/routeLabel.js";
 
 function send(res: Response, requestId: string, code: ErrorCode, message?: string): void {
   res.status(errorStatus(code)).json({
@@ -38,7 +39,7 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
   log("error", "unhandled error", {
     requestId,
     method: req.method,
-    path: req.originalUrl.split("?")[0] ?? "",
+    route: routeLabel(req),
     errorName: err instanceof Error ? err.name : "unknown",
   });
   send(res, requestId, "INTERNAL_ERROR");

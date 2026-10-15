@@ -1,14 +1,9 @@
 import { z } from "zod";
+import { hasNoControlChars, parseDateOnly } from "../../lib/text.js";
 
 export const GENDERS = ["female", "male", "other", "prefer_not_to_say"] as const;
 export const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"] as const;
 
-// No control characters (newlines, tabs, NUL) in any free-text field.
-const hasNoControlChars = (value: string): boolean =>
-  [...value].every((char) => {
-    const code = char.codePointAt(0) ?? 0;
-    return code >= 32 && code !== 127;
-  });
 const PHONE = /^\+?[0-9][0-9 ()-]{5,18}[0-9]$/;
 
 const text = (max: number) => z.string().trim().min(1).max(max).refine(hasNoControlChars);
@@ -29,13 +24,6 @@ const list = z
   });
 
 const MIN_DOB = "1900-01-01";
-
-/** Parses YYYY-MM-DD as a UTC date. Returns null instead of throwing for anything that is not a real date. */
-const parseDateOnly = (value: string): Date | null => {
-  const date = new Date(`${value}T00:00:00.000Z`);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toISOString().slice(0, 10) === value ? date : null;
-};
 
 // Refinements may still run after the format check fails, so none of them may throw.
 const dateOfBirth = z.iso

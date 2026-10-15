@@ -9,6 +9,8 @@ import { authenticate, requireAuth, requireRole } from "../../middleware/authent
 import type { ExtractionProvider } from "../../extraction/types.js";
 import type { PrivateFileStore } from "../../storage/types.js";
 import { requirePatientAccess } from "../access/patientAccess.js";
+import { correctionSchema, correctPrescription } from "./corrections.js";
+import { generatePrescriptionPdf } from "./pdf.js";
 import { processPrescription } from "./processing.js";
 import { createPrescription, getPrescription, listPrescriptions } from "./service.js";
 import { parseUpload } from "./upload.js";
@@ -101,6 +103,38 @@ export function createPrescriptionRouter(
       { requestId: req.requestId },
     );
     res.json({ data: prescription });
+  });
+
+  // A patient's correction or confirmation becomes a NEW version; nothing is overwritten.
+  router.patch("/:prescriptionId/extracted-fields", requireRole("patient"), accessGuard(), async (req, res) => {
+    const access = req.access;
+    if (!access) throw new AppError("FORBIDDEN");
+    const input = parse(correctionSchema, req.body);
+    const version = await correctPrescription(
+      db,
+      requireAuth(req),
+      { prescriptionId: uuidParam(req.params.prescriptionId), patientId: access.patientId },
+      input,
+      { requestId: req.requestId },
+    );
+    res.status(201).json({ data: version });
+  });
+
+  // A file download, not a JSON response. Owner only, never cached.
+  router.get("/:prescriptionId/pdf", requireRole("patient"), accessGuard(), async (req, res) => {
+    const access = req.access;
+    if (!access) throw new AppError("FORBIDDEN");
+    const { bytes, filename } = await generatePrescriptionPdf(
+      { db, env },
+      requireAuth(req),
+      { prescriptionId: uuidParam(req.params.prescriptionId), patientId: access.patientId },
+      { requestId: req.requestId },
+    );
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Cache-Control", "private, no-store");
+    res.setHeader("Content-Length", String(bytes.length));
+    res.end(bytes);
   });
 
   return router;

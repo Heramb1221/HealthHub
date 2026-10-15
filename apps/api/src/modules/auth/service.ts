@@ -27,9 +27,15 @@ function isUniqueViolation(err: unknown): boolean {
   return typeof err === "object" && err !== null && (err as { code?: unknown }).code === "P2002";
 }
 
+/** A token never outlives the absolute maximum session age, counted from the original login. */
+function sessionExpiry(env: Env, originAt: Date): Date {
+  return new Date(Math.min(Date.now() + env.ACCESS_TOKEN_TTL_MINUTES * 60_000, originAt.getTime() + env.SESSION_MAX_HOURS * 3_600_000));
+}
+
 async function issueSession(db: Db, env: Env, user: { id: string; email: string; role: UserRole }): Promise<AuthResult> {
-  const expiresAt = new Date(Date.now() + env.ACCESS_TOKEN_TTL_MINUTES * 60_000);
-  const session = await db.session.create({ data: { userId: user.id, expiresAt }, select: { id: true } });
+  const originAt = new Date();
+  const expiresAt = sessionExpiry(env, originAt);
+  const session = await db.session.create({ data: { userId: user.id, expiresAt, originAt }, select: { id: true } });
   const accessToken = await signAccessToken(env.JWT_SECRET, { userId: user.id, sessionId: session.id }, expiresAt);
   return { user, accessToken, expiresAt: expiresAt.toISOString() };
 }
@@ -120,4 +126,38 @@ export async function devLogin(db: Db, env: Env, input: { email: string }, ctx: 
 export async function logout(db: Db, auth: { userId: string; sessionId: string }, ctx: Ctx): Promise<void> {
   await db.session.updateMany({ where: { id: auth.sessionId, revokedAt: null }, data: { revokedAt: new Date() } });
   await recordAudit(db, { action: "auth.logout", outcome: "success", actorUserId: auth.userId, requestId: ctx.requestId });
+}
+
+/**
+ * Exchanges a still-valid access token for a fresh one. The old session is revoked in the same
+ * step, so a token can be refreshed only once, and the new session keeps the ORIGINAL login time:
+ * refreshing can never extend a login past SESSION_MAX_HOURS. The role is read from the database
+ * again, and a deactivated user cannot refresh.
+ */
+export async function refresh(db: Db, env: Env, auth: { userId: string; sessionId: string }, ctx: Ctx): Promise<AuthResult> {
+  const old = await db.session.findUnique({
+    where: { id: auth.sessionId },
+    select: { originAt: true, user: { select: { id: true, email: true, role: true, isActive: true } } },
+  });
+  const tooOld = old ? Date.now() - old.originAt.getTime() >= env.SESSION_MAX_HOURS * 3_600_000 : true;
+  if (!old || tooOld || !old.user.isActive) {
+    await db.session.updateMany({ where: { id: auth.sessionId, revokedAt: null }, data: { revokedAt: new Date() } });
+    throw new AppError("UNAUTHENTICATED");
+  }
+
+  const session = await db.$transaction(async (tx) => {
+    // Conditional, so two refreshes of the same token cannot both succeed.
+    const revoked = await tx.session.updateMany({ where: { id: auth.sessionId, revokedAt: null }, data: { revokedAt: new Date() } });
+    if (revoked.count !== 1) throw new AppError("UNAUTHENTICATED");
+    const created = await tx.session.create({
+      data: { userId: old.user.id, expiresAt: sessionExpiry(env, old.originAt), originAt: old.originAt },
+      select: { id: true, expiresAt: true },
+    });
+    await recordAudit(tx, { action: "auth.refresh", outcome: "success", actorUserId: old.user.id, requestId: ctx.requestId });
+    return created;
+  });
+
+  const user = { id: old.user.id, email: old.user.email, role: old.user.role };
+  const accessToken = await signAccessToken(env.JWT_SECRET, { userId: user.id, sessionId: session.id }, session.expiresAt);
+  return { user, accessToken, expiresAt: session.expiresAt.toISOString() };
 }
