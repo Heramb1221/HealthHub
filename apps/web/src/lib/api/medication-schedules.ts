@@ -1,8 +1,6 @@
-import { demoSchedulesApi } from "@/lib/demo/schedules";
 
 import { ApiError } from "./errors";
 import { asList, request } from "./http";
-import { pick } from "./mode";
 import type { CreateScheduleInput, DoseEvent, DoseEventInput, MedicationSchedule, UpdateScheduleInput } from "./types";
 
 export interface MedicationSchedulesApi {
@@ -35,4 +33,9 @@ const liveSchedulesApi: MedicationSchedulesApi = {
   recordDose: (scheduleId, input) => request<DoseEvent>(`${path(scheduleId)}/dose-events`, { method: "POST", json: input }),
 };
 
-export const medicationSchedulesApi: MedicationSchedulesApi = pick(liveSchedulesApi, demoSchedulesApi);
+export const medicationSchedulesApi: MedicationSchedulesApi =
+  process.env.NEXT_PUBLIC_API_MODE === "live"
+    ? liveSchedulesApi
+    : // Required only in demo builds, so demo accounts and sample data never ship in a live bundle (see README).
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      (require("@/lib/demo/schedules") as typeof import("@/lib/demo/schedules")).demoSchedulesApi;

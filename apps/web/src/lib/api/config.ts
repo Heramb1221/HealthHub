@@ -6,6 +6,9 @@
  *
  * Demo is the default so a fresh clone renders without a backend. The UI always
  * shows a persistent demo banner while demo mode is active.
+ *
+ * The demo adapters are `require`d only when the mode is not "live" (see the bottom of each src/lib/api/*.ts
+ * module), so a live build contains no demo accounts and no sample data.
  */
 export type ApiMode = "live" | "demo";
 

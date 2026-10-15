@@ -1,0 +1,110 @@
+"""Dashboard states (seeded, new, admin) and profile editing.
+
+Run via e2e/run-demo.sh (or set BASE_URL to a running server). Prints PASS/FAIL per check; exits 1 on any failure.
+"""
+import re
+from playwright.sync_api import sync_playwright
+import os, tempfile
+B = os.environ.get("BASE_URL", "http://localhost:3000").rstrip("/")
+SHOTS = os.environ.get("SHOTS_DIR", os.path.join(tempfile.gettempdir(), "healthhub-e2e"))
+FIX = os.path.join(SHOTS, "fixtures")
+os.makedirs(FIX, exist_ok=True)
+res=[]
+def ok(name,cond,extra=""):
+    res.append((name,bool(cond))); print(("PASS " if cond else "FAIL ")+name+(f"  [{extra}]" if (extra and not cond) else ""))
+def login(pg,email,pw):
+    pg.goto(B+"/sign-in"); pg.get_by_label("Email address").fill(email); pg.get_by_label("Password",exact=True).fill(pw)
+    pg.get_by_role("button",name="Sign in",exact=True).click(); pg.wait_for_url(re.compile(r".*/(dashboard|admin/hospitals)$"))
+with sync_playwright() as p:
+    br=p.chromium.launch()
+    ctx=br.new_context(viewport={"width":1280,"height":900}); pg=ctx.new_page()
+    errs=[]; pg.on("pageerror",lambda e:errs.append(str(e))); pg.on("console",lambda m: errs.append(m.text) if m.type=="error" else None)
+    login(pg,"demo.patient@healthhub.test","DemoPatient#1")
+    pg.wait_for_selector("text=Next medication reminder"); pg.wait_for_selector("text=HH-4F7K-9QXM")
+    body=pg.inner_text("main")
+    ok("dashboard shows name + HealthHub ID", "Demo Patient" in body and "HH-4F7K-9QXM" in body)
+    ok("next reminder shows Paracetamol with dose", "Paracetamol 500 mg" in body and "1 tablet" in body)
+    ok("reminder time is today/tomorrow", re.search(r"(Today|Tomorrow), \d{1,2}:\d{2}\s?(am|pm)",body,re.I))
+    ok("next appointment shows sample hospital", "Demo City Hospital" in body)
+    ok("latest prescription shows its verification status, not a redundant reading badge", "Needs your review" in body and "Reading finished" not in body)
+    ok("demo tags present in place", pg.get_by_text("Demo data").count()>=3, pg.get_by_text("Demo data").count())
+    ok("notice: 1 medicine needs review", "1 medicine needs your review" in body)
+    ok("notice: no clinician verification", "No prescription is clinician-verified" in body)
+    ok("no emergency-contact notice for seeded user", "Add an emergency contact" not in body)
+    pg.screenshot(path=f"{SHOTS}/dash-1280.png",full_page=True)
+    # copy button
+    ctx.grant_permissions(["clipboard-read","clipboard-write"])
+    pg.get_by_role("button",name=re.compile("Copy HealthHub ID")).first.click()
+    pg.wait_for_selector("text=HealthHub ID copied")
+    ok("copy writes the ID to clipboard", pg.evaluate("navigator.clipboard.readText()")=="HH-4F7K-9QXM")
+    # profile view
+    pg.get_by_role("link",name="Profile",exact=True).first.click(); pg.wait_for_url("**/profile")
+    pg.wait_for_selector("h1:has-text('Profile')"); pg.wait_for_selector("text=Date of birth")
+    body=pg.inner_text("main")
+    ok("profile shows DOB formatted", "15 January 1990" in body)
+    ok("profile shows self-reported note", "self-reported" in body.lower())
+    ok("family links explains no access by itself", "never give anyone access by itself" in body and "Not available yet" in body)
+    ok("nav marks Profile current", pg.locator('nav[aria-label="Main"] a[aria-current="page"]').inner_text().strip()=="Profile")
+    pg.screenshot(path=f"{SHOTS}/profile-1280.png",full_page=True)
+    # edit + validation
+    pg.get_by_role("button",name="Edit profile").click(); pg.wait_for_selector("h1:has-text('Edit profile')")
+    ok("focus lands on first field", pg.evaluate("document.activeElement.name")=="fullName")
+    pg.get_by_label("Full name").fill("A")
+    pg.get_by_label("Name",exact=True).fill(""); pg.get_by_label("Phone",exact=True).nth(1).fill("")
+    pg.get_by_role("button",name="Save changes").click()
+    ok("name error shown", pg.get_by_text("Enter your full name.").is_visible())
+    ok("emergency phone required when relationship set", pg.get_by_text("Enter the contact’s name.").is_visible() and pg.get_by_text("Enter the contact’s phone number.").is_visible())
+    ok("focus moved to first invalid", pg.evaluate("document.activeElement.name")=="fullName")
+    pg.screenshot(path=f"{SHOTS}/profile-errors-1280.png",full_page=True)
+    # fix and save
+    pg.get_by_label("Full name").fill("Demo Patient Edited")
+    pg.get_by_label("Name",exact=True).fill("Demo Contact")
+    pg.get_by_label("Phone",exact=True).nth(1).fill("+91 90000 00001")
+    pg.get_by_label("Blood group").select_option("B+")
+    pg.get_by_label("Allergies").fill("Dust (sample entry)\nPollen (sample entry)")
+    pg.get_by_label("Date of birth").fill("2999-01-01")
+    pg.get_by_role("button",name="Save changes").click()
+    ok("future DOB rejected", pg.get_by_text("Date of birth can’t be in the future.").is_visible())
+    pg.get_by_label("Date of birth").fill("1990-01-15")
+    pg.get_by_role("button",name="Save changes").click()
+    pg.wait_for_selector("text=Profile saved"); pg.wait_for_selector("h1:has-text('Profile')")
+    body=pg.inner_text("main")
+    ok("saved values shown", "Demo Patient Edited" in body and "B+" in body and "Pollen (sample entry)" in body)
+    pg.reload(); pg.wait_for_selector("text=Demo Patient Edited")
+    ok("edit persists across reload", True)
+    # dashboard reflects edit
+    pg.get_by_role("link",name="Dashboard",exact=True).first.click(); pg.wait_for_selector("text=Demo Patient Edited")
+    ok("dashboard reflects edited name", True)
+    # new user: empty states
+    pg.get_by_role("button",name="Sign out").click(); pg.wait_for_url("**/sign-in")
+    pg.goto(B+"/sign-up"); pg.get_by_label("Full name").fill("Asha Test"); pg.get_by_label("Email address").fill("asha.test@example.com"); pg.get_by_label("Password",exact=True).fill("longenough1")
+    pg.get_by_role("button",name="Create account",exact=True).click(); pg.wait_for_url("**/dashboard"); pg.wait_for_selector("text=Latest prescription"); pg.wait_for_selector("text=No upcoming appointments.")
+    body=pg.inner_text("main")
+    ok("new user HealthHub ID format", re.search(r"HH-[A-Z2-9]{4}-[A-Z2-9]{4}",body))
+    ok("new user empty states", "No upcoming reminders." in body and "No upcoming appointments." in body and "No prescriptions yet" in body)
+    ok("new user has no demo-seeded records", "Demo City Hospital" not in body and "Paracetamol" not in body)
+    ok("new user emergency contact notice", "Add an emergency contact" in body)
+    hid=re.search(r"HH-[A-Z2-9]{4}-[A-Z2-9]{4}",body).group(0)
+    pg.reload(); pg.wait_for_selector("text=Latest prescription"); pg.wait_for_selector("text=No upcoming appointments.")
+    ok("new user HealthHub ID stable across reload", hid in pg.inner_text("main"))
+    pg.screenshot(path=f"{SHOTS}/dash-new-1280.png",full_page=True)
+    pg.get_by_role("button",name="Sign out").click(); pg.wait_for_url("**/sign-in")
+    # admin
+    login(pg,"demo.admin@healthhub.test","DemoAdmin#1"); pg.goto(B+"/dashboard"); pg.wait_for_selector("text=This account has no patient profile")
+    ok("admin dashboard explains no patient profile", True)
+    pg.goto(B+"/profile"); pg.wait_for_selector("text=This account has no patient profile")
+    ok("admin profile explains no patient profile", True)
+    ok("no console/page errors", not errs, errs[:3])
+    # widths
+    pg.get_by_role("button",name="Sign out").click(); pg.wait_for_url("**/sign-in")
+    login(pg,"demo.patient@healthhub.test","DemoPatient#1")
+    for w,h in [(375,812),(768,1024),(1280,900)]:
+        pg.set_viewport_size({"width":w,"height":h})
+        for path in ["/dashboard","/profile"]:
+            pg.goto(B+path); pg.wait_for_selector("h1"); pg.wait_for_timeout(500)
+            sw=pg.evaluate("document.documentElement.scrollWidth")
+            ok(f"{path} no horizontal scroll @{w}", sw<=w, sw)
+        pg.goto(B+"/dashboard"); pg.wait_for_selector("text=Notices"); pg.wait_for_timeout(400); pg.screenshot(path=f"{SHOTS}/dash-{w}.png",full_page=True)
+    br.close()
+print("FAILED:", [n for n,c in res if not c])
+raise SystemExit(1 if any(not c for _, c in res) else 0)
