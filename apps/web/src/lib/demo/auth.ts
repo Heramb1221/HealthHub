@@ -53,6 +53,17 @@ export const demoAuthApi: AuthApi = {
     write(user);
     return user;
   },
+  async loginWithProvider(provider: "google" | "apple") {
+    const isGoogle = provider === "google";
+    const user: AuthUser = {
+      id: `demo-${provider}-${crypto.randomUUID().slice(0, 8)}`,
+      email: isGoogle ? "alex.chen@healthhub.test" : "alex.chen@privaterelay.appleid.com",
+      role: "patient",
+      displayName: isGoogle ? "Alex Chen (Google)" : "Alex Chen (Apple ID)",
+    };
+    write(user);
+    return user;
+  },
   async logout() {
     write(null);
   },

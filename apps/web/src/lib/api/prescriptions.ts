@@ -26,12 +26,17 @@ const livePrescriptionsApi: PrescriptionsApi = {
     return [...items].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   },
   get: (id) => request<Prescription>(path(id)),
-  upload({ file, prescriptionDate, prescriberName }) {
+  async upload({ file, prescriptionDate, prescriberName }) {
     const formData = new FormData();
     formData.set("file", file);
     if (prescriptionDate) formData.set("prescriptionDate", prescriptionDate);
     if (prescriberName) formData.set("prescriberName", prescriberName);
-    return request<UploadResult>("/prescriptions", { method: "POST", formData });
+    const created = await request<UploadResult>("/prescriptions", { method: "POST", formData });
+    try {
+      return await request<UploadResult>(`${path(created.id)}/process`, { method: "POST" });
+    } catch {
+      return created;
+    }
   },
   process: (id) => request<UploadResult>(`${path(id)}/process`, { method: "POST" }),
   async versions(id) {

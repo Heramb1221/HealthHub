@@ -127,7 +127,7 @@ export function SignUpForm({ next }: { next?: string }) {
       {formError ? <FormErrorAlert message={formError} /> : null}
       <TextField name="fullName" label="Full name" autoComplete="name" placeholder="As on your ID" error={errors.fullName} />
       <TextField name="email" label="Email address" type="email" autoComplete="email" inputMode="email" placeholder="name@example.com" error={errors.email} />
-      <PasswordField name="password" label="Password" hint="Use at least 8 characters." autoComplete="new-password" error={errors.password} />
+      <PasswordField name="password" label="Password" hint="Use at least 10 characters." autoComplete="new-password" error={errors.password} />
       <SubmitButton pending={pending} pendingLabel="Creating account">
         Create account
       </SubmitButton>

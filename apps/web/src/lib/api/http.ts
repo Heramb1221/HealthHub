@@ -1,4 +1,4 @@
-import { API_BASE_PATH } from "./config";
+import { API_BASE_PATH, SESSION_COOKIE_NAME } from "./config";
 import { ApiError, apiErrorFromResponse } from "./errors";
 
 type Query = Record<string, string | number | boolean | undefined | null>;
@@ -13,6 +13,22 @@ export interface RequestOptions {
   signal?: AbortSignal;
 }
 
+export function getAuthToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("hh_token");
+}
+
+export function setAuthToken(token: string | null): void {
+  if (typeof window === "undefined") return;
+  if (token) {
+    localStorage.setItem("hh_token", token);
+    document.cookie = `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}; path=/; SameSite=Lax; max-age=86400`;
+  } else {
+    localStorage.removeItem("hh_token");
+    document.cookie = `${SESSION_COOKIE_NAME}=; path=/; max-age=0`;
+  }
+}
+
 function buildUrl(path: string, query?: Query) {
   const url = `${API_BASE_PATH}${path.startsWith("/") ? path : `/${path}`}`;
   if (!query) return url;
@@ -25,14 +41,17 @@ function buildUrl(path: string, query?: Query) {
 }
 
 /**
- * The contract allows success responses to be either the bare resource or `{ data: resource }`
- * ("consistently across the project"). Unwrap the envelope only when it is the sole key so a
- * resource that legitimately has a `data` field is not mangled.
+ * The contract allows success responses to be either the bare resource, `{ data: resource }`,
+ * or paginated list `{ data: [...], page: ... }`.
  */
 export function unwrapEnvelope<T>(body: unknown): T {
   if (typeof body === "object" && body !== null && !Array.isArray(body)) {
-    const keys = Object.keys(body);
-    if (keys.length === 1 && keys[0] === "data") return (body as { data: T }).data;
+    if ("data" in body) {
+      const keys = Object.keys(body);
+      if (keys.length === 1 || (keys.length === 2 && "page" in body)) {
+        return (body as { data: T }).data;
+      }
+    }
   }
   return body as T;
 }
@@ -47,11 +66,16 @@ async function parseBody(response: Response): Promise<unknown> {
   }
 }
 
-/** Typed JSON request. Sends the httpOnly session cookie; never reads or stores tokens in JS. */
+/** Typed JSON request. Sends credentials and Authorization: Bearer <token>. */
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = "GET", query, json, formData, signal } = options;
   const headers: Record<string, string> = { Accept: "application/json" };
   let body: BodyInit | undefined;
+
+  const token = getAuthToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
 
   if (formData) {
     body = formData;
@@ -69,7 +93,12 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   }
 
   const parsed = await parseBody(response);
-  if (!response.ok) throw apiErrorFromResponse(response.status, parsed);
+  if (!response.ok) {
+    if (response.status === 401) {
+      setAuthToken(null);
+    }
+    throw apiErrorFromResponse(response.status, parsed);
+  }
   if (parsed === undefined) return undefined as T;
   return unwrapEnvelope<T>(parsed);
 }
@@ -77,19 +106,36 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 /** Binary download (e.g. prescription PDF). Returns the blob and a suggested filename if provided. */
 export async function requestBlob(path: string, signal?: AbortSignal): Promise<{ blob: Blob; filename?: string }> {
   let response: Response;
+  const headers: Record<string, string> = {};
+  const token = getAuthToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
   try {
-    response = await fetch(buildUrl(path), { method: "GET", credentials: "include", cache: "no-store", signal });
+    response = await fetch(buildUrl(path), { method: "GET", headers, credentials: "include", cache: "no-store", signal });
   } catch {
     throw new ApiError({ code: "NETWORK_ERROR", message: "The server could not be reached.", status: 0 });
   }
-  if (!response.ok) throw apiErrorFromResponse(response.status, await parseBody(response));
+  if (!response.ok) {
+    if (response.status === 401) setAuthToken(null);
+    throw apiErrorFromResponse(response.status, await parseBody(response));
+  }
   const disposition = response.headers.get("content-disposition") ?? "";
   const match = /filename="?([^";]+)"?/i.exec(disposition);
   return { blob: await response.blob(), filename: match?.[1] };
 }
 
-/** List endpoints may return a bare array or `{ items }` (pagination is undefined in the contract). Accept both. */
-export function asList<T>(body: T[] | { items: T[] } | undefined): T[] {
+/** List endpoints may return a bare array, `{ data: [...] }` or `{ items: [...] }`. */
+export function asList<T>(body: T[] | { items: T[] } | { data: T[] } | null | undefined): T[] {
   if (!body) return [];
-  return Array.isArray(body) ? body : body.items;
+  if (Array.isArray(body)) return body;
+  if (typeof body === "object") {
+    if ("data" in body && Array.isArray((body as { data: unknown }).data)) {
+      return (body as { data: T[] }).data;
+    }
+    if ("items" in body && Array.isArray((body as { items: unknown }).items)) {
+      return (body as { items: T[] }).items;
+    }
+  }
+  return [];
 }

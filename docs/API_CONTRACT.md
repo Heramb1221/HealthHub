@@ -19,10 +19,12 @@ Error:
 Never return stack traces, database details, secrets, or sensitive patient details in errors.
 
 ## Auth
-- `POST /auth/register`
-- `POST /auth/login`
-- `POST /auth/logout`
-- `POST /auth/refresh` only if refresh-token rotation is implemented
+- `POST /auth/register` (body: `{ email, password, fullName? }`)
+- `POST /auth/login` (body: `{ email, password }`)
+- `GET /auth/me` returns current authenticated session user `{ user: { id, email, role } }`
+- `POST /auth/logout` revokes current session
+- `POST /auth/refresh` exchanges valid token for fresh token
+- `POST /auth/dev-login` development-only login for seeded demo accounts (only when `DEV_AUTH_ENABLED=true`)
 For local demo, clearly label any development-only login shortcut. Never present a mock OTP as production verification.
 
 ## Patient

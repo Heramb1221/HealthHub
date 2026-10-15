@@ -21,6 +21,20 @@ declare module "express-serve-static-core" {
 
 const BEARER = /^Bearer ([A-Za-z0-9\-_.]+)$/;
 
+function extractToken(req: Request): string | undefined {
+  const header = req.headers.authorization;
+  const bearerToken = header ? BEARER.exec(header)?.[1] : undefined;
+  if (bearerToken) return bearerToken;
+
+  const cookieHeader = req.headers.cookie;
+  if (cookieHeader) {
+    const cookies = cookieHeader.split(";").map((c) => c.trim());
+    const cookie = cookies.find((c) => c.startsWith("hh_session="));
+    if (cookie) return decodeURIComponent(cookie.slice("hh_session=".length));
+  }
+  return undefined;
+}
+
 /**
  * Requires a valid bearer token whose session exists, is not revoked or
  * expired, and whose user is still active. Every failure is the same generic
@@ -28,8 +42,7 @@ const BEARER = /^Bearer ([A-Za-z0-9\-_.]+)$/;
  */
 export function authenticate(db: Db, env: Pick<Env, "JWT_SECRET">): RequestHandler {
   return async (req: Request, _res: Response, next: NextFunction) => {
-    const header = req.headers.authorization;
-    const token = header ? BEARER.exec(header)?.[1] : undefined;
+    const token = extractToken(req);
     if (!token) throw new AppError("UNAUTHENTICATED");
 
     const claims = await verifyAccessToken(env.JWT_SECRET, token);

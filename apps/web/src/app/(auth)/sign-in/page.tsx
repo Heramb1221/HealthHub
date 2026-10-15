@@ -17,7 +17,7 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
       </div>
       <SignInForm next={next} />
       <Separator />
-      <ProviderButtons />
+      <ProviderButtons next={next} />
       <DemoAccounts />
     </div>
   );

@@ -16,8 +16,12 @@ interface Ctx {
   requestId: string;
 }
 
-// The only metadata accepted with an upload. clinician_issued is not supported yet.
-const uploadFieldsSchema = z.strictObject({ sourceType: z.literal("uploaded_physical").optional() });
+// The metadata accepted with an upload.
+const uploadFieldsSchema = z.strictObject({
+  sourceType: z.literal("uploaded_physical").optional(),
+  prescriptionDate: z.string().optional(),
+  prescriberName: z.string().optional(),
+});
 
 export const PRESCRIPTION_SELECT = {
   id: true,

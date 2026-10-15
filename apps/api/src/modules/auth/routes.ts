@@ -46,6 +46,16 @@ export function createAuthRouter(db: Db, env: Env): Router {
     res.json({ data: { revoked: true } });
   });
 
+  router.get("/me", authenticate(db, env), async (req, res) => {
+    const auth = requireAuth(req);
+    const user = await db.user.findUnique({
+      where: { id: auth.userId },
+      select: { id: true, email: true, role: true },
+    });
+    if (!user || !user.role) throw new AppError("UNAUTHENTICATED");
+    res.json({ data: { user } });
+  });
+
   // DEVELOPMENT ONLY. Not mounted unless explicitly enabled; env validation
   // already refuses to start with it enabled in production.
   if (env.DEV_AUTH_ENABLED && env.NODE_ENV !== "production") {

@@ -41,7 +41,7 @@ async function issueSession(db: Db, env: Env, user: { id: string; email: string;
 }
 
 /** Registration always creates a patient user plus its patient row. The role is never client-supplied. */
-export async function register(db: Db, env: Env, input: { email: string; password: string }, ctx: Ctx): Promise<AuthResult> {
+export async function register(db: Db, env: Env, input: { email: string; password: string; fullName?: string }, ctx: Ctx): Promise<AuthResult> {
   const passwordHash = await hashPassword(input.password);
 
   for (let attempt = 0; attempt < MAX_HEALTH_ID_ATTEMPTS; attempt += 1) {
@@ -52,7 +52,7 @@ export async function register(db: Db, env: Env, input: { email: string; passwor
           select: { id: true, email: true, role: true },
         });
         const patient = await tx.patient.create({
-          data: { userId: created.id, healthId: generateHealthId() },
+          data: { userId: created.id, healthId: generateHealthId(), fullName: input.fullName ?? null },
           select: { id: true },
         });
         await recordAudit(tx, {

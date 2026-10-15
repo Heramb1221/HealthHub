@@ -21,7 +21,7 @@ export default async function SignUpPage({ searchParams }: { searchParams: Promi
       </div>
       <SignUpForm next={next} />
       <Separator />
-      <ProviderButtons />
+      <ProviderButtons next={next} />
     </div>
   );
 }
