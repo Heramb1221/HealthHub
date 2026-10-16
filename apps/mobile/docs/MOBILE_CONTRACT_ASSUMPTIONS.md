@@ -50,7 +50,7 @@ Differences from the Milestone-10 prompt that was attached on 2026-10-15, and wh
 - Demo credentials (`demo.patient@healthhub.test`) are synthetic and apply to the in-app demo server only.
 
 Open points for the integrator: `POST /auth/dev-login` (F2) is deliberately not used by mobile; `latest` returns the newest
-version regardless of verification (I7); `POST /auth/refresh` (L1) exists but mobile still signs the patient out at expiry (no silent refresh yet).
+version regardless of verification (I7); `POST /auth/refresh` (L1) exists and mobile now calls it 2 minutes before expiry (a 401 or the 7-day limit ends the session; network errors retry until expiry).
 
 ## Used as written (no question)
 - Success envelope `{ "data": ... }` and error envelope `{ error: { code, message, requestId } }` (A1). Bare resources are also accepted.

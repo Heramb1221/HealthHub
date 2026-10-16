@@ -71,14 +71,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Sign out at the token's expiry (access tokens are short-lived and there is no refresh in the MVP).
+  // Swap the token for a fresh one shortly before it expires (backend L1: once per token, capped at the server's
+  // login limit). If that fails the session simply ends at its expiry; nothing is faked.
   const expiresAt = state.status === "signedIn" ? state.expiresAt : null;
+  const user = state.status === "signedIn" ? state.user : null;
   useEffect(() => {
-    if (!expiresAt) return;
-    const ms = new Date(expiresAt).getTime() - Date.now();
-    const timer = setTimeout(() => void endLocally("Your session expired. Sign in again."), Math.max(ms, 0));
-    return () => clearTimeout(timer);
-  }, [expiresAt, endLocally]);
+    if (!expiresAt || !user) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const expiry = new Date(expiresAt).getTime();
+    const signOutExpired = () => void endLocally("Your session expired. Sign in again.");
+
+    const attempt = async () => {
+      if (cancelled) return;
+      if (Date.now() >= expiry) return signOutExpired();
+      try {
+        const next = await authApi.refresh();
+        if (cancelled) return;
+        if (!next?.accessToken || !next.user) throw new Error("Unexpected refresh response");
+        tokenRef.current = next.accessToken;
+        if (!IS_DEMO) await saveSession({ accessToken: next.accessToken, expiresAt: next.expiresAt, user: next.user });
+        setState({ status: "signedIn", user: next.user, expiresAt: next.expiresAt });
+      } catch (error) {
+        if (cancelled) return;
+        // 401: the server ended this login (revoked, deactivated or past its limit). Otherwise retry until expiry.
+        if (isApiError(error) && error.isUnauthenticated) return signOutExpired();
+        timer = setTimeout(() => void attempt(), Math.min(30_000, Math.max(expiry - Date.now(), 0)));
+      }
+    };
+
+    timer = setTimeout(() => void attempt(), Math.max(expiry - 2 * 60_000 - Date.now(), 0));
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [expiresAt, user, endLocally]);
 
   const establish = useCallback(async (call: () => Promise<{ user: AuthUser; accessToken: string; expiresAt: string }>) => {
     const session = await call(); // throws ApiError; screens show the server's real result

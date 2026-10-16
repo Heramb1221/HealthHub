@@ -45,6 +45,19 @@ describe("demo shortcuts", () => {
   });
 });
 
+describe("demo token refresh (backend L1)", () => {
+  it("swaps the token: the new one works, and the old one no longer does", async () => {
+    await signIn();
+    const old = token;
+    const next = await authApi.refresh();
+    assert.notEqual(next.accessToken, old);
+    token = old;
+    await rejectsWith(patientApi.me(), "UNAUTHENTICATED");
+    token = next.accessToken;
+    assert.equal((await patientApi.me()).healthId.startsWith("HH-"), true);
+  });
+});
+
 describe("demo auth", () => {
   it("validates credentials like the backend and requires a token elsewhere", async () => {
     await rejectsWith(authApi.register("a@b.co", "short"), "VALIDATION_ERROR");

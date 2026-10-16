@@ -33,6 +33,8 @@ export const authApi = {
     request<AuthSession>("/auth/register", { method: "POST", json: { email, password }, skipUnauthorizedHandler: true }),
   login: (email: string, password: string) =>
     request<AuthSession>("/auth/login", { method: "POST", json: { email, password }, skipUnauthorizedHandler: true }),
+  /** BACKEND L1: swaps a still-valid token for a fresh one (once per token, never past the 7-day login limit). No body. */
+  refresh: () => request<AuthSession>("/auth/refresh", { method: "POST", skipUnauthorizedHandler: true }),
   /** Revokes the server-side session (backend note B1). Failure is reported, never hidden. */
   logout: () => request<void>("/auth/logout", { method: "POST", skipUnauthorizedHandler: true }),
 };

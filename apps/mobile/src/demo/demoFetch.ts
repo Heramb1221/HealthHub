@@ -467,6 +467,11 @@ export async function demoFetch(input: string | URL | Request, init?: RequestIni
   const auth = headers.Authorization ?? headers.authorization;
   if (!state.token || auth !== `Bearer ${state.token}`) return fail(401, "UNAUTHENTICATED", "Authentication required");
 
+  if (path === "/auth/refresh" && method === "POST") {
+    state.token = nextId("demo-token");
+    return ok({ user: { id: "demo-user", email: state.email, role: "patient" }, accessToken: state.token, expiresAt: iso(new Date(Date.now() + 60 * 60_000)) });
+  }
+
   if (path === "/auth/logout" && method === "POST") {
     state.token = null;
     return ok({ revoked: true });
