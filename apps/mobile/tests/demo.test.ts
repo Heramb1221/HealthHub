@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
 
-import { appointmentApi, authApi, consentApi, hospitalApi, medicationApi, patientApi, prescriptionApi, qrApi } from "../src/api/endpoints.ts";
+import { appointmentApi, authApi, consentApi, historyApi, hospitalApi, medicationApi, patientApi, prescriptionApi, qrApi } from "../src/api/endpoints.ts";
 import { isApiError } from "../src/api/errors.ts";
 import { configureHttp, request } from "../src/api/http.ts";
 import { DEMO_BASE_URL, demoFetch, resetDemo } from "../src/demo/demoFetch.ts";
@@ -100,44 +100,134 @@ describe("demo prescriptions and safety gating", () => {
     await rejectsWith(request("/prescriptions", { method: "POST", formData: new FormData() }), "VALIDATION_ERROR");
   });
 
-  it("corrections add a version, are labelled patient_corrected, and carry confidence forward", async () => {
+  it("a correction is a NEW patient_corrected version based on the version the patient saw", async () => {
     await signIn();
     const before = await prescriptionApi.get("demo-rx-1");
-    const med0 = before.medications[0];
-    assert.ok(med0);
-    const updated = await prescriptionApi.correct("demo-rx-1", {
-      prescriptionDate: before.prescriptionDate,
-      prescriberName: before.prescriberName,
+    assert.equal((await prescriptionApi.latest("demo-rx-1")).versionNumber, 1);
+    const created = await prescriptionApi.correct("demo-rx-1", {
+      baseVersionNumber: 1,
       medications: before.medications.map(({ confidence: _c, ...m }, i) => (i === 1 ? { ...m, dose: "1 tablet", frequency: "once a day" } : m)),
     });
-    assert.equal(updated.verificationStatus, "patient_corrected");
-    assert.equal(updated.medications[1]?.confidence, 0.62); // correction never makes a read "confident"
+    assert.equal(created.versionNumber, 2);
+    assert.equal(created.kind, "patient_correction");
+    assert.equal(created.verificationStatus, "patient_corrected"); // the patient's own entry, never clinician verification
+    assert.deepEqual(created.changedFields, ["medications.1.dose", "medications.1.frequency"]); // names only
+    assert.equal(created.medications[0]?.confidence, 0.93); // unchanged row keeps its confidence
+    assert.equal(created.medications[1]?.confidence, 1); // edited row is "stated by a person"
+    assert.equal((await prescriptionApi.get("demo-rx-1")).verificationStatus, "patient_corrected");
     const versions = await prescriptionApi.versions("demo-rx-1");
     assert.equal(versions.items.length, 2);
     assert.equal(versions.items[0]?.kind, "patient_correction");
-    await rejectsWith(request("/prescriptions/demo-rx-1/extracted-fields", { method: "PATCH", json: { medications: [], hack: 1 } }), "VALIDATION_ERROR");
+  });
+
+  it("refuses a stale base version, unknown fields, and status fields", async () => {
+    await signIn();
+    await rejectsWith(prescriptionApi.correct("demo-rx-1", { baseVersionNumber: 0, prescriberName: "Dr. X" }), "CONFLICT");
+    await rejectsWith(request("/prescriptions/demo-rx-1/extracted-fields", { method: "PATCH", json: { baseVersionNumber: 1, medications: [], hack: 1 } }), "VALIDATION_ERROR");
+    await rejectsWith(request("/prescriptions/demo-rx-1/extracted-fields", { method: "PATCH", json: { baseVersionNumber: 1, verificationStatus: "verified_by_authorized_clinician" } }), "VALIDATION_ERROR");
+    await rejectsWith(request("/prescriptions/demo-rx-1/extracted-fields", { method: "PATCH", json: { baseVersionNumber: 1 } }), "VALIDATION_ERROR");
+    await rejectsWith(prescriptionApi.correct("demo-rx-1", { baseVersionNumber: 1, prescriptionDate: "2999-01-01" }), "VALIDATION_ERROR");
+  });
+
+  it("a patient can enter details by hand for an illegible upload, and automatic reading is then refused", async () => {
+    await signIn();
+    const bad = await request<{ id: string }>("/prescriptions", { method: "POST", formData: uploadForm("demo-illegible.png") });
+    await prescriptionApi.process(bad.id);
+    await rejectsWith(prescriptionApi.latest(bad.id), "NOT_FOUND");
+    const v = await prescriptionApi.correct(bad.id, { baseVersionNumber: 0, medications: [{ name: "Entered by me", strength: "5 mg", dose: "1 tablet", route: null, frequency: "once a day", duration: null, instructions: null }] });
+    assert.equal(v.versionNumber, 1);
+    assert.equal(v.medications[0]?.confidence, 1);
+    await rejectsWith(prescriptionApi.process(bad.id), "CONFLICT");
+  });
+
+  it("'confirmed' raises an unchanged low-confidence row to confidence 1", async () => {
+    await signIn();
+    const rx = await prescriptionApi.get("demo-rx-2");
+    const v = await prescriptionApi.correct("demo-rx-2", { baseVersionNumber: 1, medications: rx.medications.map(({ confidence: _c, ...m }) => ({ ...m, confirmed: true })) });
+    assert.equal(v.medications[0]?.confidence, 1);
+    assert.deepEqual(v.changedFields, ["medications.0.confirmed"]);
   });
 });
 
-describe("demo medication schedules (server-side gate)", () => {
-  it("refuses a schedule for a prescription that needs review, even for a complete medicine", async () => {
+describe("demo medication schedules (backend K gate)", () => {
+  const base = { startDate: new Date().toISOString().slice(0, 10), timezone: "Asia/Kolkata" };
+
+  it("refuses a schedule until a person has reviewed the version, even for a complete confident medicine", async () => {
     await signIn();
-    await rejectsWith(medicationApi.create({ prescriptionId: "demo-rx-1", medicationIndex: 0, startDate: "2026-10-13", timezone: "Asia/Kolkata" }), "CONFLICT");
-    await rejectsWith(medicationApi.create({ prescriptionId: "demo-rx-1", medicationIndex: 1, startDate: "2026-10-13", timezone: "Asia/Kolkata" }), "CONFLICT");
+    await rejectsWith(medicationApi.create({ prescriptionId: "demo-rx-2", versionNumber: 1, medicationPosition: 0, ...base }), "CONFLICT"); // unverified
+    await rejectsWith(medicationApi.create({ prescriptionId: "demo-rx-1", versionNumber: 1, medicationPosition: 0, ...base }), "CONFLICT"); // needs_review
   });
 
-  it("creates a schedule from a complete, confident medicine and records self-reported doses", async () => {
+  it("after review: refuses stale versions, incomplete rows and duplicates; creates a labelled copy", async () => {
     await signIn();
-    const s = await medicationApi.create({ prescriptionId: "demo-rx-2", medicationIndex: 0, startDate: "2026-10-13", timezone: "Asia/Kolkata" });
-    assert.equal(s.medicationName, "Mockapril");
-    assert.deepEqual(s.reminderTimes, ["08:00"]);
-    await rejectsWith(medicationApi.create({ prescriptionId: "demo-rx-2", medicationIndex: 9, startDate: "2026-10-13", timezone: "Asia/Kolkata" }), "NOT_FOUND");
-    const dose = await medicationApi.reportDose(s.id, { scheduledFor: new Date().toISOString(), status: "taken" });
-    assert.equal(dose.selfReported, true);
-    await rejectsWith(medicationApi.reportDose(s.id, { scheduledFor: "not a date", status: "taken" }), "VALIDATION_ERROR");
-    const edited = await medicationApi.update(s.id, { reminderTimes: ["09:30", "21:00"], remindersEnabled: true });
-    assert.deepEqual(edited.reminderTimes, ["09:30", "21:00"]);
+    const rx = await prescriptionApi.get("demo-rx-1");
+    const v2 = await prescriptionApi.correct("demo-rx-1", { baseVersionNumber: 1, medications: rx.medications.map(({ confidence: _c, ...m }) => m) });
+    assert.equal(v2.medications[1]?.confidence, 0.62); // untouched, unreadable row stays low confidence
+    await rejectsWith(medicationApi.create({ prescriptionId: "demo-rx-1", versionNumber: 1, medicationPosition: 0, ...base }), "CONFLICT"); // stale
+    await rejectsWith(medicationApi.create({ prescriptionId: "demo-rx-1", versionNumber: 2, medicationPosition: 1, ...base }), "CONFLICT"); // incomplete
+    await rejectsWith(medicationApi.create({ prescriptionId: "demo-rx-1", versionNumber: 2, medicationPosition: 9, ...base }), "NOT_FOUND");
+    const s = await medicationApi.create({ prescriptionId: "demo-rx-1", versionNumber: 2, medicationPosition: 0, ...base });
+    assert.equal(s.medication.name, "Examplin");
+    assert.equal(s.sourceStatus, "current");
+    assert.equal(s.remindersEnabled, false);
+    assert.match(s.notice, /not medical advice/i);
+    await rejectsWith(medicationApi.create({ prescriptionId: "demo-rx-1", versionNumber: 2, medicationPosition: 0, ...base }), "CONFLICT"); // duplicate
+    await rejectsWith(request("/medication-schedules", { method: "POST", json: { prescriptionId: "demo-rx-1", versionNumber: 2, medicationPosition: 0, ...base, dose: "10 tablets" } }), "VALIDATION_ERROR");
+  });
+
+  it("a confirmed row can be scheduled; reminders need times; doses are self-reported and not repeatable", async () => {
+    await signIn();
+    const rx = await prescriptionApi.get("demo-rx-1");
+    await prescriptionApi.correct("demo-rx-1", {
+      baseVersionNumber: 1,
+      medications: rx.medications.map(({ confidence: _c, ...m }, i) => (i === 1 ? { ...m, dose: "1 tablet", frequency: "once a day", confirmed: true } : m)),
+    });
+    const s = await medicationApi.create({ prescriptionId: "demo-rx-1", versionNumber: 2, medicationPosition: 1, ...base });
+    await rejectsWith(medicationApi.update(s.id, { remindersEnabled: true }), "VALIDATION_ERROR"); // no times
+    const edited = await medicationApi.update(s.id, { reminderTimes: ["21:00", "09:30", "21:00"], remindersEnabled: true });
+    assert.deepEqual(edited.reminderTimes, ["09:30", "21:00"]); // sorted, de-duplicated
+    assert.equal(edited.remindersActive, true);
     await rejectsWith(medicationApi.update(s.id, { reminderTimes: ["9:30"] }), "VALIDATION_ERROR");
+    await rejectsWith(request(`/medication-schedules/${s.id}`, { method: "PATCH", json: { dose: "2" } }), "VALIDATION_ERROR"); // text is not editable
+    const at = new Date().toISOString();
+    const dose = await medicationApi.reportDose(s.id, { scheduledFor: at, status: "taken" });
+    assert.equal(dose.selfReported, true);
+    await rejectsWith(medicationApi.reportDose(s.id, { scheduledFor: at, status: "skipped" }), "CONFLICT");
+    await rejectsWith(medicationApi.reportDose(s.id, { scheduledFor: "not a date", status: "taken" }), "VALIDATION_ERROR");
+    await rejectsWith(medicationApi.reportDose(s.id, { scheduledFor: new Date(Date.now() + 5 * 3_600_000).toISOString(), status: "taken" }), "VALIDATION_ERROR");
+    const listed = (await medicationApi.list()).items.find((x) => x.id === s.id);
+    assert.equal(listed?.recentDoseEvents.length, 1);
+    assert.equal(listed?.recentDoseEvents[0]?.status, "taken");
+    const stopped = await medicationApi.update(s.id, { isActive: false });
+    assert.equal(stopped.remindersActive, false);
+    await rejectsWith(medicationApi.reportDose(s.id, { scheduledFor: new Date().toISOString(), status: "taken" }), "CONFLICT");
+  });
+
+  it("flags a schedule when the prescription is later corrected differently", async () => {
+    await signIn();
+    const rx = await prescriptionApi.get("demo-rx-2");
+    await prescriptionApi.correct("demo-rx-2", { baseVersionNumber: 1, medications: rx.medications.map(({ confidence: _c, ...m }) => ({ ...m, confirmed: true })) });
+    const s = await medicationApi.create({ prescriptionId: "demo-rx-2", versionNumber: 2, medicationPosition: 0, ...base, reminderTimes: ["08:00"], remindersEnabled: true });
+    assert.equal(s.remindersActive, true);
+    await prescriptionApi.correct("demo-rx-2", { baseVersionNumber: 2, medications: rx.medications.map(({ confidence: _c, ...m }) => ({ ...m, dose: "2 tablets" })) });
+    const after = (await medicationApi.list()).items.find((x) => x.id === s.id);
+    assert.equal(after?.sourceStatus, "changed");
+    assert.equal(after?.remindersActive, false); // reminders pause; the schedule keeps the text it was made from
+    assert.equal(after?.medication.dose, "1 tablet");
+  });
+});
+
+describe("demo health history (backend L5)", () => {
+  it("adds patient-reported, unverified entries and refuses bad input", async () => {
+    await signIn();
+    const e = await historyApi.addCondition({ title: "Asthma (demo)", notes: "Mild", diagnosedOn: "2020-05-01" });
+    assert.equal(e.source, "patient_reported");
+    assert.equal(e.verificationStatus, "unverified");
+    assert.equal(e.diagnosedOn, "2020-05-01");
+    assert.equal((await historyApi.list()).items[0]?.id, e.id);
+    await rejectsWith(historyApi.addCondition({ title: "  " }), "VALIDATION_ERROR");
+    await rejectsWith(historyApi.addCondition({ title: "X", diagnosedOn: "2999-01-01" }), "VALIDATION_ERROR");
+    await rejectsWith(request("/health-history/conditions", { method: "POST", json: { name: "old field" } }), "VALIDATION_ERROR");
   });
 });
 
@@ -157,16 +247,41 @@ describe("demo hospitals, booking and QR", () => {
     await rejectsWith(request("/appointments", { method: "POST", json: { slotId: slot.id, patientId: "x" } }), "VALIDATION_ERROR");
   });
 
-  it("QR sessions carry a random reference, never medical data, and are audited", async () => {
+  it("QR sessions carry a random link, never medical data; they expire on revoke and are audited", async () => {
     await signIn();
     const session = await qrApi.createSession({ prescriptionId: "demo-rx-2" });
-    assert.ok(session.reference?.startsWith("healthhub://demo-qr/"));
+    assert.ok(session.qrPayload.startsWith("healthhub://qr/"));
+    assert.equal(session.revokedAt, null);
     assert.ok(!JSON.stringify(session).toLowerCase().includes("mockapril"));
-    assert.equal((await qrApi.getSession(session.id)).status, "active");
-    await rejectsWith(qrApi.createSession({ prescriptionId: "nope" }), "VALIDATION_ERROR");
+    const lookup = await qrApi.getSession(session.id);
+    assert.equal(lookup.prescription.id, "demo-rx-2");
+    assert.equal("patient" in lookup, false); // no profile data
+    await rejectsWith(qrApi.createSession({ prescriptionId: "nope" }), "NOT_FOUND");
     await rejectsWith(qrApi.getSession("missing"), "NOT_FOUND");
-    const history = await patientApi.accessHistory();
-    assert.ok(history.items.some((e) => e.action === "consent.created"));
+    const revoked = await qrApi.revokeSession(session.id);
+    assert.ok(revoked.revokedAt);
+    assert.equal((await qrApi.revokeSession(session.id)).revokedAt, revoked.revokedAt); // repeating changes nothing
+    await rejectsWith(qrApi.getSession(session.id), "NOT_FOUND"); // revoked looks like it never existed
+    const actions = (await patientApi.accessHistory()).items.map((e) => e.action);
+    assert.ok(actions.includes("qr.session_created") && actions.includes("qr.session_revoked"));
+  });
+
+  it("appointments are flat, refuse overlapping bookings, and cancelling is idempotent", async () => {
+    await signIn();
+    const slots = (await hospitalApi.availability("demo-h1")).items;
+    const first = slots[0];
+    assert.ok(first);
+    const appt = await appointmentApi.book({ slotId: first.id });
+    assert.equal(appt.hospital?.isDemo, true);
+    assert.equal(appt.startsAt, first.startsAt);
+    // The same time at another hospital overlaps the patient's own appointment.
+    const other = (await hospitalApi.availability("demo-h2")).items.find((s) => s.startsAt === first.startsAt);
+    assert.ok(other);
+    await rejectsWith(appointmentApi.book({ slotId: other.id }), "CONFLICT");
+    const cancelled = await appointmentApi.cancel(appt.id);
+    assert.equal(cancelled.status, "cancelled");
+    assert.ok(cancelled.cancelledAt);
+    assert.equal((await appointmentApi.cancel(appt.id)).cancelledAt, cancelled.cancelledAt);
   });
 });
 

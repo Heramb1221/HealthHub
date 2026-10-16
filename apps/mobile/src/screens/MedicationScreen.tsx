@@ -4,7 +4,7 @@ import { medicationApi } from "../api/endpoints";
 import { describeError } from "../api/errors";
 import type { DoseStatus, MedicationSchedule } from "../api/types";
 import { useResource } from "../hooks/useResource";
-import { formatDateOnly, formatTimeOnly, localTimeToIso } from "../lib/format";
+import { formatDateOnly, formatDateTime, formatTimeOnly, localTimeToIso } from "../lib/format";
 import {
   cancelLocalReminders,
   countLocalReminders,
@@ -59,6 +59,28 @@ function ScheduleCard({ schedule, onUpdated }: { schedule: MedicationSchedule; o
   const [enabled, setEnabled] = useState(schedule.remindersEnabled);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [toggling, setToggling] = useState(false);
+  const [toggleError, setToggleError] = useState<string | null>(null);
+
+  const med = schedule.medication;
+  const doseStatusFor = (time: string): DoseStatus | undefined => {
+    if (reported[time]) return reported[time];
+    const at = localTimeToIso(time);
+    return at ? schedule.recentDoseEvents.find((e) => Date.parse(e.scheduledFor) === Date.parse(at))?.status : undefined;
+  };
+
+  async function toggleActive() {
+    setToggling(true);
+    setToggleError(null);
+    try {
+      onUpdated(await medicationApi.update(schedule.id, { isActive: !schedule.isActive }));
+    } catch (error) {
+      const info = describeError(error);
+      setToggleError(`${info.title}. ${info.detail}`);
+    } finally {
+      setToggling(false);
+    }
+  }
 
   const badTimes = parseList(timesText).filter((t) => !isValidTimeOfDay(t));
   const timesError = badTimes.length ? `Use 24-hour HH:mm, for example 08:00. Not valid: ${badTimes.join(", ")}` : null;
@@ -97,8 +119,14 @@ function ScheduleCard({ schedule, onUpdated }: { schedule: MedicationSchedule; o
 
   return (
     <Card>
-      <AppText variant="heading" accessibilityRole="header">{schedule.medicationName}</AppText>
-      <AppText>{schedule.dose} · {schedule.frequency}</AppText>
+      <AppText variant="heading" accessibilityRole="header">{med.name ?? "Medicine"}</AppText>
+      <AppText>{[med.strength, med.dose, med.frequency].filter(Boolean).join(" · ")}</AppText>
+      <AppText variant="caption" muted>Copied from your prescription record (version {schedule.sourceVersionNumber}). It can't be edited here.</AppText>
+      {schedule.sourceStatus !== "current" ? (
+        <Banner tone="warning" title={schedule.sourceStatus === "removed" ? "This medicine was removed from the prescription" : "The prescription now says something different"} icon="alert-triangle">
+          Reminders for this schedule are paused. Check the prescription and make a new schedule if it still applies.
+        </Banner>
+      ) : null}
       <AppText variant="small" muted>
         From {formatDateOnly(schedule.startDate)}{schedule.endDate ? ` to ${formatDateOnly(schedule.endDate)}` : ""}
       </AppText>
@@ -129,14 +157,14 @@ function ScheduleCard({ schedule, onUpdated }: { schedule: MedicationSchedule; o
             <Stack gap={space.sm}>
               <AppText variant="label">Today's doses (self-report)</AppText>
               {schedule.reminderTimes.map((time) => {
-                const done = reported[time];
+                const done = doseStatusFor(time);
                 const label = formatTimeOnly(localTimeToIso(time));
                 return (
                   <Row key={time} style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
                     <AppText>{label || time}</AppText>
                     {done ? (
                       <Badge label={`You marked ${done}`} tone={done === "taken" ? "success" : "neutral"} icon={done === "taken" ? "check" : "skip-forward"} />
-                    ) : (
+                    ) : !schedule.isActive ? null : (
                       <Row>
                         <Button label="Taken" variant="secondary" onPress={() => void report(time, "taken")} loading={busyTime === `${time}:taken`} disabled={busyTime !== null} accessibilityHint={`Record that you took the ${label} dose`} />
                         <Button label="Skipped" variant="ghost" onPress={() => void report(time, "skipped")} loading={busyTime === `${time}:skipped`} disabled={busyTime !== null} accessibilityHint={`Record that you skipped the ${label} dose`} />
@@ -148,6 +176,18 @@ function ScheduleCard({ schedule, onUpdated }: { schedule: MedicationSchedule; o
             </Stack>
           )}
           {doseError ? <Banner tone="danger" title={doseError} icon="alert-circle" /> : null}
+          {schedule.recentDoseEvents.length > 0 ? (
+            <Stack gap={space.xs}>
+              <AppText variant="label">Recent doses you recorded</AppText>
+              {schedule.recentDoseEvents.slice(0, 5).map((e) => (
+                <AppText key={e.id} variant="small" muted>{formatDateTime(e.scheduledFor)} · {e.status === "taken" ? "Taken" : "Skipped"} (self-reported)</AppText>
+              ))}
+              <AppText variant="caption" muted>A recorded dose can't be changed or removed yet.</AppText>
+            </Stack>
+          ) : null}
+          <AppText variant="caption" muted>{schedule.notice}</AppText>
+          {toggleError ? <Banner tone="danger" title={toggleError} icon="alert-circle" /> : null}
+          <Button label={schedule.isActive ? "Stop this schedule" : "Resume this schedule"} variant="ghost" icon={schedule.isActive ? "pause-circle" : "play-circle"} onPress={() => void toggleActive()} loading={toggling} />
           <Button label="Edit reminders" variant="secondary" icon="edit-2" onPress={() => { setTimesText(listToText(schedule.reminderTimes)); setEnabled(schedule.remindersEnabled); setEditing(true); }} />
         </>
       )}

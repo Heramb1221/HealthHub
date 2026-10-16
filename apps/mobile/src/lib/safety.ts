@@ -40,16 +40,39 @@ export function isInstructionSafe(med: PrescriptionMedication): boolean {
   return medicationReviewReasons(med).length === 0;
 }
 
+/** BACKEND K2: a version counts as reviewed only after a person corrected or confirmed it. */
+export function isReviewedByPerson(status: Prescription["verificationStatus"]): boolean {
+  return status === "patient_corrected" || status === "verified_by_authorized_clinician";
+}
+
+export type ScheduleBlock = "not_finished" | "not_reviewed" | "incomplete" | "low_confidence";
+
 /**
- * Whether the UI may offer "Add to schedule" for this medication. Conservative: the prescription must have
- * finished processing, must not be flagged for review as a whole, and the medication itself must be complete.
+ * Why "Add to schedule" is not offered, or null when it is. Mirrors backend K2 (reviewed by a person, complete,
+ * confidence >= 0.85) so the patient is told what to do, but the server decides and may still refuse.
  */
+export function scheduleBlock(
+  prescription: Pick<Prescription, "processingStatus" | "verificationStatus">,
+  med: PrescriptionMedication,
+): ScheduleBlock | null {
+  if (prescription.processingStatus !== "completed") return "not_finished";
+  if (!isReviewedByPerson(prescription.verificationStatus)) return "not_reviewed";
+  const reasons = medicationReviewReasons(med);
+  if (reasons.some((r) => r.startsWith("missing_"))) return "incomplete";
+  if (reasons.includes("low_confidence")) return "low_confidence";
+  return null;
+}
+
+export const SCHEDULE_BLOCK_LABEL: Record<ScheduleBlock, string> = {
+  not_finished: "A schedule can be made once the prescription has been read.",
+  not_reviewed: "To make a schedule, first review these details against your paper prescription and save them.",
+  incomplete: "A schedule can't be made until the name, strength, dose and how often are all filled in.",
+  low_confidence: "Tick \"I checked this medicine\" when you review the details to confirm it against your paper prescription.",
+};
+
+/** Whether the UI may offer "Add to schedule" for this medication. */
 export function canOfferSchedule(prescription: Pick<Prescription, "processingStatus" | "verificationStatus">, med: PrescriptionMedication): boolean {
-  return (
-    prescription.processingStatus === "completed" &&
-    prescription.verificationStatus !== "needs_review" &&
-    isInstructionSafe(med)
-  );
+  return scheduleBlock(prescription, med) === null;
 }
 
 /** A dose line is shown as an instruction only when safe; otherwise the UI shows "Needs review". */

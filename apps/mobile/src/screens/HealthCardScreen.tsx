@@ -23,6 +23,7 @@ export function HealthCardScreen() {
   const [qrError, setQrError] = useState<string | null>(null);
   const [lookup, setLookup] = useState<QrLookup | null>(null);
   const [lookupBusy, setLookupBusy] = useState(false);
+  const [revoking, setRevoking] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
 
@@ -39,8 +40,10 @@ export function HealthCardScreen() {
   if (!c) return null;
 
   const readable = (list.data?.items ?? []).filter((p) => p.processingStatus === "completed");
+  const revoked = Boolean(session?.revokedAt);
   const expired = session ? new Date(session.expiresAt).getTime() <= now.getTime() : false;
-  const payload = session ? (session.url ?? session.reference ?? session.id) : null;
+  // BACKEND J3: the payload is a link with a random id; it is the only thing the QR code encodes.
+  const payload = session ? session.qrPayload : null;
 
   async function createQr() {
     if (!selected) return;
@@ -57,6 +60,22 @@ export function HealthCardScreen() {
       setQrError(`${info.title}. ${info.detail}`);
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function revokeQr() {
+    if (!session) return;
+    setRevoking(true);
+    setQrError(null);
+    try {
+      setSession(await qrApi.revokeSession(session.id));
+      setLookup(null);
+      void access.reload();
+    } catch (error) {
+      const info = describeError(error);
+      setQrError(`${info.title}. ${info.detail}`);
+    } finally {
+      setRevoking(false);
     }
   }
 
@@ -101,7 +120,7 @@ export function HealthCardScreen() {
 
         <AppText variant="heading" accessibilityRole="header">Share a prescription with a QR code</AppText>
         <AppText variant="small" muted>
-          The QR code holds only a random reference, never medical details. It stops working when it expires, and each lookup is recorded below.
+          The QR code holds only a random link, never medical details. Scanning it gives no access by itself: a provider also needs your consent. It stops working when it expires or when you turn it off, and each use is recorded below.
         </AppText>
         {list.loading ? (
           <AppText muted>Loading prescriptions…</AppText>
@@ -124,7 +143,9 @@ export function HealthCardScreen() {
 
         {session && payload ? (
           <Card style={{ alignItems: "center" }}>
-            {expired ? (
+            {revoked ? (
+              <Banner tone="info" title="You turned this QR code off" icon="slash">It no longer works. Create a new one to share again.</Banner>
+            ) : expired ? (
               <Banner tone="warning" title="This QR code has expired" icon="clock">Create a new one to share again.</Banner>
             ) : (
               <>
@@ -132,13 +153,14 @@ export function HealthCardScreen() {
                   <QRCode value={payload} size={200} />
                 </View>
                 <AppText variant="small" muted>Expires in {formatCountdown(session.expiresAt, now)} ({fmt(session.expiresAt)})</AppText>
-                <Button label="Check what this QR shows" variant="secondary" icon="eye" onPress={() => void checkLookup()} loading={lookupBusy} />
+                <Button label="Check what this QR shows" variant="secondary" icon="eye" onPress={() => void checkLookup()} loading={lookupBusy} disabled={revoking} />
+                <Button label="Turn this QR code off" variant="danger" icon="slash" onPress={() => void revokeQr()} loading={revoking} disabled={lookupBusy} />
               </>
             )}
             {lookupError ? <Banner tone="danger" title={lookupError} icon="alert-circle" /> : null}
-            {lookup && !expired ? (
+            {lookup && !expired && !revoked ? (
               <AppText variant="small" accessibilityLiveRegion="polite">
-                QR is active{lookup.prescription?.medications ? ` and would show ${lookup.prescription.medications.length} medicine(s)` : ""}.
+                QR is active. A permitted reader would see this prescription as it is now ({lookup.prescription.medications.length} medicine(s)) with its review status, and nothing from your profile.
               </AppText>
             ) : null}
           </Card>

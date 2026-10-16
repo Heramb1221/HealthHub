@@ -31,6 +31,7 @@ interface Version {
   kind: "extraction" | "patient_correction";
   verificationStatus: string;
   extractionProvider: string | null;
+  extractionConfidence: number | null;
   prescriptionDate: string | null;
   prescriberName: string | null;
   medications: Med[];
@@ -44,17 +45,28 @@ interface Rx {
   createdAt: string;
   versions: Version[];
 }
+interface DemoDose {
+  id: string;
+  scheduledFor: string;
+  status: "taken" | "skipped";
+  recordedAt: string;
+}
 interface Schedule {
   id: string;
-  medicationName: string;
-  dose: string;
-  frequency: string;
+  prescriptionId: string;
+  position: number;
+  sourceVersionNumber: number;
+  /** Copy of the prescription row at creation (backend K1): never edited afterwards. */
+  med: Omit<Med, "confidence">;
   startDate: string;
   endDate: string | null;
   reminderTimes: string[];
   remindersEnabled: boolean;
   timezone: string;
   isActive: boolean;
+  doses: DemoDose[];
+  createdAt: string;
+  updatedAt: string;
 }
 interface Slot {
   id: string;
@@ -67,6 +79,13 @@ interface Appt {
   id: string;
   slotId: string;
   status: "confirmed" | "cancelled";
+  cancelledAt: string | null;
+  createdAt: string;
+}
+interface QrSess {
+  prescriptionId: string;
+  expiresAt: number;
+  revokedAt: string | null;
   createdAt: string;
 }
 
@@ -91,7 +110,7 @@ interface State {
   history: Json[];
   access: Json[];
   consents: Json[];
-  qr: Map<string, { prescriptionId: string; expiresAt: number }>;
+  qr: Map<string, QrSess>;
   slots: Slot[];
   appts: Appt[];
 }
@@ -129,6 +148,7 @@ function version(prescriptionId: string, n: number, kind: Version["kind"], statu
     kind,
     verificationStatus: status,
     extractionProvider: kind === "extraction" ? "demo-synthetic" : null,
+    extractionConfidence: kind === "extraction" ? 0.9 : null,
     prescriptionDate: date,
     prescriberName: prescriber,
     medications: meds,
@@ -161,7 +181,7 @@ function freshState(): State {
     rxs: [],
     schedules: [],
     history: [
-      { id: "demo-hist-1", title: "Seasonal allergy (demo entry)", kind: "condition", notes: "Sample entry reported by the patient.", recordedAt: iso(new Date(Date.now() - 30 * 86_400_000)), source: "patient_reported", verificationStatus: "unverified" },
+      { id: "demo-hist-1", title: "Seasonal allergy (demo entry)", kind: "condition", notes: "Sample entry reported by the patient.", diagnosedOn: null, createdAt: iso(new Date(Date.now() - 30 * 86_400_000)), source: "patient_reported", verificationStatus: "unverified" },
     ],
     access: [
       { id: "demo-a1", occurredAt: iso(new Date(Date.now() - 86_400_000)), action: "patient.profile_updated", outcome: "success", actor: { type: "self" }, resourceType: "patient", details: { changedFields: ["phone"] } },
@@ -228,6 +248,10 @@ function rxView(rx: Rx): Json {
   };
 }
 
+function qrView(id: string, q: QrSess): Json {
+  return { id, prescriptionId: q.prescriptionId, qrPayload: `healthhub://qr/${id}`, expiresAt: iso(new Date(q.expiresAt)), revokedAt: q.revokedAt, createdAt: q.createdAt };
+}
+
 function slotView(s: Slot): Json {
   return { id: s.id, startsAt: s.startsAt, endsAt: s.endsAt, status: s.booked ? "booked" : "open" };
 }
@@ -239,10 +263,67 @@ function apptView(a: Appt): Json {
     id: a.id,
     slotId: a.slotId,
     status: a.status,
+    hospital: hospital ? { id: hospital.id, name: hospital.name, isDemo: true } : { id: "", name: "Hospital", isDemo: true },
+    startsAt: slot?.startsAt ?? a.createdAt,
+    endsAt: slot?.endsAt ?? a.createdAt,
+    cancelledAt: a.cancelledAt,
     createdAt: a.createdAt,
-    slot: slot ? { startsAt: slot.startsAt, endsAt: slot.endsAt, hospitalId: slot.hospitalId } : undefined,
-    hospital: hospital ? { id: hospital.id, name: hospital.name, isDemo: true } : undefined,
   };
+}
+
+const MED_KEYS = ["name", "strength", "dose", "route", "frequency", "duration", "instructions"] as const;
+const REVIEWED = ["patient_corrected", "verified_by_authorized_clinician"];
+const realDate = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) && new Date(`${v}T00:00:00Z`).toISOString().startsWith(v);
+const shiftKey = (days: number): string => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+
+function scheduleView(sch: Schedule): Json {
+  const rx = state.rxs.find((r) => r.id === sch.prescriptionId);
+  const latest = rx?.versions[rx.versions.length - 1];
+  let sourceStatus: "current" | "changed" | "removed" = "current";
+  if (latest && latest.versionNumber !== sch.sourceVersionNumber) {
+    const now = latest.medications[sch.position];
+    if (!now) sourceStatus = "removed";
+    else sourceStatus = MED_KEYS.every((k) => now[k] === sch.med[k]) ? "current" : "changed";
+  }
+  const today = dateKey(new Date());
+  const inWindow = sch.startDate <= today && (sch.endDate === null || today <= sch.endDate);
+  const cutoff = Date.now() - 14 * 86_400_000;
+  return {
+    id: sch.id,
+    prescriptionId: sch.prescriptionId,
+    sourceVersionNumber: sch.sourceVersionNumber,
+    sourceStatus,
+    medication: { ...sch.med },
+    startDate: sch.startDate,
+    endDate: sch.endDate,
+    reminderTimes: sch.reminderTimes,
+    remindersEnabled: sch.remindersEnabled,
+    remindersActive: sch.isActive && sch.remindersEnabled && sourceStatus === "current" && inWindow,
+    timezone: sch.timezone,
+    isActive: sch.isActive,
+    recentDoseEvents: sch.doses.filter((d) => Date.parse(d.scheduledFor) >= cutoff).slice(-20).reverse().map((d) => ({ ...d, selfReported: true })),
+    notice: "This is a reminder plan made from your prescription record. It is not medical advice. Follow your doctor's instructions.",
+    createdAt: sch.createdAt,
+    updatedAt: sch.updatedAt,
+  };
+}
+
+function changedFieldNames(prev: Version | undefined, date: string | null, prescriber: string | null, meds: Med[], confirmedRows: number[]): string[] {
+  const out: string[] = [];
+  if ((prev?.prescriptionDate ?? null) !== date) out.push("prescriptionDate");
+  if ((prev?.prescriberName ?? null) !== prescriber) out.push("prescriberName");
+  const before = prev?.medications ?? [];
+  for (let i = 0; i < Math.max(before.length, meds.length); i++) {
+    const b = before[i];
+    const a = meds[i];
+    if (!b) out.push(`medications.${i}.added`);
+    else if (!a) out.push(`medications.${i}.removed`);
+    else {
+      for (const k of MED_KEYS) if (b[k] !== a[k]) out.push(`medications.${i}.${k}`);
+      if (confirmedRows.includes(i)) out.push(`medications.${i}.confirmed`);
+    }
+  }
+  return out;
 }
 
 /** Same safety gate as the web/mobile clients and backend note I3 (0.85, four required fields). */
@@ -335,13 +416,17 @@ function validMeds(input: unknown): Med[] | null {
   const out: Med[] = [];
   for (const m of input) {
     if (!isRecord(m)) return null;
-    const allowed = ["name", "strength", "dose", "route", "frequency", "duration", "instructions"];
-    if (Object.keys(m).some((k) => !allowed.includes(k))) return null;
-    const field = (k: string): string | null => {
+    if (Object.keys(m).some((k) => ![...MED_KEYS, "confirmed"].includes(k as never))) return null;
+    if ("confirmed" in m && typeof m.confirmed !== "boolean") return null;
+    const row: Record<string, string | null> = {};
+    for (const k of MED_KEYS) {
       const v = m[k];
-      return typeof v === "string" && v.trim() ? v.trim().slice(0, 200) : null;
-    };
-    out.push({ name: field("name"), strength: field("strength"), dose: field("dose"), route: field("route"), frequency: field("frequency"), duration: field("duration"), instructions: field("instructions"), confidence: 0 });
+      if (v === undefined || v === null) row[k] = null;
+      else if (typeof v === "string" && v.trim() !== "" && v.length <= 200) row[k] = v.trim();
+      else return null;
+    }
+    if (MED_KEYS.every((k) => row[k] === null)) return null;
+    out.push({ ...(row as Omit<Med, "confidence">), confidence: 0 });
   }
   return out;
 }
@@ -421,9 +506,14 @@ export async function demoFetch(input: string | URL | Request, init?: RequestIni
     const sub = rxMatch[2];
     if (!sub && method === "GET") return ok(rxView(rx));
     if (sub === "versions" && method === "GET") return list([...rx.versions].reverse());
+    if (sub === "latest" && method === "GET") {
+      const last = rx.versions[rx.versions.length - 1];
+      return last ? ok(last) : fail(404, "NOT_FOUND", "No extracted version yet");
+    }
     if (sub === "process" && method === "POST") {
       if (rx.status === "completed") return fail(409, "CONFLICT", "This prescription has already been read");
-      await delay(500);
+      if (rx.versions.some((v) => v.kind === "patient_correction")) return fail(409, "CONFLICT", "Details you entered are already saved for this prescription");
+      await delay(2000);
       const lower = rx.fileName.toLowerCase();
       if (lower.includes("illegible")) {
         rx.status = "failed";
@@ -435,17 +525,46 @@ export async function demoFetch(input: string | URL | Request, init?: RequestIni
       return ok(rxView(rx));
     }
     if (sub === "extracted-fields" && method === "PATCH") {
-      if (rx.status !== "completed" && rx.status !== "failed") return fail(409, "CONFLICT", "Wait for reading to finish first");
-      if (!isRecord(body) || Object.keys(body).some((k) => !["prescriptionDate", "prescriberName", "medications"].includes(k))) return invalid();
-      const meds = validMeds(body.medications);
-      const date = body.prescriptionDate;
-      if (!meds || (date !== null && (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date))))) return invalid();
+      // BACKEND J1: owner only, based on the version the patient saw, a NEW version is the result.
+      if (rx.status === "processing") return fail(409, "CONFLICT", "The prescription is being processed");
+      if (!isRecord(body) || Object.keys(body).some((k) => !["baseVersionNumber", "prescriptionDate", "prescriberName", "medications"].includes(k))) return invalid();
+      const base = body.baseVersionNumber;
+      if (typeof base !== "number" || !Number.isInteger(base) || base < 0) return invalid();
+      if (!("prescriptionDate" in body) && !("prescriberName" in body) && !("medications" in body)) return invalid();
+      if (base !== rx.versions.length) return fail(409, "CONFLICT", "The record changed since you loaded it");
       const prev = rx.versions[rx.versions.length - 1];
-      // A patient correction carries forward the extraction confidence per medicine position; new rows get 0 (never "confident").
-      const carried = meds.map((m, i) => ({ ...m, confidence: prev?.medications[i]?.confidence ?? 0 }));
-      rx.versions.push(version(rx.id, rx.versions.length + 1, "patient_correction", "patient_corrected", (date as string | null) ?? null, trimmedOrNull(body.prescriberName) ?? null, carried, ["medications"]));
-      rx.status = "completed";
-      return ok(rxView(rx));
+      let date = prev?.prescriptionDate ?? null;
+      if ("prescriptionDate" in body) {
+        const d = body.prescriptionDate;
+        if (d !== null && (!realDate(d) || d < "1900-01-01" || d > dateKey(new Date()))) return invalid();
+        date = d as string | null;
+      }
+      let prescriber = prev?.prescriberName ?? null;
+      if ("prescriberName" in body) {
+        const n = body.prescriberName;
+        if (n !== null && (typeof n !== "string" || n.trim() === "")) return invalid();
+        prescriber = n === null ? null : n.trim();
+      }
+      let meds = prev?.medications ?? [];
+      const confirmedRows: number[] = [];
+      if ("medications" in body) {
+        const rows = validMeds(body.medications);
+        if (!rows) return invalid();
+        const input = body.medications as Json[];
+        meds = rows.map((row, i) => {
+          const before = prev?.medications[i];
+          const unchanged = before !== undefined && MED_KEYS.every((k) => before[k] === row[k]);
+          const confirmed = input[i]?.confirmed === true;
+          if (confirmed) confirmedRows.push(i);
+          // BACKEND J1/K3: unchanged keeps its confidence unless confirmed; edited or added rows are "stated by a person" (1).
+          return { ...row, confidence: unchanged ? (confirmed ? 1 : (before?.confidence ?? 1)) : 1 };
+        });
+      }
+      const changed = changedFieldNames(prev, date, prescriber, meds, confirmedRows);
+      const created = version(rx.id, rx.versions.length + 1, "patient_correction", "patient_corrected", date, prescriber, meds, changed);
+      rx.versions.push(created);
+      if (rx.status === "failed" || rx.status === "pending") rx.status = "completed";
+      return ok(created, 201);
     }
     if (sub === "pdf") return fail(404, "NOT_FOUND", "PDF is not available in demo mode");
   }
@@ -463,36 +582,42 @@ export async function demoFetch(input: string | URL | Request, init?: RequestIni
     return ok(c);
   }
 
-  // ----- medication schedules -----
+  // ----- medication schedules (BACKEND K) -----
   if (path === "/medication-schedules") {
-    if (method === "GET") return list(state.schedules);
+    if (method === "GET") return list([...state.schedules].reverse().map(scheduleView));
     if (method === "POST") {
-      if (!isRecord(body)) return invalid();
+      const allowed = ["prescriptionId", "versionNumber", "medicationPosition", "startDate", "endDate", "reminderTimes", "remindersEnabled", "timezone"];
+      if (!isRecord(body) || Object.keys(body).some((k) => !allowed.includes(k))) return invalid();
+      const pos = body.medicationPosition;
+      if (typeof body.prescriptionId !== "string" || typeof body.versionNumber !== "number" || typeof pos !== "number" || !Number.isInteger(pos) || pos < 0 || pos > 29) return invalid();
+      if (!realDate(body.startDate) || body.startDate < shiftKey(-30) || body.startDate > shiftKey(365)) return invalid();
+      if (body.endDate !== undefined && body.endDate !== null && (!realDate(body.endDate) || body.endDate < body.startDate)) return invalid();
+      if (typeof body.timezone !== "string" || !/^(UTC|[A-Za-z]+(\/[A-Za-z0-9_+-]+)+)$/i.test(body.timezone)) return invalid();
+      const times = body.reminderTimes === undefined ? [] : body.reminderTimes;
+      if (!Array.isArray(times) || times.length > 12 || times.some((x) => typeof x !== "string" || !/^([01]\d|2[0-3]):[0-5]\d$/.test(x))) return invalid();
+      const sortedTimes = [...new Set(times as string[])].sort();
+      const enabled = body.remindersEnabled === true;
+      if (enabled && sortedTimes.length === 0) return invalid();
       const rx = state.rxs.find((r) => r.id === body.prescriptionId);
-      const idx = body.medicationIndex;
-      if (!rx || typeof idx !== "number" || typeof body.startDate !== "string" || typeof body.timezone !== "string") return invalid();
+      if (!rx) return notFound();
       const v = rx.versions[rx.versions.length - 1];
-      const m = v?.medications[idx];
-      if (!v || !m) return notFound();
-      if (rx.status !== "completed" || v.verificationStatus === "needs_review" || !medicationIsSafe(m)) {
-        return fail(409, "CONFLICT", "This medicine needs review before a schedule can be made");
-      }
-      const f = (m.frequency ?? "").toLowerCase();
-      const times = f.includes("twice") ? ["08:00", "20:00"] : f.includes("once") ? ["08:00"] : [];
+      if (!v) return fail(409, "CONFLICT", "This prescription has no details yet");
+      if (v.versionNumber !== body.versionNumber) return fail(409, "CONFLICT", "The prescription changed since you loaded it. Reload and try again");
+      if (!REVIEWED.includes(v.verificationStatus)) return fail(409, "CONFLICT", "Review and save this prescription yourself before making a schedule");
+      const m = v.medications[pos];
+      if (!m) return notFound();
+      if (!medicationIsSafe(m)) return fail(409, "CONFLICT", "This medicine is incomplete or not confirmed, so a schedule can't be made");
+      if (state.schedules.some((x) => x.isActive && x.prescriptionId === rx.id && x.position === pos)) return fail(409, "CONFLICT", "This medicine already has an active schedule");
+      if (state.schedules.filter((x) => x.isActive).length >= 50) return fail(409, "CONFLICT", "Too many active schedules");
+      const { confidence: _c, ...copy } = m;
       const sch: Schedule = {
-        id: nextId("demo-sch"),
-        medicationName: m.name ?? "Medicine",
-        dose: [m.strength, m.dose].filter(Boolean).join(" · "),
-        frequency: m.frequency ?? "",
-        startDate: body.startDate,
-        endDate: null,
-        reminderTimes: times,
-        remindersEnabled: times.length > 0,
-        timezone: body.timezone,
-        isActive: true,
+        id: nextId("demo-sch"), prescriptionId: rx.id, position: pos, sourceVersionNumber: v.versionNumber, med: copy,
+        startDate: body.startDate, endDate: (body.endDate as string | null | undefined) ?? null,
+        reminderTimes: sortedTimes, remindersEnabled: enabled, timezone: body.timezone, isActive: true, doses: [],
+        createdAt: iso(new Date()), updatedAt: iso(new Date()),
       };
       state.schedules.push(sch);
-      return ok(sch, 201);
+      return ok(scheduleView(sch), 201);
     }
   }
   const schMatch = /^\/medication-schedules\/([^/]+)(?:\/(dose-events))?$/.exec(path);
@@ -500,48 +625,88 @@ export async function demoFetch(input: string | URL | Request, init?: RequestIni
     const sch = state.schedules.find((s) => s.id === decodeURIComponent(schMatch[1] ?? ""));
     if (!sch) return notFound();
     if (!schMatch[2] && method === "PATCH") {
-      if (!isRecord(body) || Object.keys(body).some((k) => !["remindersEnabled", "reminderTimes", "isActive"].includes(k))) return invalid();
+      const allowed = ["reminderTimes", "remindersEnabled", "timezone", "endDate", "isActive"];
+      if (!isRecord(body) || Object.keys(body).length === 0 || Object.keys(body).some((k) => !allowed.includes(k))) return invalid();
+      let times = sch.reminderTimes;
       if ("reminderTimes" in body) {
         const t = body.reminderTimes;
-        if (!Array.isArray(t) || t.some((x) => typeof x !== "string" || !/^([01]\d|2[0-3]):[0-5]\d$/.test(x))) return invalid();
-        sch.reminderTimes = t as string[];
+        if (!Array.isArray(t) || t.length > 12 || t.some((x) => typeof x !== "string" || !/^([01]\d|2[0-3]):[0-5]\d$/.test(x))) return invalid();
+        times = [...new Set(t as string[])].sort();
       }
-      if (typeof body.remindersEnabled === "boolean") sch.remindersEnabled = body.remindersEnabled;
+      const enabled = typeof body.remindersEnabled === "boolean" ? body.remindersEnabled : sch.remindersEnabled;
+      if (enabled && times.length === 0) return invalid();
+      if ("timezone" in body && (typeof body.timezone !== "string" || !/^(UTC|[A-Za-z]+(\/[A-Za-z0-9_+-]+)+)$/i.test(body.timezone))) return invalid();
+      if ("endDate" in body && body.endDate !== null && (!realDate(body.endDate) || body.endDate < sch.startDate)) return invalid();
+      if (typeof body.isActive === "boolean" && body.isActive && !sch.isActive) {
+        if (state.schedules.some((x) => x !== sch && x.isActive && x.prescriptionId === sch.prescriptionId && x.position === sch.position)) return fail(409, "CONFLICT", "This medicine already has an active schedule");
+        if ((scheduleView(sch).sourceStatus as string) !== "current") return fail(409, "CONFLICT", "The prescription has changed since this schedule was made");
+      }
+      sch.reminderTimes = times;
+      sch.remindersEnabled = enabled;
+      if (typeof body.timezone === "string") sch.timezone = body.timezone;
+      if ("endDate" in body) sch.endDate = body.endDate as string | null;
       if (typeof body.isActive === "boolean") sch.isActive = body.isActive;
-      return ok(sch);
+      sch.updatedAt = iso(new Date());
+      return ok(scheduleView(sch));
     }
     if (schMatch[2] === "dose-events" && method === "POST") {
-      if (!isRecord(body) || (body.status !== "taken" && body.status !== "skipped") || typeof body.scheduledFor !== "string" || Number.isNaN(Date.parse(body.scheduledFor))) return invalid();
-      return ok({ id: nextId("demo-dose"), scheduledFor: body.scheduledFor, status: body.status, reportedAt: iso(new Date()), selfReported: true }, 201);
+      if (!isRecord(body) || Object.keys(body).some((k) => k !== "scheduledFor" && k !== "status")) return invalid();
+      if ((body.status !== "taken" && body.status !== "skipped") || typeof body.scheduledFor !== "string" || Number.isNaN(Date.parse(body.scheduledFor))) return invalid();
+      const at = Date.parse(body.scheduledFor);
+      if (!sch.isActive) return fail(409, "CONFLICT", "This schedule is stopped");
+      if (at > Date.now() + 3_600_000) return invalid();
+      const day = new Date(at).toISOString().slice(0, 10);
+      if (day < sch.startDate || (sch.endDate && day > sch.endDate)) return invalid();
+      if (sch.doses.some((d) => Date.parse(d.scheduledFor) === at)) return fail(409, "CONFLICT", "A dose is already recorded for this time");
+      const event: DemoDose = { id: nextId("demo-dose"), scheduledFor: new Date(at).toISOString(), status: body.status, recordedAt: iso(new Date()) };
+      sch.doses.push(event);
+      return ok({ ...event, scheduleId: sch.id, selfReported: true }, 201);
     }
   }
 
-  // ----- history -----
+  // ----- history (BACKEND L5) -----
   if (path === "/health-history" && method === "GET") return list(state.history);
   if (path === "/health-history/conditions" && method === "POST") {
-    if (!isRecord(body) || Object.keys(body).some((k) => k !== "name" && k !== "notes")) return invalid();
-    const name = trimmedOrNull(body.name);
-    if (!name) return invalid();
-    const entry = { id: nextId("demo-hist"), title: name, kind: "condition", notes: trimmedOrNull(body.notes) ?? null, recordedAt: iso(new Date()), source: "patient_reported", verificationStatus: "unverified" };
+    if (!isRecord(body) || Object.keys(body).some((k) => !["title", "notes", "diagnosedOn"].includes(k))) return invalid();
+    const title = trimmedOrNull(body.title);
+    if (!title || title.length > 120) return invalid();
+    const notes = body.notes === undefined ? null : trimmedOrNull(body.notes);
+    if (notes === undefined || (notes !== null && notes.length > 500)) return invalid();
+    const on = body.diagnosedOn ?? null;
+    if (on !== null && (!realDate(on) || on < "1900-01-01" || on > dateKey(new Date()))) return invalid();
+    if (state.history.length >= 200) return fail(409, "CONFLICT", "History entry limit reached");
+    const entry = { id: nextId("demo-hist"), title, kind: "condition", notes, diagnosedOn: on, createdAt: iso(new Date()), source: "patient_reported", verificationStatus: "unverified" };
     state.history.unshift(entry);
     return ok(entry, 201);
   }
 
-  // ----- QR -----
+  // ----- QR (BACKEND J3: random reference, 15 min, owner-only, revocable) -----
   if (path === "/qr/access-sessions" && method === "POST") {
-    if (!isRecord(body) || typeof body.prescriptionId !== "string" || !state.rxs.some((r) => r.id === body.prescriptionId)) return invalid();
+    if (!isRecord(body) || Object.keys(body).some((k) => k !== "prescriptionId") || typeof body.prescriptionId !== "string") return invalid();
+    if (!state.rxs.some((r) => r.id === body.prescriptionId)) return notFound();
     const id = nextId("demo-qr");
-    const expiresAt = Date.now() + 10 * 60_000;
-    state.qr.set(id, { prescriptionId: body.prescriptionId, expiresAt });
-    state.access.unshift({ id: nextId("demo-a"), occurredAt: iso(new Date()), action: "consent.created", outcome: "success", actor: { type: "self" }, resourceType: "qr_session", details: { resourceScope: "prescriptions:read" } });
-    return ok({ id, expiresAt: iso(new Date(expiresAt)), reference: `healthhub://demo-qr/${id}` }, 201);
+    const sess: QrSess = { prescriptionId: body.prescriptionId, expiresAt: Date.now() + 15 * 60_000, revokedAt: null, createdAt: iso(new Date()) };
+    state.qr.set(id, sess);
+    state.access.unshift({ id: nextId("demo-a"), occurredAt: iso(new Date()), action: "qr.session_created", outcome: "success", actor: { type: "self" }, resourceType: "qr_session", details: {} });
+    return ok(qrView(id, sess), 201);
   }
   const qrMatch = /^\/qr\/access-sessions\/([^/]+)$/.exec(path);
-  if (qrMatch && method === "GET") {
-    const s = state.qr.get(decodeURIComponent(qrMatch[1] ?? ""));
-    if (!s || s.expiresAt <= Date.now()) return notFound();
-    const rx = state.rxs.find((r) => r.id === s.prescriptionId);
-    return ok({ status: "active", expiresAt: iso(new Date(s.expiresAt)), prescription: rx ? { medications: rxView(rx).medications } : undefined });
+  if (qrMatch) {
+    const qid = decodeURIComponent(qrMatch[1] ?? "");
+    const s = state.qr.get(qid);
+    if (!s) return notFound();
+    if (method === "GET") {
+      if (s.revokedAt || s.expiresAt <= Date.now()) return notFound();
+      const rx = state.rxs.find((r) => r.id === s.prescriptionId);
+      return rx ? ok({ session: { id: qid, expiresAt: iso(new Date(s.expiresAt)) }, prescription: rxView(rx) }) : notFound();
+    }
+    if (method === "DELETE") {
+      if (!s.revokedAt) {
+        s.revokedAt = iso(new Date());
+        state.access.unshift({ id: nextId("demo-a"), occurredAt: iso(new Date()), action: "qr.session_revoked", outcome: "success", actor: { type: "self" }, resourceType: "qr_session", details: {} });
+      }
+      return ok(qrView(qid, s));
+    }
   }
 
   // ----- hospitals and appointments -----
@@ -559,9 +724,13 @@ export async function demoFetch(input: string | URL | Request, init?: RequestIni
       if (!isRecord(body) || Object.keys(body).some((k) => k !== "slotId") || typeof body.slotId !== "string") return invalid();
       const slot = state.slots.find((s) => s.id === body.slotId);
       if (!slot) return notFound();
-      if (slot.booked) return fail(409, "CONFLICT", "Slot already booked");
+      if (Date.parse(slot.startsAt) <= Date.now()) return fail(409, "CONFLICT", "This slot has already started or passed");
+      if (slot.booked) return fail(409, "CONFLICT", "This slot is no longer available");
+      const mine = state.appts.filter((a) => a.status === "confirmed").map((a) => state.slots.find((x) => x.id === a.slotId)).filter((x): x is Slot => Boolean(x));
+      if (mine.some((o) => Date.parse(o.startsAt) < Date.parse(slot.endsAt) && Date.parse(o.endsAt) > Date.parse(slot.startsAt))) return fail(409, "CONFLICT", "You already have an appointment at this time");
+      if (mine.length >= 10) return fail(409, "CONFLICT", "Too many upcoming appointments. Cancel one first");
       slot.booked = true;
-      const a: Appt = { id: nextId("demo-appt"), slotId: slot.id, status: "confirmed", createdAt: iso(new Date()) };
+      const a: Appt = { id: nextId("demo-appt"), slotId: slot.id, status: "confirmed", cancelledAt: null, createdAt: iso(new Date()) };
       state.appts.push(a);
       return ok(apptView(a), 201);
     }
@@ -571,7 +740,10 @@ export async function demoFetch(input: string | URL | Request, init?: RequestIni
     const a = state.appts.find((x) => x.id === decodeURIComponent(cancelMatch[1] ?? ""));
     if (!a) return notFound();
     if (a.status === "confirmed") {
+      const st = state.slots.find((x) => x.id === a.slotId);
+      if (st && Date.parse(st.startsAt) <= Date.now()) return fail(409, "CONFLICT", "This appointment has already started or passed");
       a.status = "cancelled";
+      a.cancelledAt = iso(new Date());
       const slot = state.slots.find((s) => s.id === a.slotId);
       if (slot) slot.booked = false;
     }

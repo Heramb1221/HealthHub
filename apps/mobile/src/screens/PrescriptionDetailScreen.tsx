@@ -4,17 +4,17 @@ import * as Sharing from "expo-sharing";
 import { useEffect, useRef, useState } from "react";
 
 import { medicationApi, prescriptionApi } from "../api/endpoints";
-import { describeError } from "../api/errors";
+import { ApiError, describeError } from "../api/errors";
 import type { MedicationInput, Prescription, PrescriptionMedication } from "../api/types";
 import { IS_DEMO } from "../config";
 import { useResource } from "../hooks/useResource";
 import { useServerValue } from "../hooks/useServerValue";
 import { formatDateOnly, formatDateTime, orDash, toDateInput } from "../lib/format";
-import { canOfferSchedule, doseLine, medicationReviewReasons, REVIEW_REASON_LABEL } from "../lib/safety";
+import { doseLine, medicationReviewReasons, REVIEW_REASON_LABEL, SCHEDULE_BLOCK_LABEL, scheduleBlock } from "../lib/safety";
 import { PROCESSING_STATUS, SOURCE_TYPE_LABEL, VERIFICATION_STATUS } from "../lib/status";
 import { blankToNull, isValidDateOnly } from "../lib/validation";
 import type { RootStackParamList } from "../navigation/types";
-import { AppText, Badge, Banner, Button, Card, Divider, Field, Screen, Stack, TextField } from "../ui/components";
+import { AppText, Badge, Banner, Button, Card, Chip, Divider, Field, Screen, Stack, TextField } from "../ui/components";
 import { ErrorState, LoadingState } from "../ui/states";
 import { colors, space } from "../ui/theme";
 
@@ -28,9 +28,11 @@ interface MedForm {
   frequency: string;
   duration: string;
   instructions: string;
+  /** BACKEND K3: "I checked this row against the original prescription". */
+  confirmed: boolean;
 }
 
-const EMPTY_MED: MedForm = { name: "", strength: "", dose: "", route: "", frequency: "", duration: "", instructions: "" };
+const EMPTY_MED: MedForm = { name: "", strength: "", dose: "", route: "", frequency: "", duration: "", instructions: "", confirmed: false };
 
 function medToForm(m: PrescriptionMedication): MedForm {
   return {
@@ -41,6 +43,7 @@ function medToForm(m: PrescriptionMedication): MedForm {
     frequency: m.frequency ?? "",
     duration: m.duration ?? "",
     instructions: m.instructions ?? "",
+    confirmed: false,
   };
 }
 
@@ -53,10 +56,11 @@ function formToInput(f: MedForm): MedicationInput {
     frequency: blankToNull(f.frequency),
     duration: blankToNull(f.duration),
     instructions: blankToNull(f.instructions),
+    ...(f.confirmed ? { confirmed: true } : {}),
   };
 }
 
-const MED_FIELDS: { key: keyof MedForm; label: string; hint?: string }[] = [
+const MED_FIELDS: { key: Exclude<keyof MedForm, "confirmed">; label: string; hint?: string }[] = [
   { key: "name", label: "Medicine name", hint: "As written on the prescription" },
   { key: "strength", label: "Strength", hint: "For example: 500 mg" },
   { key: "dose", label: "Dose", hint: "For example: 1 tablet" },
@@ -73,6 +77,17 @@ export function PrescriptionDetailScreen({ route }: Props) {
   const { id } = route.params;
   const res = useResource((signal) => prescriptionApi.get(id, signal));
   const versions = useResource((signal) => prescriptionApi.versions(id, signal));
+  // The newest version number (0 when none yet): corrections and schedules must name the version the patient saw.
+  const latest = useResource((signal) =>
+    prescriptionApi.latest(id, signal).then(
+      (v) => v.versionNumber,
+      (e: unknown) => {
+        if (e instanceof ApiError && e.status === 404) return 0;
+        throw e;
+      },
+    ),
+  );
+  const baseVersion = latest.data;
   const [rx, setRx] = useServerValue<Prescription>(res.data);
   const [gaveUp, setGaveUp] = useState(false);
 
@@ -114,7 +129,7 @@ export function PrescriptionDetailScreen({ route }: Props) {
 
   const proc = PROCESSING_STATUS[rx.processingStatus];
   const ver = VERIFICATION_STATUS[rx.verificationStatus];
-  const canEdit = rx.processingStatus === "completed" || rx.processingStatus === "failed";
+  const canEdit = (rx.processingStatus === "completed" || rx.processingStatus === "failed") && baseVersion !== null;
   const stillWorking = rx.processingStatus === "pending" || rx.processingStatus === "processing";
 
   async function startProcessing() {
@@ -149,18 +164,21 @@ export function PrescriptionDetailScreen({ route }: Props) {
     setSaveMsg(null);
     try {
       const nonEmpty = meds.filter((m) => Object.values(m).some((v) => v.trim() !== ""));
-      const updated = await prescriptionApi.correct(id, {
+      if (baseVersion === null) return;
+      await prescriptionApi.correct(id, {
+        baseVersionNumber: baseVersion,
         prescriptionDate: blankToNull(dateText),
         prescriberName: blankToNull(prescriber),
         medications: nonEmpty.map(formToInput),
       });
-      setRx(updated);
+      // The server answers with the new version; re-read the record so the screen shows what is really stored.
+      await Promise.all([res.poll(), latest.poll(), versions.poll()]);
       setEditing(false);
       setSaveMsg({ tone: "success", text: "Saved as your correction. The original file and earlier versions are kept." });
-      void versions.reload();
     } catch (error) {
       const info = describeError(error);
       setSaveMsg({ tone: "danger", text: `${info.title}. ${info.detail}` });
+      if (error instanceof ApiError && error.status === 409) void Promise.all([res.poll(), latest.poll(), versions.poll()]);
     } finally {
       setSaving(false);
     }
@@ -169,13 +187,15 @@ export function PrescriptionDetailScreen({ route }: Props) {
   async function addToSchedule(index: number) {
     setScheduleBusy(index);
     try {
+      if (baseVersion === null || baseVersion < 1) return;
       const created = await medicationApi.create({
         prescriptionId: id,
-        medicationIndex: index,
+        versionNumber: baseVersion,
+        medicationPosition: index,
         startDate: todayKey(),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
-      setScheduleMsg((m) => ({ ...m, [index]: { tone: "success", text: `Added to your medicine schedule${created?.medicationName ? `: ${created.medicationName}` : ""}.` } }));
+      setScheduleMsg((m) => ({ ...m, [index]: { tone: "success", text: `Added to your medicine schedule${created.medication.name ? `: ${created.medication.name}` : ""}. Set reminder times on the Medicines tab.` } }));
     } catch (error) {
       const info = describeError(error);
       setScheduleMsg((m) => ({ ...m, [index]: { tone: "danger", text: `${info.title}. ${info.detail}` } }));
@@ -232,6 +252,12 @@ export function PrescriptionDetailScreen({ route }: Props) {
                   multiline={f.key === "instructions"}
                 />
               ))}
+              <Chip
+                label={m.confirmed ? `Checked against paper (medicine ${i + 1})` : `I checked medicine ${i + 1} against my paper prescription`}
+                selected={m.confirmed}
+                onPress={() => setMeds((all) => all.map((x, j) => (j === i ? { ...x, confirmed: !x.confirmed } : x)))}
+              />
+              <AppText variant="caption" muted>Only tick this if the details above match your paper prescription. It is your own check, not a clinician's.</AppText>
               <Button label={`Remove medicine ${i + 1}`} variant="danger" icon="trash-2" onPress={() => setMeds((all) => all.filter((_, j) => j !== i))} />
             </Card>
           ))}
@@ -308,13 +334,13 @@ export function PrescriptionDetailScreen({ route }: Props) {
                 <Field label="For how long" value={orDash(m.duration)} />
                 <Field label="Other instructions" value={orDash(m.instructions)} />
                 <AppText variant="caption" muted>Reading confidence: {Math.round((m.confidence ?? 0) * 100)}%</AppText>
-                {canOfferSchedule(rx, m) ? (
+                {scheduleBlock(rx, m) === null ? (
                   <>
-                    <Button label={`Add ${m.name ?? "medicine"} to schedule`} variant="secondary" icon="clock" onPress={() => void addToSchedule(i)} loading={scheduleBusy === i} />
+                    <Button label={`Add ${m.name ?? "medicine"} to schedule`} variant="secondary" icon="clock" onPress={() => void addToSchedule(i)} loading={scheduleBusy === i} disabled={baseVersion === null || baseVersion < 1} />
                     {sched ? <Banner tone={sched.tone} title={sched.text} icon={sched.tone === "success" ? "check-circle" : "alert-circle"} /> : null}
                   </>
                 ) : (
-                  <AppText variant="caption" color={colors.warning}>A schedule can't be made until this medicine is complete and reviewed.</AppText>
+                  <AppText variant="caption" color={colors.warning}>{SCHEDULE_BLOCK_LABEL[scheduleBlock(rx, m) ?? "not_reviewed"]}</AppText>
                 )}
               </Card>
             );

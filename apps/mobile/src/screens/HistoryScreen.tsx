@@ -3,8 +3,9 @@ import { useState } from "react";
 import { historyApi } from "../api/endpoints";
 import { describeError } from "../api/errors";
 import { useResource } from "../hooks/useResource";
-import { formatDateTime } from "../lib/format";
+import { formatDateOnly, formatDateTime } from "../lib/format";
 import { describeHistoryVerification } from "../lib/status";
+import { isValidDateOnly } from "../lib/validation";
 import { AppText, Badge, Banner, Button, Card, Row, Screen, Stack, TextField } from "../ui/components";
 import { EmptyState, ErrorState, LoadingState } from "../ui/states";
 
@@ -19,20 +20,27 @@ export function HistoryScreen() {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [notes, setNotes] = useState("");
+  const [diagnosed, setDiagnosed] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   const nameError = name.length > 0 && name.trim().length === 0 ? "Enter a condition name." : null;
+  const today = new Date().toISOString().slice(0, 10);
+  const diagnosedError =
+    diagnosed.trim() && (!isValidDateOnly(diagnosed.trim()) || diagnosed.trim() < "1900-01-01" || diagnosed.trim() > today)
+      ? "Use the format YYYY-MM-DD, for example 2024-03-15. The date can't be in the future."
+      : null;
 
   async function add() {
-    if (!name.trim()) return;
+    if (!name.trim() || diagnosedError) return;
     setSaving(true);
     setError(null);
     try {
-      await historyApi.addCondition({ name: name.trim(), ...(notes.trim() ? { notes: notes.trim() } : {}) });
+      await historyApi.addCondition({ title: name.trim(), ...(notes.trim() ? { notes: notes.trim() } : {}), ...(diagnosed.trim() ? { diagnosedOn: diagnosed.trim() } : {}) });
       setName("");
       setNotes("");
+      setDiagnosed("");
       setAdding(false);
       setSuccess(true);
       await res.reload(); // show what the server actually stored
@@ -58,10 +66,12 @@ export function HistoryScreen() {
         {adding ? (
           <Card>
             <AppText variant="heading" accessibilityRole="header">Add a condition</AppText>
-            <TextField label="Condition" value={name} onChangeText={setName} error={nameError} hint="For example: Seasonal allergy" />
-            <TextField label="Notes (optional)" value={notes} onChangeText={setNotes} multiline />
+            <TextField label="Condition" value={name} onChangeText={setName} error={nameError} hint="For example: Seasonal allergy" maxLength={120} />
+            <TextField label="Notes (optional)" value={notes} onChangeText={setNotes} multiline maxLength={500} />
+            <TextField label="When it was diagnosed (optional)" value={diagnosed} onChangeText={setDiagnosed} error={diagnosedError} hint="YYYY-MM-DD, or leave blank" keyboardType="numbers-and-punctuation" />
+            <AppText variant="caption" muted>Once saved, an entry can't be edited or removed yet, so check it before saving.</AppText>
             {error ? <Banner tone="danger" title={error} icon="alert-circle" /> : null}
-            <Button label="Save condition" onPress={() => void add()} loading={saving} disabled={!name.trim()} />
+            <Button label="Save condition" onPress={() => void add()} loading={saving} disabled={!name.trim() || Boolean(diagnosedError)} />
             <Button label="Cancel" variant="ghost" onPress={() => { setAdding(false); setError(null); }} disabled={saving} />
           </Card>
         ) : (
@@ -76,7 +86,8 @@ export function HistoryScreen() {
               <Card key={h.id}>
                 <AppText variant="label">{h.title}</AppText>
                 {h.notes ? <AppText variant="small" muted>{h.notes}</AppText> : null}
-                {h.recordedAt ? <AppText variant="caption" muted>{formatDateTime(h.recordedAt)}</AppText> : null}
+                {h.diagnosedOn ? <AppText variant="caption" muted>Diagnosed {formatDateOnly(h.diagnosedOn)}</AppText> : null}
+                <AppText variant="caption" muted>Added {formatDateTime(h.createdAt)}</AppText>
                 <Row style={{ flexWrap: "wrap" }}>
                   {h.source ? <Badge label={SOURCE_LABEL[h.source] ?? h.source.replace(/_/g, " ")} tone="neutral" icon="tag" /> : null}
                   {ver ? <Badge label={ver.label} tone={ver.tone} icon={ver.icon as never} /> : null}

@@ -11,7 +11,7 @@ import type {
   CreateScheduleBody,
   DoseEvent,
   DoseEventBody,
-  ExtractedFieldsUpdate,
+  CorrectionBody,
   HealthCard,
   HistoryEntry,
   Hospital,
@@ -19,7 +19,7 @@ import type {
   Patient,
   PatientUpdate,
   Prescription,
-  PrescriptionVersionSummary,
+  PrescriptionVersion,
   QrLookup,
   QrSession,
   UpdateScheduleBody,
@@ -47,7 +47,7 @@ export const patientApi = {
 export const prescriptionApi = {
   list: (signal?: AbortSignal, cursor?: string) => requestList<Prescription>("/prescriptions", { ...opts(signal), query: { cursor } }),
   get: (id: string, signal?: AbortSignal) => request<Prescription>(`/prescriptions/${enc(id)}`, opts(signal)),
-  versions: (id: string, signal?: AbortSignal) => requestList<PrescriptionVersionSummary>(`/prescriptions/${enc(id)}/versions`, opts(signal)),
+  versions: (id: string, signal?: AbortSignal) => requestList<PrescriptionVersion>(`/prescriptions/${enc(id)}/versions`, opts(signal)),
   /** Multipart upload. Part name `file` is ASSUMED (contract says only "multipart file upload plus metadata"). */
   upload: (file: UploadFile) => {
     const form = new FormData();
@@ -57,8 +57,11 @@ export const prescriptionApi = {
   },
   // The server reads the file inside this request (up to 30 s, backend note I5), so allow longer than the default.
   process: (id: string) => request<Prescription>(`/prescriptions/${enc(id)}/process`, { method: "POST", timeoutMs: 45_000 }),
-  correct: (id: string, body: ExtractedFieldsUpdate) =>
-    request<Prescription>(`/prescriptions/${enc(id)}/extracted-fields`, { method: "PATCH", json: body }),
+  /** BACKEND I7: the newest version (404 until one exists). Its `versionNumber` is the base for a correction or schedule. */
+  latest: (id: string, signal?: AbortSignal) => request<PrescriptionVersion>(`/prescriptions/${enc(id)}/latest`, opts(signal)),
+  /** BACKEND J1: records a NEW version (201). Re-read the record afterwards; the response is the version, not the record. */
+  correct: (id: string, body: CorrectionBody) =>
+    request<PrescriptionVersion>(`/prescriptions/${enc(id)}/extracted-fields`, { method: "PATCH", json: body }),
   /** URL + auth header for a native download; the bearer token is never put in the URL. */
   pdfRequest: (id: string) => ({ url: apiUrl(`/prescriptions/${enc(id)}/pdf`), headers: authHeaders() }),
 };
@@ -72,6 +75,8 @@ export const consentApi = {
 export const qrApi = {
   createSession: (body: CreateQrSessionBody) => request<QrSession>("/qr/access-sessions", { method: "POST", json: body }),
   getSession: (sessionId: string, signal?: AbortSignal) => request<QrLookup>(`/qr/access-sessions/${enc(sessionId)}`, opts(signal)),
+  /** BACKEND J6: ends the session now; repeating it changes nothing. */
+  revokeSession: (sessionId: string) => request<QrSession>(`/qr/access-sessions/${enc(sessionId)}`, { method: "DELETE" }),
 };
 
 export const medicationApi = {

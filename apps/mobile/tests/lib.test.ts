@@ -5,7 +5,7 @@ import { ApiError, describeError } from "../src/api/errors.ts";
 import type { Appointment, Consent, Hospital, MedicationSchedule, Prescription, PrescriptionMedication } from "../src/api/types.ts";
 import { nextAppointment } from "../src/lib/appointments.ts";
 import { formatCountdown, formatDateOnly, localTimeToIso, toDateInput } from "../src/lib/format.ts";
-import { canOfferSchedule, doseLine, isInstructionSafe, medicationReviewReasons } from "../src/lib/safety.ts";
+import { canOfferSchedule, doseLine, isInstructionSafe, medicationReviewReasons, scheduleBlock } from "../src/lib/safety.ts";
 import { enabledReminderTimes, nextReminder } from "../src/lib/schedule.ts";
 import { describeAccessEvent } from "../src/lib/access.ts";
 import { consentStatus, providerLabel, scopeLabel, sortConsents } from "../src/lib/consents.ts";
@@ -39,12 +39,15 @@ describe("prescription safety policy", () => {
     assert.equal(doseLine(bad), null);
   });
 
-  it("only offers a schedule for completed, non-needs-review prescriptions with safe medications", () => {
-    const base: Pick<Prescription, "processingStatus" | "verificationStatus"> = { processingStatus: "completed", verificationStatus: "unverified" };
+  it("only offers a schedule once a person has reviewed the version and the medicine is complete and confident", () => {
+    const base: Pick<Prescription, "processingStatus" | "verificationStatus"> = { processingStatus: "completed", verificationStatus: "patient_corrected" };
     assert.equal(canOfferSchedule(base, goodMed), true);
-    assert.equal(canOfferSchedule({ ...base, verificationStatus: "needs_review" }, goodMed), false);
-    assert.equal(canOfferSchedule({ ...base, processingStatus: "processing" }, goodMed), false);
-    assert.equal(canOfferSchedule(base, { ...goodMed, dose: null }), false);
+    assert.equal(scheduleBlock({ ...base, verificationStatus: "unverified" }, goodMed), "not_reviewed");
+    assert.equal(scheduleBlock({ ...base, verificationStatus: "needs_review" }, goodMed), "not_reviewed");
+    assert.equal(canOfferSchedule({ ...base, verificationStatus: "verified_by_authorized_clinician" }, goodMed), true);
+    assert.equal(scheduleBlock({ ...base, processingStatus: "processing" }, goodMed), "not_finished");
+    assert.equal(scheduleBlock(base, { ...goodMed, dose: null }), "incomplete");
+    assert.equal(scheduleBlock(base, { ...goodMed, confidence: 0.5 }), "low_confidence");
   });
 });
 
@@ -97,7 +100,10 @@ describe("formatting", () => {
 });
 
 const sched = (over: Partial<MedicationSchedule>): MedicationSchedule => ({
-  id: "s", medicationName: "Med", dose: "1", frequency: "daily", startDate: "2026-10-01", reminderTimes: ["08:00", "20:00"], remindersEnabled: true, isActive: true, ...over,
+  id: "s", prescriptionId: "p", sourceVersionNumber: 1, sourceStatus: "current",
+  medication: { name: "Med", strength: "5 mg", dose: "1", route: null, frequency: "daily", duration: null, instructions: null },
+  startDate: "2026-10-01", endDate: null, reminderTimes: ["08:00", "20:00"], remindersEnabled: true, remindersActive: true, timezone: "Asia/Kolkata",
+  isActive: true, recentDoseEvents: [], notice: "n", createdAt: "2026-10-01T00:00:00Z", updatedAt: "2026-10-01T00:00:00Z", ...over,
 });
 
 describe("schedule helpers", () => {
@@ -109,7 +115,7 @@ describe("schedule helpers", () => {
     assert.equal(r2?.at.getDate(), 10);
   });
   it("ignores inactive, disabled, ended and malformed schedules", () => {
-    assert.equal(nextReminder([sched({ isActive: false }), sched({ remindersEnabled: false }), sched({ endDate: "2026-10-01" }), sched({ reminderTimes: ["bad"] })], now), null);
+    assert.equal(nextReminder([sched({ isActive: false }), sched({ remindersEnabled: false }), sched({ remindersActive: false }), sched({ endDate: "2026-10-01" }), sched({ reminderTimes: ["bad"] })], now), null);
   });
   it("lists distinct enabled times sorted", () => {
     assert.deepEqual(enabledReminderTimes([sched({}), sched({ reminderTimes: ["20:00", "06:30"] }), sched({ remindersEnabled: false, reminderTimes: ["01:00"] })]), ["06:30", "08:00", "20:00"]);
@@ -118,7 +124,7 @@ describe("schedule helpers", () => {
 
 describe("appointments", () => {
   const now = new Date(2026, 9, 9, 12, 0);
-  const appt = (id: string, status: Appointment["status"], startsAt: string): Appointment => ({ id, slotId: id, status, slot: { startsAt, endsAt: startsAt } });
+  const appt = (id: string, status: Appointment["status"], startsAt: string): Appointment => ({ id, slotId: id, status, hospital: { id: "h", name: "H", isDemo: true }, startsAt, endsAt: startsAt, cancelledAt: null, createdAt: startsAt });
   it("picks the earliest upcoming confirmed appointment", () => {
     const list = [
       appt("past", "confirmed", new Date(2026, 9, 8).toISOString()),
@@ -234,7 +240,7 @@ describe("hospital search and appointment grouping", () => {
 
   it("groups upcoming confirmed appointments soonest first, and the rest newest first", () => {
     const now = new Date(2026, 9, 14, 12, 0);
-    const a = (id: string, status: Appointment["status"], d: Date): Appointment => ({ id, slotId: id, status, slot: { startsAt: d.toISOString(), endsAt: d.toISOString() } });
+    const a = (id: string, status: Appointment["status"], d: Date): Appointment => ({ id, slotId: id, status, hospital: { id: "h", name: "H", isDemo: true }, startsAt: d.toISOString(), endsAt: d.toISOString(), cancelledAt: null, createdAt: d.toISOString() });
     const g = groupAppointments(
       [
         a("later", "confirmed", new Date(2026, 9, 20)),

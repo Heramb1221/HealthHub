@@ -1,11 +1,11 @@
 import type { Appointment } from "../api/types.ts";
 
 export function appointmentStart(a: Appointment): string | null {
-  return a.slot?.startsAt ?? a.startsAt ?? null;
+  return a.startsAt || null;
 }
 
 export function appointmentHospitalName(a: Appointment): string {
-  return a.hospital?.name ?? a.hospitalName ?? "Hospital";
+  return a.hospital.name || "Hospital";
 }
 
 /** Earliest confirmed appointment that has not started yet, or null. */

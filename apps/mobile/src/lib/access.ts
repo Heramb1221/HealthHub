@@ -24,6 +24,14 @@ export function describeAccessEvent(e: AccessEvent): AccessDescription {
       return { text: `You gave a provider access to ${scope ?? "your records"}.`, tone: "neutral" };
     case "consent.revoked":
       return { text: `You revoked a provider's access to ${scope ?? "your records"}.`, tone: "neutral" };
+    case "qr.session_created":
+      return { text: "You created a QR code for a prescription.", tone: "neutral" };
+    case "qr.session_revoked":
+      return { text: "You turned a QR code off.", tone: "neutral" };
+    case "prescription.corrected":
+      return { text: "You saved a correction to a prescription.", tone: "neutral" };
+    case "prescription.pdf_downloaded":
+      return { text: "You downloaded a prescription as a PDF.", tone: "neutral" };
     case "patient.profile_updated": {
       const fields = e.details?.changedFields?.length ? ` (${e.details.changedFields.join(", ")})` : "";
       return { text: `Your profile was updated${fields}.`, tone: "neutral" };

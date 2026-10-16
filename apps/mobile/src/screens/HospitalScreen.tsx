@@ -87,7 +87,7 @@ export function HospitalScreen({ route, navigation }: Props) {
 
         {booked ? (
           <Banner tone="success" title="Appointment confirmed" icon="check-circle">
-            {booked.slot?.startsAt ?? booked.startsAt ? formatDateTime(booked.slot?.startsAt ?? booked.startsAt) : "See My appointments for details."}
+            {formatDateTime(booked.startsAt)}
           </Banner>
         ) : null}
         {booked ? <Button label="View my appointments" variant="secondary" onPress={() => navigation.navigate("Tabs", { screen: "Care" })} /> : null}

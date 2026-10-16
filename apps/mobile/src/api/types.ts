@@ -137,25 +137,42 @@ export interface Prescription {
   updatedAt: string;
 }
 
-/** BACKEND I8 (owner only). Only the fields the app displays are typed. */
-export interface PrescriptionVersionSummary {
+/** BACKEND I8/J1 (owner only): one stored version of a prescription. The newest one is what the record shows. */
+export interface PrescriptionVersion {
   id: string;
+  prescriptionId: string;
   versionNumber: number;
-  kind?: "extraction" | "patient_correction";
-  verificationStatus?: VerificationStatus;
-  extractionProvider?: string | null;
-  changedFields?: string[];
+  kind: "extraction" | "patient_correction";
+  verificationStatus: VerificationStatus;
+  extractionProvider: string | null;
+  extractionConfidence: number | null;
+  prescriptionDate: string | null;
+  prescriberName: string | null;
+  medications: PrescriptionMedication[];
+  /** Field names only, never values (J1). */
+  changedFields: string[];
   createdAt: string;
 }
 
-/** ASSUMED medication input for a patient correction. Confidence is decided by the server (backend note E5). */
-export type MedicationInput = Omit<PrescriptionMedication, "confidence">;
+/** Kept for list rows: the same object, only some fields are displayed. */
+export type PrescriptionVersionSummary = PrescriptionVersion;
 
-/** ASSUMED: PATCH /prescriptions/:id/extracted-fields replaces the extracted fields with a new version. */
-export interface ExtractedFieldsUpdate {
-  prescriptionDate: string | null;
-  prescriberName: string | null;
-  medications: MedicationInput[];
+/** Medication input for a patient correction. Confidence is decided by the server (J1, K3). */
+export type MedicationInput = Omit<PrescriptionMedication, "confidence"> & {
+  /** BACKEND K3: "I checked this row against the original prescription". Raises an unchanged row to confidence 1. */
+  confirmed?: boolean;
+};
+
+/**
+ * BACKEND J1: PATCH /prescriptions/:id/extracted-fields. `baseVersionNumber` is the version the patient was looking at
+ * (0 when none exists yet); a newer version makes the server answer 409. Omitted fields keep their value;
+ * `medications`, when sent, replaces the whole list. The response is the NEW version (201), not the record.
+ */
+export interface CorrectionBody {
+  baseVersionNumber: number;
+  prescriptionDate?: string | null;
+  prescriberName?: string | null;
+  medications?: MedicationInput[];
 }
 
 /** File reference for multipart upload (React Native style file part). */
@@ -166,94 +183,123 @@ export interface UploadFile {
 }
 
 // ---------- Medication schedules and doses ----------
-/** SCHEMA (MedicationSchedule, marked PROVISIONAL by the backend). */
+export type ScheduleSourceStatus = "current" | "changed" | "removed";
+
+/** BACKEND K1/K6/K7. The medication text is a copy of the prescription row and is never edited here. */
 export interface MedicationSchedule {
   id: string;
-  medicationName: string;
-  dose: string;
-  frequency: string;
+  prescriptionId: string;
+  sourceVersionNumber: number;
+  /** `changed`/`removed`: the prescription no longer says what this schedule was made from. */
+  sourceStatus: ScheduleSourceStatus;
+  medication: {
+    name: string | null;
+    strength: string | null;
+    dose: string | null;
+    route: string | null;
+    frequency: string | null;
+    duration: string | null;
+    instructions: string | null;
+  };
   startDate: string;
-  endDate?: string | null;
-  /** "HH:mm" strings. */
+  endDate: string | null;
+  /** Local "HH:MM" times. */
   reminderTimes: string[];
   remindersEnabled: boolean;
-  timezone?: string;
+  /** The one flag clients use to decide whether to remind (K6). */
+  remindersActive: boolean;
+  timezone: string;
   isActive: boolean;
+  /** Last 14 days, at most 20 (K7). */
+  recentDoseEvents: DoseEvent[];
+  /** Server wording: a reminder plan, not medical advice. */
+  notice: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /**
- * ASSUMED: the client names the prescription and the medication position only; the server derives
- * name/dose/frequency from the latest stored version and refuses incomplete or ambiguous ones.
- * The client never sends dose text for a schedule.
+ * BACKEND K2. The client names the exact prescription version and row the patient saw; the server copies the text,
+ * and refuses with 409 unless a person has reviewed the version and the row is complete and confident.
  */
 export interface CreateScheduleBody {
   prescriptionId: string;
-  medicationIndex: number;
+  versionNumber: number;
+  medicationPosition: number;
   startDate: string;
+  endDate?: string | null;
+  reminderTimes?: string[];
+  remindersEnabled?: boolean;
   timezone: string;
 }
 
-/** ASSUMED: editable reminder preferences. */
+/** BACKEND K5: only these can change; anything else is a 400. */
 export interface UpdateScheduleBody {
-  remindersEnabled?: boolean;
   reminderTimes?: string[];
+  remindersEnabled?: boolean;
+  timezone?: string;
+  endDate?: string | null;
   isActive?: boolean;
 }
 
 export type DoseStatus = "taken" | "skipped";
 
-/** PROPOSED B4 */
+/** BACKEND K7 */
 export interface DoseEventBody {
   scheduledFor: string;
   status: DoseStatus;
 }
 
-/** PROPOSED B4: responses label the event as self-reported. */
+/** BACKEND K7: always self-reported, never verified. */
 export interface DoseEvent {
-  id?: string;
+  id: string;
+  scheduleId?: string;
   scheduledFor: string;
   status: DoseStatus;
-  reportedAt?: string;
-  selfReported?: boolean;
+  recordedAt: string;
+  selfReported: true;
 }
 
 // ---------- Health history ----------
-/** ASSUMED: GET /health-history returns a log of entries with source and verification labels. */
+/** BACKEND L5: entries are patient reported and never above "unverified". */
 export interface HistoryEntry {
   id: string;
+  kind: string;
   title: string;
-  kind?: string;
-  notes?: string | null;
-  recordedAt?: string | null;
-  source?: string;
-  verificationStatus?: string;
+  notes: string | null;
+  diagnosedOn: string | null;
+  source: string;
+  verificationStatus: string;
+  createdAt: string;
 }
 
-/** ASSUMED: POST /health-history/conditions body. */
+/** BACKEND L5: POST /health-history/conditions. Entries cannot be edited or deleted afterwards. */
 export interface AddConditionBody {
-  name: string;
-  notes?: string;
+  title: string;
+  notes?: string | null;
+  diagnosedOn?: string | null;
 }
 
 // ---------- QR ----------
-/** PROPOSED B5 */
+/** BACKEND J3 */
 export interface CreateQrSessionBody {
   prescriptionId: string;
 }
 
-/** PROPOSED B5: random reference and expiry, never medical data. `url`/`reference` are ASSUMED field names. */
+/** BACKEND J3: `qrPayload` is a link with a random id and nothing medical. It is what the QR code encodes. */
 export interface QrSession {
   id: string;
+  prescriptionId: string;
+  qrPayload: string;
   expiresAt: string;
-  url?: string;
-  reference?: string;
+  revokedAt: string | null;
+  createdAt: string;
 }
 
-/** ASSUMED: scope-limited lookup result. */
+/** BACKEND J3: what a permitted reader gets back. */
 export interface QrLookup {
-  status?: string;
-  expiresAt?: string;
-  prescription?: Partial<Prescription>;
+  session: { id: string; expiresAt: string };
+  prescription: Prescription;
 }
 
 // ---------- Hospitals and appointments ----------
@@ -282,15 +328,14 @@ export interface CreateAppointmentBody {
   slotId: string;
 }
 
-/** SCHEMA (Appointment) + ASSUMED embedded slot/hospital labels. */
+/** BACKEND L4: flat shape. The hospital's `isDemo` must be shown as demo data. */
 export interface Appointment {
   id: string;
   slotId: string;
   status: "confirmed" | "cancelled";
-  createdAt?: string;
-  startsAt?: string;
-  endsAt?: string;
-  slot?: { startsAt: string; endsAt: string; hospitalId?: string };
-  hospital?: { id?: string; name: string; isDemo?: boolean };
-  hospitalName?: string;
+  hospital: { id: string; name: string; isDemo: boolean };
+  startsAt: string;
+  endsAt: string;
+  cancelledAt: string | null;
+  createdAt: string;
 }
