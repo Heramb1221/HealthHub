@@ -4,6 +4,7 @@ import { beforeEach, describe, it } from "node:test";
 import { appointmentApi, authApi, consentApi, historyApi, hospitalApi, medicationApi, patientApi, prescriptionApi, qrApi } from "../src/api/endpoints.ts";
 import { isApiError } from "../src/api/errors.ts";
 import { configureHttp, request } from "../src/api/http.ts";
+import { DEMO_ACCOUNTS } from "../src/demo/accounts.ts";
 import { DEMO_BASE_URL, demoFetch, resetDemo } from "../src/demo/demoFetch.ts";
 
 let token: string | null = null;
@@ -28,6 +29,21 @@ function uploadForm(name: string): FormData {
   f.append("file", new Blob(["x"]), name);
   return f;
 }
+
+describe("demo shortcuts", () => {
+  it("sign in through the same demo endpoint and give the sandbox people their synthetic names", async () => {
+    for (const [id, name] of [["patient", "Asha Demo"], ["google", "Alex Chen"], ["apple", "Alex Chen"]] as const) {
+      resetDemo();
+      const a = DEMO_ACCOUNTS[id];
+      const session = await authApi.login(a.email, a.password);
+      token = session.accessToken;
+      assert.equal(session.user.role, "patient");
+      assert.equal((await patientApi.me()).fullName, name);
+    }
+    token = null;
+    await rejectsWith(patientApi.me(), "UNAUTHENTICATED");
+  });
+});
 
 describe("demo auth", () => {
   it("validates credentials like the backend and requires a token elsewhere", async () => {

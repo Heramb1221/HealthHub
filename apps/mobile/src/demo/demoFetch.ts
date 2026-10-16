@@ -1,3 +1,5 @@
+import { demoNameFor } from "./accounts.ts";
+
 /**
  * DEMO MODE: an in-memory stand-in for the HealthHub API, used only when the app runs without a server.
  *
@@ -457,6 +459,7 @@ export async function demoFetch(input: string | URL | Request, init?: RequestIni
     if (path === "/auth/register" && state.registered.has(email)) return fail(409, "CONFLICT", "Could not create the account");
     if (path === "/auth/register") state.registered.add(email);
     state.email = email;
+    state.patient.fullName = demoNameFor(email);
     state.token = nextId("demo-token");
     return ok({ user: { id: "demo-user", email, role: "patient" }, accessToken: state.token, expiresAt: iso(new Date(Date.now() + 60 * 60_000)) }, path === "/auth/register" ? 201 : 200);
   }

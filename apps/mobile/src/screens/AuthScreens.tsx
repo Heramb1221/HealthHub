@@ -1,4 +1,4 @@
-import { Feather } from "@expo/vector-icons";
+import { AntDesign, Feather } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useState } from "react";
 import { View } from "react-native";
@@ -10,6 +10,58 @@ import { AppText, Banner, Button, Screen, Stack, TextField } from "../ui/compone
 import { colors, space } from "../ui/theme";
 import { IS_DEMO } from "../config";
 import { isValidEmail, passwordProblem } from "../lib/validation";
+import type { DemoAccount } from "../demo/accounts";
+
+/**
+ * Demo mode only. These buttons sign in to the in-app synthetic API as a made-up person. They are NOT real
+ * Google or Apple sign-in and say so on the button group; they do not exist in live mode.
+ */
+function DemoShortcuts() {
+  const { signInDemo } = useAuth();
+  const [busy, setBusy] = useState<DemoAccount["id"] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  if (!IS_DEMO) return null;
+
+  async function go(id: DemoAccount["id"]) {
+    setBusy(id);
+    setError(null);
+    try {
+      await signInDemo(id);
+    } catch (e) {
+      const info = describeError(e);
+      setError(`${info.title}. ${info.detail}`);
+      setBusy(null);
+    }
+  }
+
+  return (
+    <Stack gap={space.md}>
+      <Banner tone="demo" title="Demo shortcuts" icon="info">
+        These sign you in to sample data inside the app. They are not real Google, Apple or HealthHub accounts, and nothing leaves your phone.
+      </Banner>
+      <Button label="Quick demo sign-in (sample patient)" icon="zap" onPress={() => void go("patient")} loading={busy === "patient"} disabled={busy !== null} />
+      <Button
+        label="Continue with Google (demo sandbox)"
+        variant="secondary"
+        leading={<AntDesign name="google" size={18} color={colors.primary} />}
+        onPress={() => void go("google")}
+        loading={busy === "google"}
+        disabled={busy !== null}
+        accessibilityHint="Signs in as a made-up demo person. This is not a real Google sign-in."
+      />
+      <Button
+        label="Continue with Apple (demo sandbox)"
+        variant="secondary"
+        leading={<AntDesign name="apple" size={18} color={colors.primary} />}
+        onPress={() => void go("apple")}
+        loading={busy === "apple"}
+        disabled={busy !== null}
+        accessibilityHint="Signs in as a made-up demo person. This is not a real Apple sign-in."
+      />
+      {error ? <Banner tone="danger" title={error} icon="alert-circle" /> : null}
+    </Stack>
+  );
+}
 
 type Props<T extends keyof AuthStackParamList> = NativeStackScreenProps<AuthStackParamList, T>;
 
@@ -39,6 +91,7 @@ export function WelcomeScreen({ navigation }: Props<"Welcome">) {
           <Button label="Sign in" onPress={() => navigation.navigate("SignIn")} />
           <Button label="Create an account" variant="secondary" onPress={() => navigation.navigate("Register")} />
         </Stack>
+        <DemoShortcuts />
       </Stack>
     </Screen>
   );
@@ -92,6 +145,7 @@ function AuthForm({ mode, navigation }: { mode: "signIn" | "register"; navigatio
             Use any email and a password of at least 10 characters. No account is created and nothing is stored.
           </Banner>
         ) : null}
+        {!isRegister ? <DemoShortcuts /> : null}
         {isRegister ? (
           <Banner tone="warning" title="Use test data only" icon="alert-triangle">
             This prototype is not approved for real patient records.

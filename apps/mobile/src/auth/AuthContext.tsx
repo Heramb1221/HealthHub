@@ -7,6 +7,7 @@ import type { AuthUser } from "../api/types";
 import { API_CONFIG, IS_DEMO } from "../config";
 import { demoFetch, resetDemo } from "../demo/demoFetch";
 import { cancelLocalReminders } from "../lib/reminders";
+import { DEMO_ACCOUNTS, type DemoAccount } from "../demo/accounts";
 import { clearSession, loadSession, saveSession } from "./storage";
 
 type AuthState =
@@ -18,6 +19,8 @@ interface AuthContextValue {
   state: AuthState;
   signIn: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
+  /** Demo mode only: one-tap sign-in through the in-app synthetic API. Throws in live mode. */
+  signInDemo: (account: DemoAccount["id"]) => Promise<void>;
   /** Resolves with a note to show the user when the server could not confirm the logout. */
   signOut: () => Promise<string | null>;
 }
@@ -92,6 +95,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       state,
       signIn: (email, password) => establish(() => authApi.login(email.trim(), password)),
       register: (email, password) => establish(() => authApi.register(email.trim(), password)),
+      signInDemo: (id) => {
+        // Never available against a real server: nothing here may pretend to authenticate.
+        if (!IS_DEMO) return Promise.reject(new Error("Demo sign-in is only available in demo mode"));
+        const account = DEMO_ACCOUNTS[id];
+        return establish(() => authApi.login(account.email, account.password));
+      },
       signOut: async () => {
         let note: string | null = null;
         try {

@@ -100,13 +100,15 @@ interface ButtonProps {
   onPress: () => void;
   variant?: "primary" | "secondary" | "danger" | "ghost";
   icon?: IconName;
+  /** Custom leading element (for example a brand glyph). Takes the place of `icon`. */
+  leading?: ReactNode;
   loading?: boolean;
   disabled?: boolean;
   accessibilityHint?: string;
   style?: StyleProp<ViewStyle>;
 }
 
-export function Button({ label, onPress, variant = "primary", icon, loading, disabled, accessibilityHint, style }: ButtonProps) {
+export function Button({ label, onPress, variant = "primary", icon, leading, loading, disabled, accessibilityHint, style }: ButtonProps) {
   const inactive = Boolean(disabled || loading);
   const palette = buttonPalette[variant];
   return (
@@ -123,7 +125,7 @@ export function Button({ label, onPress, variant = "primary", icon, loading, dis
         style,
       ]}
     >
-      {loading ? <ActivityIndicator color={palette.fg} /> : icon ? <Feather name={icon} size={18} color={palette.fg} /> : null}
+      {loading ? <ActivityIndicator color={palette.fg} /> : leading ? leading : icon ? <Feather name={icon} size={18} color={palette.fg} /> : null}
       <Text style={[type.label, { color: palette.fg, fontSize: 16 }]}>{label}</Text>
     </Pressable>
   );
