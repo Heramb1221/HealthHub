@@ -8,16 +8,16 @@ interface Ctx {
 }
 
 const SELECT = {
-  id: true, name: true, address: true, city: true, phone: true, specialties: true, isActive: true, isDemo: true, createdAt: true, updatedAt: true,
+  id: true, name: true, address: true, city: true, phone: true, website: true, timings: true, locationUrl: true, specialties: true, isActive: true, isDemo: true, createdAt: true, updatedAt: true,
 } as const;
 
 type Row = {
-  id: string; name: string; address: string | null; city: string | null; phone: string | null; specialties: string[];
+  id: string; name: string; address: string | null; city: string | null; phone: string | null; website: string | null; timings: string | null; locationUrl: string | null; specialties: string[];
   isActive: boolean; isDemo: boolean; createdAt: Date; updatedAt: Date;
 };
 
 export interface HospitalDto {
-  id: string; name: string; address: string | null; city: string | null; phone: string | null; specialties: string[];
+  id: string; name: string; address: string | null; city: string | null; phone: string | null; website: string | null; timings: string | null; locationUrl: string | null; specialties: string[];
   isActive: boolean;
   /** True for seeded demo data. Clients must show it as demo, never as a real hospital. */
   isDemo: boolean;
@@ -62,12 +62,31 @@ export async function getHospital(db: Db, auth: AuthContext, id: string): Promis
 export async function createHospital(
   db: Db,
   auth: AuthContext,
-  input: { name: string; address?: string | null | undefined; city?: string | null | undefined; phone?: string | null | undefined; specialties?: string[] | undefined },
+  input: {
+    name: string;
+    address?: string | null | undefined;
+    city?: string | null | undefined;
+    phone?: string | null | undefined;
+    website?: string | null | undefined;
+    timings?: string | null | undefined;
+    locationUrl?: string | null | undefined;
+    specialties?: string[] | undefined;
+  },
   ctx: Ctx,
 ): Promise<HospitalDto> {
   const row = await db.$transaction(async (tx) => {
     const created = await tx.hospital.create({
-      data: { name: input.name, address: input.address ?? null, city: input.city ?? null, phone: input.phone ?? null, specialties: input.specialties ?? [], isDemo: false },
+      data: {
+        name: input.name,
+        address: input.address ?? null,
+        city: input.city ?? null,
+        phone: input.phone ?? null,
+        website: input.website ?? null,
+        timings: input.timings ?? null,
+        locationUrl: input.locationUrl ?? null,
+        specialties: input.specialties ?? [],
+        isDemo: false,
+      },
       select: SELECT,
     });
     await recordAudit(tx, { action: "hospital.created", outcome: "success", actorUserId: auth.userId, resourceType: "hospital", resourceId: created.id, requestId: ctx.requestId });
@@ -80,7 +99,17 @@ export async function updateHospital(
   db: Db,
   auth: AuthContext,
   id: string,
-  input: { name?: string | undefined; address?: string | null | undefined; city?: string | null | undefined; phone?: string | null | undefined; specialties?: string[] | undefined; isActive?: boolean | undefined },
+  input: {
+    name?: string | undefined;
+    address?: string | null | undefined;
+    city?: string | null | undefined;
+    phone?: string | null | undefined;
+    website?: string | null | undefined;
+    timings?: string | null | undefined;
+    locationUrl?: string | null | undefined;
+    specialties?: string[] | undefined;
+    isActive?: boolean | undefined;
+  },
   ctx: Ctx,
 ): Promise<HospitalDto> {
   const row = await db.$transaction(async (tx) => {
@@ -88,7 +117,7 @@ export async function updateHospital(
     if (!current) throw new AppError("NOT_FOUND");
     const changed: string[] = [];
     const data: Record<string, unknown> = {};
-    for (const key of ["name", "address", "city", "phone", "specialties", "isActive"] as const) {
+    for (const key of ["name", "address", "city", "phone", "website", "timings", "locationUrl", "specialties", "isActive"] as const) {
       const value = input[key];
       if (value !== undefined && JSON.stringify(value) !== JSON.stringify(current[key])) {
         data[key] = value;

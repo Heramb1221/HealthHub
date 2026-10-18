@@ -74,6 +74,10 @@ export function HospitalsView() {
                       {h.isDemo ? <DemoTag /> : null}
                     </p>
                     <p className="text-muted-foreground text-sm">{[h.city, h.address].filter(Boolean).join(" · ") || "Address not provided"}</p>
+                    <div className="text-muted-foreground flex flex-wrap items-center gap-3 text-xs">
+                      {h.timings ? <span>🕒 {h.timings}</span> : null}
+                      {h.phone ? <span>📞 {h.phone}</span> : null}
+                    </div>
                     {h.specialties.length > 0 ? <p className="text-sm">{h.specialties.join(" · ")}</p> : null}
                   </div>
                   <Button asChild variant="outline" size="sm" className="self-start sm:self-center">

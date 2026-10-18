@@ -17,6 +17,9 @@ export const createHospitalSchema = z.strictObject({
   address: text(300).nullable().optional(),
   city: text(80).nullable().optional(),
   phone: phone.nullable().optional(),
+  website: z.string().trim().url().max(500).nullable().optional(),
+  timings: text(120).nullable().optional(),
+  locationUrl: z.string().trim().url().max(500).nullable().optional(),
   specialties: specialties.optional(),
 });
 
@@ -26,6 +29,9 @@ export const updateHospitalSchema = z
     address: text(300).nullable().optional(),
     city: text(80).nullable().optional(),
     phone: phone.nullable().optional(),
+    website: z.string().trim().url().max(500).nullable().optional(),
+    timings: text(120).nullable().optional(),
+    locationUrl: z.string().trim().url().max(500).nullable().optional(),
     specialties: specialties.optional(),
     isActive: z.boolean().optional(),
   })

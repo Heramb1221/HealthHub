@@ -80,9 +80,14 @@ export function HospitalScreen({ route, navigation }: Props) {
             {h.isDemo ? <DemoTag /> : null}
           </Row>
           <Field label="Address" value={[h.address, h.city].filter(Boolean).join(", ") || "Not provided"} />
+          {h.timings ? <Field label="Timings" value={h.timings} /> : null}
           <Field label="Specialties" value={h.specialties?.length ? h.specialties.join(", ") : "Not provided"} />
           <Field label="Phone" value={orDash(h.phone)} />
-          {h.phone ? <Button label="Call hospital" icon="phone" variant="secondary" onPress={() => void Linking.openURL(`tel:${h.phone}`)} /> : null}
+          <Stack gap={space.sm}>
+            {h.phone ? <Button label="Call hospital" icon="phone" variant="secondary" onPress={() => void Linking.openURL(`tel:${h.phone}`)} /> : null}
+            {h.locationUrl ? <Button label="View on Google Maps" icon="map-pin" variant="secondary" onPress={() => void Linking.openURL(h.locationUrl!)} /> : null}
+            {h.website ? <Button label="Visit website" icon="external-link" variant="secondary" onPress={() => void Linking.openURL(h.website!)} /> : null}
+          </Stack>
         </Card>
 
         {booked ? (

@@ -313,6 +313,9 @@ export interface Hospital {
   address?: string | null;
   city?: string | null;
   phone?: string | null;
+  website?: string | null;
+  timings?: string | null;
+  locationUrl?: string | null;
   specialties?: string[];
   isActive?: boolean;
   isDemo?: boolean;

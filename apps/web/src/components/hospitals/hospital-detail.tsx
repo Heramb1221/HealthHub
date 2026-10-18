@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, CalendarX, Info, LoaderCircle, TriangleAlert } from "lucide-react";
+import { ArrowLeft, CalendarX, Clock, ExternalLink, Globe, Info, LoaderCircle, MapPin, TriangleAlert } from "lucide-react";
 
 import { EmptyState, ErrorState, LoadingState } from "@/components/feedback/states";
 import { PageHeader } from "@/components/layout/page-header";
@@ -100,8 +100,30 @@ export function HospitalDetail({ id }: { id: string }) {
       <dl className="bg-card divide-y rounded-md border px-5 text-sm">
         <div className="grid gap-1 py-3 sm:grid-cols-[10rem_1fr]">
           <dt className="text-muted-foreground">Address</dt>
-          <dd>{h.address ?? "Not provided"}</dd>
+          <dd className="space-y-1.5">
+            <p>{h.address ?? "Not provided"}</p>
+            {h.locationUrl ? (
+              <a
+                href={h.locationUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-info inline-flex items-center gap-1.5 text-xs font-medium underline underline-offset-4 hover:opacity-80"
+              >
+                <MapPin className="size-3.5" /> Open in Google Maps
+                <ExternalLink className="size-3" />
+              </a>
+            ) : null}
+          </dd>
         </div>
+        {h.timings ? (
+          <div className="grid gap-1 py-3 sm:grid-cols-[10rem_1fr]">
+            <dt className="text-muted-foreground">Timings</dt>
+            <dd className="inline-flex items-center gap-1.5">
+              <Clock className="size-3.5 text-muted-foreground" />
+              <span>{h.timings}</span>
+            </dd>
+          </div>
+        ) : null}
         <div className="grid gap-1 py-3 sm:grid-cols-[10rem_1fr]">
           <dt className="text-muted-foreground">Phone</dt>
           <dd>
@@ -114,6 +136,23 @@ export function HospitalDetail({ id }: { id: string }) {
             )}
           </dd>
         </div>
+        {h.website ? (
+          <div className="grid gap-1 py-3 sm:grid-cols-[10rem_1fr]">
+            <dt className="text-muted-foreground">Website</dt>
+            <dd>
+              <a
+                href={h.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-info inline-flex items-center gap-1.5 underline underline-offset-4 hover:opacity-80"
+              >
+                <Globe className="size-3.5" />
+                {h.website.replace(/^https?:\/\//i, "")}
+                <ExternalLink className="size-3" />
+              </a>
+            </dd>
+          </div>
+        ) : null}
         <div className="grid gap-1 py-3 sm:grid-cols-[10rem_1fr]">
           <dt className="text-muted-foreground">Specialities</dt>
           <dd>{h.specialties.length ? h.specialties.join(" · ") : "Not provided"}</dd>

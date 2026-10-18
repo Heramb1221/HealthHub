@@ -47,7 +47,7 @@ function HospitalList() {
         <Card key={h.id} style={{ marginTop: 12 }}>
           <ListRow
             title={h.name}
-            subtitle={[h.city, h.specialties?.join(", ")].filter(Boolean).join(" · ") || undefined}
+            subtitle={[h.city, h.timings, h.specialties?.join(", ")].filter(Boolean).join(" · ") || undefined}
             onPress={() => nav.navigate("Hospital", { id: h.id })}
             accessibilityLabel={`${h.name}${h.isDemo ? ", demo data" : ""}. View details and appointments`}
           />

@@ -164,6 +164,9 @@ export interface Hospital {
   city: string | null;
   address: string | null;
   phone: string | null;
+  website?: string | null;
+  timings?: string | null;
+  locationUrl?: string | null;
   specialties: string[];
   /** false = deactivated by an administrator */
   active: boolean;
@@ -183,7 +186,11 @@ export interface Hospital {
  *   5. Administrators must not be able to read patient records or see who booked a slot (spec: hospital-admin
  *      permissions do not imply access to medical records). The portal shows open times only.
  */
-export type HospitalInput = Pick<Hospital, "name" | "city" | "address" | "phone" | "specialties">;
+export type HospitalInput = Pick<Hospital, "name" | "city" | "address" | "phone" | "specialties"> & {
+  website?: string | null;
+  timings?: string | null;
+  locationUrl?: string | null;
+};
 export type UpdateHospitalInput = Partial<HospitalInput>;
 
 export interface AvailabilitySlot {

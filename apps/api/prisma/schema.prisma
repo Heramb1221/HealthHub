@@ -338,6 +338,9 @@ model Hospital {
   address     String?
   city        String?
   phone       String?
+  website     String?
+  timings     String?
+  locationUrl String?
   specialties String[] @default([])
   isActive    Boolean  @default(true)
   // Seeded demo rows are labelled so they are never presented as real data.
