@@ -17,7 +17,13 @@ const SELECT = { id: true, kind: true, title: true, notes: true, diagnosedOn: tr
 type Row = { id: string; kind: string; title: string; notes: string | null; diagnosedOn: Date | null; source: string; verificationStatus: string; createdAt: Date };
 
 export interface HistoryEntryDto {
-  id: string; kind: string; title: string; notes: string | null; diagnosedOn: string | null;
+  id: string;
+  kind: string;
+  title: string;
+  notes: string | null;
+  description: string | null;
+  diagnosedOn: string | null;
+  occurredOn: string | null;
   /** Where the entry came from. Always patient_reported today. */
   source: string;
   /** Never above "unverified": this system does not verify medical history. */
@@ -25,10 +31,21 @@ export interface HistoryEntryDto {
   createdAt: string;
 }
 
-const toDto = (r: Row): HistoryEntryDto => ({
-  id: r.id, kind: r.kind, title: r.title, notes: r.notes, diagnosedOn: r.diagnosedOn ? r.diagnosedOn.toISOString().slice(0, 10) : null,
-  source: r.source, verificationStatus: r.verificationStatus, createdAt: r.createdAt.toISOString(),
-});
+const toDto = (r: Row): HistoryEntryDto => {
+  const dateStr = r.diagnosedOn ? r.diagnosedOn.toISOString().slice(0, 10) : null;
+  return {
+    id: r.id,
+    kind: r.kind,
+    title: r.title,
+    notes: r.notes,
+    description: r.notes,
+    diagnosedOn: dateStr,
+    occurredOn: dateStr,
+    source: r.source,
+    verificationStatus: r.verificationStatus,
+    createdAt: r.createdAt.toISOString(),
+  };
+};
 
 /**
  * The owner reads their own history. A provider must name the patient and hold a live

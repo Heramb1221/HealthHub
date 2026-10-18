@@ -31,8 +31,10 @@ describe("LocalFileStore", () => {
 
   it("creates files readable only by the owner and leaves no temp files", async () => {
     await store.put("perm/check/file", Buffer.from("x"));
-    expect((await stat(join(root, "perm/check/file"))).mode & 0o777).toBe(0o600);
-    expect((await stat(join(root, "perm/check"))).mode & 0o777).toBe(0o700);
+    if (process.platform !== "win32") {
+      expect((await stat(join(root, "perm/check/file"))).mode & 0o777).toBe(0o600);
+      expect((await stat(join(root, "perm/check"))).mode & 0o777).toBe(0o700);
+    }
     expect((await readdir(join(root, "perm/check"))).every((name) => !name.endsWith(".tmp"))).toBe(true);
   });
 

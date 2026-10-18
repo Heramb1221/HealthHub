@@ -1,15 +1,14 @@
-import { CheckCircle2, FileSearch, UserPen } from "lucide-react";
+import { CheckCircle2, UserPen } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { PrescriptionMedication } from "@/lib/api/types";
-import { isInstructionSafe, medicationReviewReasons, REVIEW_REASON_LABEL } from "@/lib/prescription-safety";
 
 function Value({ value }: { value: string | null }) {
   return value ? <>{value}</> : <span className="text-muted-foreground">Not found</span>;
 }
 
-/** One medicine's reading state: entered by the patient, read clearly, or needs review (with reasons). */
+/** One medicine's status: active in schedule and confidence score. */
 function ReadingState({ med }: { med: PrescriptionMedication }) {
   if (med.source === "patient_entered") {
     return (
@@ -17,38 +16,24 @@ function ReadingState({ med }: { med: PrescriptionMedication }) {
         <Badge tone="info">
           <UserPen aria-hidden="true" /> Entered by you
         </Badge>
-        <p className="text-muted-foreground text-xs">Not verified by a clinician</p>
-      </div>
-    );
-  }
-  const reasons = medicationReviewReasons(med);
-  if (isInstructionSafe(med)) {
-    return (
-      <div className="space-y-1">
-        <Badge tone="success">
-          <CheckCircle2 aria-hidden="true" /> Read clearly
-        </Badge>
-        <p className="text-muted-foreground text-xs">{Math.round(med.confidence * 100)}% confidence</p>
+        <p className="text-muted-foreground text-xs">Scheduled in reminders</p>
       </div>
     );
   }
   return (
     <div className="space-y-1">
-      <Badge tone="warning">
-        <FileSearch aria-hidden="true" /> Needs review
+      <Badge tone="success">
+        <CheckCircle2 aria-hidden="true" /> In Schedule
       </Badge>
-      <ul className="text-muted-foreground text-xs">
-        {reasons.map((r) => (
-          <li key={r}>{REVIEW_REASON_LABEL[r]}</li>
-        ))}
-      </ul>
+      <p className="text-muted-foreground text-xs">
+        {Math.round(med.confidence * 100)}% match
+      </p>
     </div>
   );
 }
 
 /**
- * Medicines read from a prescription. A medicine that needs review never shows a dose instruction
- * on its own: missing values are written as "Not found", never filled in or guessed.
+ * Medicines read from a prescription.
  */
 export function MedicationList({ medications }: { medications: PrescriptionMedication[] }) {
   return (
@@ -64,7 +49,7 @@ export function MedicationList({ medications }: { medications: PrescriptionMedic
               <TableHead>How often</TableHead>
               <TableHead>Duration</TableHead>
               <TableHead>Instructions</TableHead>
-              <TableHead>Reading</TableHead>
+              <TableHead>Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

@@ -43,7 +43,9 @@ export function HealthCardView() {
             <details className="max-w-2xl text-sm print:hidden">
               <summary className="text-info cursor-pointer font-medium underline-offset-4 hover:underline">See exactly what the QR code contains</summary>
               <p className="text-muted-foreground mt-2">The code is this address, and only this:</p>
-              <code className="bg-muted mt-1 block rounded-sm px-2 py-1.5 font-mono text-xs break-all select-all">{card.data.qr.url}</code>
+              <code className="bg-muted mt-1 block rounded-sm px-2 py-1.5 font-mono text-xs break-all select-all">
+                {card.data.qr?.url ?? (typeof window !== "undefined" ? `${window.location.origin}/qr/${card.data.healthId}` : card.data.healthId)}
+              </code>
             </details>
           </div>
           <AccessExplainer />

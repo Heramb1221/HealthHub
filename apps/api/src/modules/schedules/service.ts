@@ -240,7 +240,7 @@ export async function createSchedule(db: Db, auth: AuthContext, input: CreateSch
   if (!eligibility.ok) return refuse(eligibility.reason, REFUSAL_MESSAGE[eligibility.reason]);
   // Eligibility guarantees these are present.
   const { name, strength, dose, frequency } = medication;
-  if (name === null || strength === null || dose === null || frequency === null) throw new AppError("INTERNAL_ERROR");
+  if (!name) throw new AppError("INTERNAL_ERROR");
 
   const now = new Date();
   const row = await db.$transaction(async (tx) => {
@@ -257,10 +257,10 @@ export async function createSchedule(db: Db, auth: AuthContext, input: CreateSch
         patientId,
         sourceMedicationId: medication.id,
         medicationName: name,
-        strength,
-        dose,
+        strength: strength ?? "",
+        dose: dose ?? "1 dose",
         route: medication.route,
-        frequency,
+        frequency: frequency ?? "As prescribed",
         duration: medication.duration,
         instructions: medication.instructions,
         startDate: parseDateOnly(input.startDate) as Date,
@@ -398,13 +398,17 @@ export async function recordDoseEvent(
     where: { id: scheduleId, patientId },
     select: { id: true, isActive: true, timezone: true, startDate: true, endDate: true },
   });
-  if (!schedule) throw new AppError("NOT_FOUND");
-  if (!schedule.isActive) throw new AppError("CONFLICT", "This schedule is not active");
+  if (!schedule) throw new AppError("NOT_FOUND", "Medication reminder not found");
+  if (!schedule.isActive) throw new AppError("CONFLICT", "This reminder schedule is currently paused or inactive");
 
   const now = Date.now();
-  if (input.scheduledFor.getTime() > now + FUTURE_TOLERANCE_MS) throw new AppError("VALIDATION_ERROR");
+  if (input.scheduledFor.getTime() > now + FUTURE_TOLERANCE_MS) {
+    throw new AppError("VALIDATION_ERROR", "Doses cannot be recorded for future times");
+  }
   const day = localDate(input.scheduledFor, schedule.timezone);
-  if (day < dateOnly(schedule.startDate) || (schedule.endDate && day > dateOnly(schedule.endDate))) throw new AppError("VALIDATION_ERROR");
+  if (day < dateOnly(schedule.startDate) || (schedule.endDate && day > dateOnly(schedule.endDate))) {
+    throw new AppError("VALIDATION_ERROR", "Dose time falls outside the active date range of this reminder schedule");
+  }
 
   try {
     const event = await db.doseEvent.create({
@@ -421,6 +425,20 @@ export async function recordDoseEvent(
     };
   } catch (err) {
     if (typeof err === "object" && err !== null && (err as { code?: unknown }).code === "P2002") {
+      const existing = await db.doseEvent.findUnique({
+        where: { scheduleId_scheduledFor: { scheduleId, scheduledFor: input.scheduledFor } },
+        select: { id: true, scheduleId: true, scheduledFor: true, status: true, recordedAt: true },
+      });
+      if (existing) {
+        return {
+          id: existing.id,
+          scheduleId: existing.scheduleId,
+          scheduledFor: existing.scheduledFor.toISOString(),
+          status: existing.status,
+          recordedAt: existing.recordedAt.toISOString(),
+          selfReported: true,
+        };
+      }
       throw new AppError("CONFLICT", "A dose is already recorded for this time");
     }
     throw err;

@@ -13,9 +13,39 @@ export interface RequestOptions {
   signal?: AbortSignal;
 }
 
+declare global {
+  interface Window {
+    Clerk?: {
+      session?: {
+        getToken: () => Promise<string | null>;
+      };
+    };
+  }
+}
+
 export function getAuthToken(): string | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem("hh_token");
+  const local = localStorage.getItem("hh_token");
+  if (local) return local;
+  const match = document.cookie.match(/(?:^|;\s*)(?:__session|hh_session)=([^;]+)/);
+  if (match) return decodeURIComponent(match[1]);
+  return null;
+}
+
+export async function resolveAuthToken(): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+  if (window.Clerk?.session?.getToken) {
+    try {
+      const fresh = await window.Clerk.session.getToken();
+      if (fresh) {
+        localStorage.setItem("hh_token", fresh);
+        return fresh;
+      }
+    } catch {
+      // fallback to cached token
+    }
+  }
+  return getAuthToken();
 }
 
 export function setAuthToken(token: string | null): void {
@@ -72,7 +102,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   const headers: Record<string, string> = { Accept: "application/json" };
   let body: BodyInit | undefined;
 
-  const token = getAuthToken();
+  const token = await resolveAuthToken();
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
@@ -94,7 +124,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 
   const parsed = await parseBody(response);
   if (!response.ok) {
-    if (response.status === 401) {
+    if (response.status === 401 && typeof window !== "undefined" && !window.Clerk?.session) {
       setAuthToken(null);
     }
     throw apiErrorFromResponse(response.status, parsed);
@@ -107,7 +137,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 export async function requestBlob(path: string, signal?: AbortSignal): Promise<{ blob: Blob; filename?: string }> {
   let response: Response;
   const headers: Record<string, string> = {};
-  const token = getAuthToken();
+  const token = await resolveAuthToken();
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
@@ -117,7 +147,7 @@ export async function requestBlob(path: string, signal?: AbortSignal): Promise<{
     throw new ApiError({ code: "NETWORK_ERROR", message: "The server could not be reached.", status: 0 });
   }
   if (!response.ok) {
-    if (response.status === 401) setAuthToken(null);
+    if (response.status === 401 && typeof window !== "undefined" && !window.Clerk?.session) setAuthToken(null);
     throw apiErrorFromResponse(response.status, await parseBody(response));
   }
   const disposition = response.headers.get("content-disposition") ?? "";

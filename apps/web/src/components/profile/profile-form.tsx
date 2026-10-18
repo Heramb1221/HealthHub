@@ -56,7 +56,8 @@ export function ProfileForm({ patient, onCancel, onSaved }: { patient: Patient; 
       onSaved(updated);
     } catch (error) {
       const { title, detail } = describeError(error);
-      setFormError(`${title}. ${detail}`);
+      const msg = detail && detail !== title ? detail : title;
+      setFormError(msg);
       setPending(false);
     }
   }

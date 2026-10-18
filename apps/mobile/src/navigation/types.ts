@@ -19,6 +19,10 @@ export type RootStackParamList = {
   PrescriptionUpload: undefined;
   PrescriptionDetail: { id: string };
   History: undefined;
+  Vaccinations: undefined;
+  FamilyTree: undefined;
   HealthCard: undefined;
+  Sharing: undefined;
   Hospital: { id: string };
+  AddSchedule: { prescriptionId?: string; medicationPosition?: number } | undefined;
 };

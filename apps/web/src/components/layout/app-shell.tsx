@@ -3,10 +3,11 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarClock, CalendarDays, FileText, History, Hospital, IdCard, LayoutDashboard, LogOut, UserRound, type LucideIcon } from "lucide-react";
+import { CalendarClock, CalendarDays, FileText, History, Hospital, IdCard, LayoutDashboard, LogOut, Syringe, UserRound, Users, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Brand } from "@/components/layout/brand";
+import { UserButton } from "@clerk/nextjs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { describeError } from "@/lib/api/errors";
@@ -25,6 +26,8 @@ const PATIENT_NAV: NavItem[] = [
   { href: "/prescriptions", label: "Prescriptions", icon: FileText },
   { href: "/medications", label: "Medications", icon: CalendarClock },
   { href: "/history", label: "History", icon: History },
+  { href: "/vaccinations", label: "Vaccinations", icon: Syringe },
+  { href: "/family", label: "Family Tree", icon: Users },
   { href: "/health-card", label: "Health card", icon: IdCard },
   { href: "/hospitals", label: "Hospitals", icon: Hospital },
   { href: "/appointments", label: "Appointments", icon: CalendarDays },
@@ -64,6 +67,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               {user.displayName ?? user.email}
               {isAdmin ? <Badge tone="info">Administrator</Badge> : null}
             </p>
+            <UserButton />
             <Button variant="outline" size="sm" onClick={handleSignOut}>
               <LogOut aria-hidden="true" /> Sign out
             </Button>

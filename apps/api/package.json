@@ -9,7 +9,7 @@
   "scripts": {
     "postinstall": "prisma generate",
     "dev": "tsx watch --env-file-if-exists=.env src/server.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json",
     "start": "node --env-file-if-exists=.env dist/server.js",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -22,9 +22,9 @@
     "seed:demo": "tsx --env-file-if-exists=.env scripts/seed-demo.ts"
   },
   "dependencies": {
+    "@clerk/express": "^2.1.80",
     "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "7.10.0",
-    "argon2": "0.45.1",
     "busboy": "1.6.0",
     "cors": "2.8.6",
     "express": "5.2.1",

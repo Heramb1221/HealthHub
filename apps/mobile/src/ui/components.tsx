@@ -18,6 +18,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { IS_DEMO } from "../config";
+
 import { colors, MIN_TOUCH, radius, space, toneStyles, type, type Tone } from "./theme";
 
 export type IconName = ComponentProps<typeof Feather>["name"];
@@ -49,6 +51,7 @@ export function Screen({ children, safeEdges, refreshing, onRefresh, contentStyl
   );
   return (
     <SafeAreaView style={styles.screen} edges={safeEdges ?? []}>
+      {IS_DEMO ? <DemoBar /> : null}
       {body}
     </SafeAreaView>
   );
@@ -97,13 +100,15 @@ interface ButtonProps {
   onPress: () => void;
   variant?: "primary" | "secondary" | "danger" | "ghost";
   icon?: IconName;
+  /** Custom leading element (for example a brand glyph). Takes the place of `icon`. */
+  leading?: ReactNode;
   loading?: boolean;
   disabled?: boolean;
   accessibilityHint?: string;
   style?: StyleProp<ViewStyle>;
 }
 
-export function Button({ label, onPress, variant = "primary", icon, loading, disabled, accessibilityHint, style }: ButtonProps) {
+export function Button({ label, onPress, variant = "primary", icon, leading, loading, disabled, accessibilityHint, style }: ButtonProps) {
   const inactive = Boolean(disabled || loading);
   const palette = buttonPalette[variant];
   return (
@@ -120,7 +125,7 @@ export function Button({ label, onPress, variant = "primary", icon, loading, dis
         style,
       ]}
     >
-      {loading ? <ActivityIndicator color={palette.fg} /> : icon ? <Feather name={icon} size={18} color={palette.fg} /> : null}
+      {loading ? <ActivityIndicator color={palette.fg} /> : leading ? leading : icon ? <Feather name={icon} size={18} color={palette.fg} /> : null}
       <Text style={[type.label, { color: palette.fg, fontSize: 16 }]}>{label}</Text>
     </Pressable>
   );
@@ -268,6 +273,16 @@ export function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** Always-visible notice while the app runs on built-in sample data instead of a server. */
+function DemoBar() {
+  return (
+    <View style={styles.demoBar} accessible accessibilityRole="alert" accessibilityLabel="Demo mode. Sample data only. Nothing is saved to a server.">
+      <Feather name="info" size={14} color={colors.demo} />
+      <Text style={[type.caption, { color: colors.demo, fontWeight: "600" }]}>Demo mode: sample data only, nothing is saved or sent</Text>
+    </View>
+  );
+}
+
 export function DemoTag() {
   return <Badge label="Demo data" tone="demo" icon="info" />;
 }
@@ -326,5 +341,6 @@ const styles = StyleSheet.create({
     paddingVertical: space.xs,
     borderRadius: radius.sm,
   },
+  demoBar: { flexDirection: "row", alignItems: "center", gap: space.xs, justifyContent: "center", paddingVertical: space.xs, paddingHorizontal: space.md, backgroundColor: colors.demoSurface },
   banner: { flexDirection: "row", gap: space.md, padding: space.md, borderRadius: radius.md, borderWidth: 1 },
 });

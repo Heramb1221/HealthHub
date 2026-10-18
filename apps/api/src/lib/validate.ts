@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { AppError } from "./errors.js";
+import { log } from "./logger.js";
 
 /**
  * Parses untrusted input. On failure throws a generic VALIDATION_ERROR; the
@@ -7,7 +8,11 @@ import { AppError } from "./errors.js";
  */
 export function parse<S extends z.ZodType>(schema: S, input: unknown): z.infer<S> {
   const result = schema.safeParse(input);
-  if (!result.success) throw new AppError("VALIDATION_ERROR");
+  if (!result.success) {
+    const details = result.error.issues.map((i) => `${i.path.join(".") || "root"}: ${i.message}`).join("; ");
+    log("warn", `Validation failed: ${details}`);
+    throw new AppError("VALIDATION_ERROR", `Validation failed: ${details}`);
+  }
   return result.data;
 }
 

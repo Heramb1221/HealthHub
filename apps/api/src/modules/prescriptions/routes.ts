@@ -15,6 +15,8 @@ import { processPrescription } from "./processing.js";
 import { createPrescription, getPrescription, listPrescriptions } from "./service.js";
 import { parseUpload } from "./upload.js";
 import { getLatestVersion, listVersions } from "./versions.js";
+import { checkPrescriptionContraindications } from "./contraindications.js";
+import { notifyPrescriptionEvent } from "../notifications/service.js";
 
 const listQuerySchema = z.strictObject({
   limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -85,6 +87,11 @@ export function createPrescriptionRouter(
     res.json({ data: await getLatestVersion(db, uuidParam(req.params.prescriptionId)) });
   });
 
+  // Contraindications and drug-drug interaction safety analysis.
+  router.get("/:prescriptionId/contraindications", accessGuard(), async (req, res) => {
+    res.json({ data: await checkPrescriptionContraindications(db, uuidParam(req.params.prescriptionId), env) });
+  });
+
   // History is owner-only: the patient role is required first, so providers
   // are refused even when they hold a consent.
   router.get("/:prescriptionId/versions", requireRole("patient"), accessGuard(), async (req, res) => {
@@ -102,6 +109,8 @@ export function createPrescriptionRouter(
       { prescriptionId: uuidParam(req.params.prescriptionId), patientId: access.patientId },
       { requestId: req.requestId },
     );
+    // Fire and forget prescription completion notification
+    notifyPrescriptionEvent(db, env, prescription.id);
     res.json({ data: prescription });
   });
 
@@ -133,6 +142,22 @@ export function createPrescriptionRouter(
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.setHeader("Cache-Control", "private, no-store");
+    res.setHeader("Content-Length", String(bytes.length));
+    res.end(bytes);
+  });
+
+  // Streams the original uploaded physical prescription file (image or PDF)
+  router.get("/:prescriptionId/file", accessGuard(), async (req, res) => {
+    const record = await db.prescriptionRecord.findUnique({
+      where: { id: uuidParam(req.params.prescriptionId) },
+      select: { originalStorageKey: true, originalMimeType: true, originalFileName: true },
+    });
+    if (!record) throw new AppError("NOT_FOUND", "Prescription not found");
+    const bytes = await store.read(record.originalStorageKey);
+    if (!bytes) throw new AppError("NOT_FOUND", "Original prescription file not found");
+    res.setHeader("Content-Type", record.originalMimeType);
+    res.setHeader("Content-Disposition", `inline; filename="${record.originalFileName}"`);
+    res.setHeader("Cache-Control", "private, no-cache");
     res.setHeader("Content-Length", String(bytes.length));
     res.end(bytes);
   });

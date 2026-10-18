@@ -321,4 +321,21 @@ export const demoPrescriptionsApi: PrescriptionsApi = {
     const patient = await demoPatientsApi.getMe();
     return { blob: buildPdf(pdfLines(rx, patient.healthId)), filename: `healthhub-prescription-${id}.pdf` };
   },
+
+  async downloadFile(id) {
+    const rx = (await context()).all.find((p) => p.id === id) ?? notFound();
+    const patient = await demoPatientsApi.getMe();
+    return { blob: buildPdf(pdfLines(rx, patient.healthId)), filename: `prescription-${id}.pdf` };
+  },
+
+  async contraindications(id) {
+    return {
+      prescriptionId: id,
+      hasInteractions: false,
+      alerts: [],
+      summary: "No significant contraindications detected in demo mode.",
+      disclaimer: "Safety notice: Demo simulated contraindication check.",
+      analyzedAt: new Date().toISOString(),
+    };
+  },
 };

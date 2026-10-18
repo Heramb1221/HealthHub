@@ -79,7 +79,9 @@ const liveAuthApi: AuthApi = {
       return toUser(await request<AuthResponse>("/auth/me"));
     } catch (error) {
       if (isApiError(error) && error.isUnauthenticated) {
-        setAuthToken(null);
+        if (typeof window !== "undefined" && !window.Clerk?.session) {
+          setAuthToken(null);
+        }
         return null;
       }
       throw error;
@@ -87,9 +89,4 @@ const liveAuthApi: AuthApi = {
   },
 };
 
-export const authApi: AuthApi =
-  process.env.NEXT_PUBLIC_API_MODE === "live"
-    ? liveAuthApi
-    : // Required only in demo builds, so demo accounts and sample data never ship in a live bundle (see README).
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      (require("@/lib/demo/auth") as typeof import("@/lib/demo/auth")).demoAuthApi;
+export const authApi: AuthApi = liveAuthApi;

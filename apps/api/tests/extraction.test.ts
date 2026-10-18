@@ -72,6 +72,7 @@ describe("createExtractionProvider", () => {
   it("returns null when disabled and the mock when asked", () => {
     expect(createExtractionProvider("disabled")).toBeNull();
     expect(createExtractionProvider("mock")?.name).toBe("mock-synthetic");
+    expect(createExtractionProvider("gemini", "dummy_key")?.name).toBe("gemini-vision");
   });
 });
 
@@ -82,9 +83,20 @@ describe("EXTRACTION_PROVIDER setting", () => {
     expect(loadEnv(base).EXTRACTION_PROVIDER).toBe("disabled");
   });
 
-  it("allows only disabled and mock; Gemini and anything else stop the server", () => {
+  it("allows disabled, mock, and gemini; gemini requires GEMINI_API_KEY", () => {
     expect(loadEnv({ ...base, EXTRACTION_PROVIDER: "mock" }).EXTRACTION_PROVIDER).toBe("mock");
-    for (const value of ["gemini", "GEMINI", "google", "openai", "tesseract", "enabled", "true", ""]) {
+    expect(loadEnv({ ...base, EXTRACTION_PROVIDER: "gemini", GEMINI_API_KEY: "dummy_key" }).EXTRACTION_PROVIDER).toBe("gemini");
+
+    // gemini without GEMINI_API_KEY is rejected
+    try {
+      loadEnv({ ...base, EXTRACTION_PROVIDER: "gemini" });
+      expect.unreachable("gemini without GEMINI_API_KEY");
+    } catch (err) {
+      expect(err).toBeInstanceOf(EnvError);
+      expect((err as EnvError).variables).toEqual(["GEMINI_API_KEY"]);
+    }
+
+    for (const value of ["GEMINI", "google", "openai", "tesseract", "enabled", "true", ""]) {
       try {
         loadEnv({ ...base, EXTRACTION_PROVIDER: value });
         expect.unreachable(value);

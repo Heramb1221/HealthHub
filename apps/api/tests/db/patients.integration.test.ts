@@ -84,15 +84,16 @@ describe.skipIf(!TEST_DATABASE_URL)("patient profile, health card, access histor
         gender: null,
         bloodGroup: null,
         phone: null,
-        emergencyContact: { name: null, phone: null },
+        emergencyContact: { name: null, relationship: null, phone: null },
         allergies: [],
         existingConditions: [],
         currentMedications: [],
         address: null,
       });
       expect(res.body.data.healthId).toMatch(/^HH-[0-9A-HJKMNP-TV-Z]{8}$/);
+      expect(res.body.data.email).toBeTruthy();
       const text = JSON.stringify(res.body);
-      for (const leaked of ["passwordHash", "userId", "email", "role", "photoStorageKey", "argon2"]) expect(text).not.toContain(leaked);
+      for (const leaked of ["passwordHash", "userId", "role", "photoStorageKey", "argon2"]) expect(text).not.toContain(leaked);
     });
   });
 
@@ -157,7 +158,7 @@ describe.skipIf(!TEST_DATABASE_URL)("patient profile, health card, access histor
         { createdAt: "2000-01-01T00:00:00Z" },
         { photoStorageKey: "x" },
         { fullName: "Ok", healthId: "HH-HACKED00" },
-        { emergencyContact: { name: "Ok", relationship: "x" } },
+        { emergencyContact: { name: "Ok", unknownField: "x" } },
       ];
       for (const body of attempts) {
         const res = await patch(p.token, body);

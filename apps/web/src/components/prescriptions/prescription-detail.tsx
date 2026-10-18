@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowLeft, Download, FileSearch, LoaderCircle, PencilLine, RefreshCw, ShieldCheck, TriangleAlert, UserPen } from "lucide-react";
+import { ArrowLeft, Download, Eye, LoaderCircle, PencilLine, RefreshCw, ShieldCheck, TriangleAlert, UserPen } from "lucide-react";
 import { toast } from "sonner";
 
 import { EmptyState, ErrorState, LoadingState } from "@/components/feedback/states";
@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { CorrectionForm } from "@/components/prescriptions/correction-form";
 import { MedicationList } from "@/components/prescriptions/medication-list";
 import { VersionHistory } from "@/components/prescriptions/version-history";
+import { ContraindicationAlerts } from "@/components/prescriptions/contraindication-alerts";
 import { DemoTag } from "@/components/status/demo-tag";
 import { ProcessingBadge, VerificationBadge } from "@/components/status/verification-badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -17,7 +18,6 @@ import { Button } from "@/components/ui/button";
 import { describeError, isApiError } from "@/lib/api/errors";
 import { prescriptionsApi } from "@/lib/api/prescriptions";
 import type { Prescription } from "@/lib/api/types";
-import { formatBytes } from "@/lib/file-sniff";
 import { formatDate } from "@/lib/format";
 import { SOURCE_TYPE_LABEL } from "@/lib/status";
 import { useDocumentTitle } from "@/lib/use-document-title";
@@ -78,29 +78,33 @@ function StatusBanner({ rx, onRetry, retrying, slow }: { rx: Prescription; onRet
     );
   }
   return (
-    <Alert tone="warning">
-      <FileSearch aria-hidden="true" />
-      <AlertTitle>Check these details against your paper prescription</AlertTitle>
+    <Alert tone="success">
+      <ShieldCheck aria-hidden="true" />
+      <AlertTitle>Prescription extracted & added to medication reminders</AlertTitle>
       <AlertDescription>
-        <p>Automatic reading can be wrong. Medicines marked “Needs review” are kept out of your schedule until you correct them. Ask your doctor or pharmacist how to take any medicine.</p>
+        <p>All identified medicines have been automatically added to your Medication Schedule. You can adjust reminder times or correct any details anytime.</p>
       </AlertDescription>
     </Alert>
   );
 }
 
-function RecordDetails({ rx }: { rx: Prescription }) {
+function RecordDetails({ rx, onViewFile }: { rx: Prescription; onViewFile: () => void }) {
   const rows: [string, React.ReactNode][] = [
-    ["Prescriber", rx.prescriberName ?? <span className="text-muted-foreground">Not provided</span>],
+    ["Prescriber", rx.prescriberName ?? <span key="no-prescriber" className="text-muted-foreground">Not provided</span>],
     ["Source", SOURCE_TYPE_LABEL[rx.sourceType]],
     [
       "Original file",
-      rx.sourceFile ? (
-        <>
-          <span className="break-all">{rx.sourceFile.fileName}</span>
-          <span className="text-muted-foreground block text-xs">{formatBytes(rx.sourceFile.sizeBytes)} · kept unchanged</span>
-        </>
-      ) : (
-        <span className="text-muted-foreground">Kept unchanged</span>
+      (
+        <div key="original-file-details" className="space-y-1">
+          <span className="break-all font-medium text-xs">{rx.sourceFile ? rx.sourceFile.fileName : "Uploaded document"}</span>
+          <button
+            type="button"
+            onClick={onViewFile}
+            className="text-info block text-xs underline underline-offset-4 hover:opacity-80"
+          >
+            Open original prescription document →
+          </button>
+        </div>
       ),
     ],
     ["Added", formatDate(rx.createdAt)],
@@ -123,6 +127,7 @@ export function PrescriptionDetail({ id }: { id: string }) {
   const rx = useResource(() => prescriptionsApi.get(id), id);
   const [editing, setEditing] = React.useState(false);
   const [downloading, setDownloading] = React.useState(false);
+  const [openingFile, setOpeningFile] = React.useState(false);
   const [retrying, setRetrying] = React.useState(false);
   const [tick, setTick] = React.useState(0);
   const startedAt = React.useRef<number | null>(null);
@@ -168,6 +173,21 @@ export function PrescriptionDetail({ id }: { id: string }) {
       toast.error("PDF couldn’t be downloaded", { description: `${title}. ${detail}` });
     } finally {
       setDownloading(false);
+    }
+  }
+
+  async function viewOriginalFile() {
+    setOpeningFile(true);
+    try {
+      const { blob } = await prescriptionsApi.downloadFile(id);
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (error) {
+      const { title, detail } = describeError(error);
+      toast.error("Original prescription file could not be opened", { description: `${title}. ${detail}` });
+    } finally {
+      setOpeningFile(false);
     }
   }
 
@@ -243,6 +263,9 @@ export function PrescriptionDetail({ id }: { id: string }) {
         title={title}
         actions={
           <>
+            <Button variant="outline" onClick={viewOriginalFile} disabled={openingFile}>
+              {openingFile ? <LoaderCircle className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <Eye aria-hidden="true" />} View Original
+            </Button>
             {canCorrect ? (
               <Button variant="outline" onClick={download} disabled={downloading}>
                 {downloading ? <LoaderCircle className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <Download aria-hidden="true" />} Download PDF
@@ -266,10 +289,17 @@ export function PrescriptionDetail({ id }: { id: string }) {
 
       <div className="grid gap-10 lg:grid-cols-[2fr_1fr]">
         <div className="min-w-0 space-y-10">
+          <ContraindicationAlerts prescriptionId={p.id} status={p.processingStatus} />
+
           <section aria-labelledby="medicines" className="space-y-4">
-            <h2 id="medicines" className="text-lg">
-              Medicines
-            </h2>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 id="medicines" className="text-lg">
+                Medicines
+              </h2>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/medications">View in Medication Reminders</Link>
+              </Button>
+            </div>
             {p.medications.length > 0 ? (
               <MedicationList medications={p.medications} />
             ) : p.processingStatus === "completed" ? (
@@ -302,7 +332,7 @@ export function PrescriptionDetail({ id }: { id: string }) {
           <h2 id="record" className="text-lg">
             Record details
           </h2>
-          <RecordDetails rx={p} />
+          <RecordDetails rx={p} onViewFile={viewOriginalFile} />
         </aside>
       </div>
     </div>

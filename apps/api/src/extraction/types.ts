@@ -18,8 +18,8 @@ export interface ExtractionProvider {
 
 /** The provider does not recognise this input (for example a real document given to the synthetic-only mock). */
 export class ExtractionUnrecognizedError extends Error {
-  constructor() {
-    super("input not recognised by extraction provider");
+  constructor(options?: ErrorOptions) {
+    super("input not recognised by extraction provider", options);
     this.name = "ExtractionUnrecognizedError";
   }
 }

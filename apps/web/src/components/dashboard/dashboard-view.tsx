@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { CalendarClock, CalendarDays, FileText, UserRound } from "lucide-react";
+import { CalendarClock, CalendarDays, FileText, ShieldAlert, UserRound } from "lucide-react";
 
 import { EmptyState, ErrorState } from "@/components/feedback/states";
 import { LoadingState } from "@/components/feedback/states";
@@ -10,6 +10,8 @@ import { PageHeader } from "@/components/layout/page-header";
 import { HealthId } from "@/components/profile/health-id";
 import { DemoTag } from "@/components/status/demo-tag";
 import { ProcessingBadge, VerificationBadge } from "@/components/status/verification-badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { appointmentsApi } from "@/lib/api/appointments";
 import { isApiError } from "@/lib/api/errors";
@@ -111,6 +113,16 @@ export function DashboardView() {
   const schedules = useResource(() => medicationSchedulesApi.list(), "schedules");
   const appointments = useResource(() => appointmentsApi.list(), "appointments");
 
+  const latestCompletedRx =
+    prescriptions.status === "ready"
+      ? prescriptions.data.find((p) => p.processingStatus === "completed")
+      : null;
+
+  const contraindications = useResource(
+    () => (latestCompletedRx ? prescriptionsApi.contraindications(latestCompletedRx.id) : Promise.resolve(null)),
+    latestCompletedRx?.id ? `dash-contra:${latestCompletedRx.id}` : "dash-contra:none",
+  );
+
   // An account with no patient profile (e.g. the administrator) gets a clear explanation instead of four errors.
   if (patient.status === "error" && isApiError(patient.error) && patient.error.isNotFound) {
     return (
@@ -126,7 +138,13 @@ export function DashboardView() {
   }
 
   const notices: Notice[] | null =
-    patient.status === "ready" && prescriptions.status === "ready" ? buildNotices(patient.data, prescriptions.data) : null;
+    patient.status === "ready" && prescriptions.status === "ready"
+      ? buildNotices(patient.data, prescriptions.data, contraindications.status === "ready" ? contraindications.data : null)
+      : null;
+
+  const contraReport = contraindications.status === "ready" ? contraindications.data : null;
+  const hasInteractions = Boolean(contraReport?.hasInteractions && contraReport.alerts.length > 0);
+  const hasHighRisk = Boolean(contraReport?.alerts.some((a) => a.severity === "high"));
 
   return (
     <div className="space-y-8">
@@ -162,6 +180,59 @@ export function DashboardView() {
           <LoadingState label="Loading your profile" rows={1} />
         )}
       </section>
+
+      {hasInteractions && latestCompletedRx && contraReport ? (
+        <section aria-labelledby="contraindications-banner" className="space-y-3">
+          <Alert tone={hasHighRisk ? "danger" : "warning"} className="p-5 shadow-sm">
+            <ShieldAlert className="size-5 mt-0.5" aria-hidden="true" />
+            <div className="space-y-2 flex-1">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <AlertTitle className="text-base font-semibold flex items-center gap-2">
+                  Prescription Safety Alert: {hasHighRisk ? "High-Risk Interactions Detected" : "Drug Interaction Caution"}
+                </AlertTitle>
+                <Badge tone={hasHighRisk ? "danger" : "warning"}>
+                  {contraReport.alerts.length} {contraReport.alerts.length === 1 ? "Precaution" : "Precautions"}
+                </Badge>
+              </div>
+              <AlertDescription className="space-y-3">
+                <p className="text-sm font-medium leading-relaxed">
+                  {contraReport.summary}
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2 pt-1">
+                  {contraReport.alerts.map((a) => (
+                    <div
+                      key={a.id}
+                      className="rounded-md border border-border bg-card/90 p-3 text-xs text-foreground space-y-1 shadow-xs"
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-semibold line-clamp-1">{a.title}</span>
+                        <Badge tone={a.severity === "high" ? "danger" : "warning"} className="text-[10px] uppercase">
+                          {a.severity}
+                        </Badge>
+                      </div>
+                      <div className="text-[11px] text-muted-foreground">
+                        <span className="font-medium text-foreground">Medicines: </span>
+                        {a.medications.join(", ")}
+                      </div>
+                      <p className="text-muted-foreground line-clamp-2 pt-0.5">{a.patientAdvice}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-border/50">
+                  <p className="text-xs text-muted-foreground italic">
+                    Do not discontinue or alter medications on your own. Discuss these findings with your prescribing doctor.
+                  </p>
+                  <Button asChild size="sm" variant={hasHighRisk ? "default" : "outline"}>
+                    <Link href={`/prescriptions/${latestCompletedRx.id}`}>
+                      View Full Safety Report
+                    </Link>
+                  </Button>
+                </div>
+              </AlertDescription>
+            </div>
+          </Alert>
+        </section>
+      ) : null}
 
       <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
         <div className="bg-card divide-y rounded-md border px-5 py-5">

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ChevronRight, FileText, Upload } from "lucide-react";
 
 import { isNoPatientError, NoPatientProfile } from "@/components/feedback/no-patient";
@@ -37,6 +38,7 @@ function UploadButton() {
 }
 
 export function PrescriptionsList() {
+  const router = useRouter();
   const list = useResource(() => prescriptionsApi.list(), "list");
 
   return (
@@ -51,7 +53,7 @@ export function PrescriptionsList() {
         <EmptyState
           icon={FileText}
           title="No prescriptions yet"
-          description="Upload a photo or PDF of a paper prescription. HealthHub reads it, then asks you to check the details."
+          description="Upload a photo or PDF of a paper prescription. Sehat Med reads it and automatically adds medications to your schedule."
           action={<UploadButton />}
         />
       ) : (
@@ -64,18 +66,24 @@ export function PrescriptionsList() {
                   <TableHead>Prescription</TableHead>
                   <TableHead>Medicines</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>
-                    <span className="sr-only">Open</span>
-                  </TableHead>
+                  <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {list.data.map((rx) => {
                   const m = medicinesSummary(rx);
                   return (
-                    <TableRow key={rx.id} className="align-top">
+                    <TableRow
+                      key={rx.id}
+                      className="align-top cursor-pointer hover:bg-muted/60 transition-colors"
+                      onClick={() => router.push(`/prescriptions/${rx.id}`)}
+                    >
                       <TableCell className="space-y-1">
-                        <Link href={`/prescriptions/${rx.id}`} className="text-info font-medium underline-offset-4 hover:underline">
+                        <Link
+                          href={`/prescriptions/${rx.id}`}
+                          className="text-info font-medium underline-offset-4 hover:underline"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           {titleOf(rx)}
                         </Link>
                         <p className="text-muted-foreground text-xs">{rx.prescriberName ?? "Prescriber not provided"}</p>
@@ -83,7 +91,7 @@ export function PrescriptionsList() {
                       </TableCell>
                       <TableCell className="max-w-64">
                         <p className="line-clamp-2">{m.names}</p>
-                        {m.review > 0 ? <p className="text-warning text-xs font-medium">{m.review} need review</p> : null}
+                        <p className="text-success text-xs font-medium mt-0.5">{m.count} {m.count === 1 ? "medicine" : "medicines"} active</p>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1.5">
@@ -92,7 +100,13 @@ export function PrescriptionsList() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <ChevronRight aria-hidden="true" className="text-muted-foreground inline size-4" />
+                        <Link
+                          href={`/prescriptions/${rx.id}`}
+                          className="inline-flex items-center gap-1 text-sm font-medium text-info hover:underline"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          Open <ChevronRight aria-hidden="true" className="size-4" />
+                        </Link>
                       </TableCell>
                     </TableRow>
                   );

@@ -1,17 +1,26 @@
 # HealthHub mobile (Expo + React Native + TypeScript)
 
 Patient app for Android and iOS. It talks to the same Express API as the web app (`/api/v1`) and follows
-`docs/API_CONTRACT.md`. Read `docs/MOBILE_CONTRACT_ASSUMPTIONS.md` first: the backend does not yet implement
-most patient routes, and several payload shapes are assumptions awaiting confirmation.
+`docs/API_CONTRACT.md`. Read `docs/MOBILE_CONTRACT_ASSUMPTIONS.md` first: it records which payload shapes the backend has confirmed
+(sections F-L of its decision note: auth, patients, prescriptions, corrections, QR, schedules, history, hospitals, appointments) and what is still unverified against a running server.
 
-> Prototype / MVP. Not a medical device. Use synthetic test data only. There is no demo or mock mode: if the
-> API is missing or unreachable the app shows that, and no action reports success unless the server confirmed it.
+> Prototype / MVP. Not a medical device. Use synthetic test data only. In LIVE mode no action reports success unless
+> the server confirmed it. In DEMO mode (below) everything is built-in sample data and is labelled as such.
+
+## Modes
+- **Demo (default when `EXPO_PUBLIC_API_URL` is not set):** `npm install && npm start` just works. An in-memory synthetic API
+  (`src/demo/demoFetch.ts`) runs inside the app and follows the backend's real rules (needs-review gating, no double booking,
+  rejected unknown fields). A "Demo mode" bar is always visible. Nothing is sent or saved, sign-in accepts any email with a
+  10+ character password and creates no account (the sign-in screens also offer a one-tap sample patient and clearly labelled
+  "demo sandbox" Google/Apple buttons that sign in as a made-up person; they are not real Google/Apple sign-in and are hidden in live mode), and uploaded files are **not read**: processing returns a fixed synthetic result
+  chosen by file name (`illegible` fails, `ambiguous` needs review, anything else reads as a clear sample). PDF export is off.
+- **Live:** set `EXPO_PUBLIC_API_URL` (see `.env.example`) to use the real HealthHub API. `EXPO_PUBLIC_APP_MODE=demo|live` forces a mode.
 
 ## Run
 
 ```bash
 cd apps/mobile
-cp .env.example .env        # set EXPO_PUBLIC_API_URL (see below)
+cp .env.example .env        # optional: set EXPO_PUBLIC_API_URL for live mode (or EXPO_PUBLIC_APP_MODE=live|demo); leave unset for demo
 npm install
 npm start                   # then press a / i, or scan the QR with Expo Go
 ```
@@ -26,10 +35,10 @@ npm start                   # then press a / i, or scan the QR with Expo Go
 
 ```bash
 npm run typecheck     # tsc --noEmit
+npm run lint          # eslint (eslint-config-expo, includes React hooks rules)
 npm test              # Node built-in test runner (types stripped, no extra dependency)
 npm run export:check  # Metro/Hermes bundle for android + ios into .export-check/ (delete afterwards)
 ```
-No linter is configured in the repo yet.
 
 ## Structure
 
@@ -37,6 +46,7 @@ No linter is configured in the repo yet.
 App.tsx, index.ts
 src/config.ts            API address validation (no hidden fallback server)
 src/api/                 errors.ts, http.ts (no RN imports, unit-tested), types.ts (provenance-tagged), endpoints.ts
+src/hooks/               useResource (focus-loading, polling), useServerValue (show a save result until refetch)
 src/auth/                SecureStore session (token + expiry + identity only), AuthContext
 src/lib/                 safety.ts (review policy), status.ts, format.ts, validation.ts, schedule.ts, appointments.ts, reminders.ts
 src/ui/                  theme.ts (tokens from DESIGN_SYSTEM), components.tsx, states.tsx (loading/empty/error/permission)
@@ -50,7 +60,8 @@ Welcome / sign in / register · Dashboard · Profile (view/edit) · Prescription
 PDF) · Prescription detail (processing status with polling, source and verification state, per-medicine review
 flags, editable corrections saved as a new version, version history, PDF share) · Medicines (schedule, self-reported
 doses, reminder preferences, local-reminder prototype) · Medical history · Health card + protected QR + access
-history · Hospital directory · Hospital detail with slot booking · My appointments (cancel).
+history · Hospital directory · Hospital search and detail with slot booking · My appointments (upcoming, past and cancelled; cancel) · Sharing and access (list and revoke
+provider consents; granting is not in the app yet) · Profile > About (version, connection mode, safety statement).
 
 ## Safety and privacy decisions
 - Tokens only in `expo-secure-store`. API data is held in memory; no medical record is written to device storage. The shared PDF is deleted from the cache after sharing.
@@ -60,8 +71,8 @@ history · Hospital directory · Hospital detail with slot booking · My appoint
 - Seeded hospitals flagged `isDemo` show a "Demo data" tag. No ratings, credentials or payments exist.
 
 ## Dependencies added beyond core Expo/React Navigation
-`expo-secure-store` (token storage), `expo-image-picker` (required by design doc), `expo-document-picker` (PDF selection),
-`expo-notifications` (local reminder prototype), `expo-file-system` + `expo-sharing` (authenticated PDF download and share),
+`eslint` + `eslint-config-expo` (dev only; lint), `expo-secure-store` (token storage), `expo-image-picker` (required by design doc), `expo-document-picker` (PDF selection),
+`expo-notifications` (local reminder prototype), `expo-splash-screen` (SDK-native splash configuration; icon and splash images are in `assets/`), `expo-file-system` + `expo-sharing` (authenticated PDF download and share),
 `react-native-qrcode-svg` + `react-native-svg` (QR rendering). Versions come from the Expo SDK 57 table.
 
 ## Known limitations

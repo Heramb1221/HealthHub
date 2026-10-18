@@ -25,7 +25,7 @@ export function SiteFooter() {
   return (
     <footer className="border-t">
       <div className="text-muted-foreground mx-auto flex max-w-6xl flex-col gap-2 px-4 py-8 text-sm sm:flex-row sm:items-center sm:justify-between">
-        <p>HealthHub is a personal health-record tool. It does not give medical advice.</p>
+        <p>Sehat Med is a personal health-record tool. It does not give medical advice.</p>
         <p>
           <Link href="/sign-in" className="underline underline-offset-4">
             Sign in

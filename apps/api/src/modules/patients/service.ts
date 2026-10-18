@@ -1,5 +1,6 @@
 import type { Db } from "../../db/client.js";
 import type { AuthContext } from "../../middleware/authenticate.js";
+import { AppError } from "../../lib/errors.js";
 import { recordAudit } from "../audit/audit.js";
 import { ownPatientId } from "./ownPatient.js";
 import type { UpdateProfileInput } from "./schemas.js";
@@ -17,6 +18,7 @@ const PROFILE_SELECT = {
   bloodGroup: true,
   phone: true,
   emergencyContactName: true,
+  emergencyContactRelationship: true,
   emergencyContactPhone: true,
   allergies: true,
   existingConditions: true,
@@ -24,6 +26,11 @@ const PROFILE_SELECT = {
   address: true,
   createdAt: true,
   updatedAt: true,
+  user: {
+    select: {
+      email: true,
+    },
+  },
 } as const;
 
 type ProfileRow = {
@@ -35,6 +42,7 @@ type ProfileRow = {
   bloodGroup: string | null;
   phone: string | null;
   emergencyContactName: string | null;
+  emergencyContactRelationship: string | null;
   emergencyContactPhone: string | null;
   allergies: string[];
   existingConditions: string[];
@@ -42,6 +50,9 @@ type ProfileRow = {
   address: string | null;
   createdAt: Date;
   updatedAt: Date;
+  user: {
+    email: string;
+  };
 };
 
 export interface ProfileDto {
@@ -52,7 +63,12 @@ export interface ProfileDto {
   gender: string | null;
   bloodGroup: string | null;
   phone: string | null;
-  emergencyContact: { name: string | null; phone: string | null };
+  email: string | null;
+  emergencyContact: {
+    name: string | null;
+    relationship: string | null;
+    phone: string | null;
+  };
   allergies: string[];
   existingConditions: string[];
   currentMedications: string[];
@@ -71,7 +87,12 @@ function toProfile(row: ProfileRow): ProfileDto {
     gender: row.gender,
     bloodGroup: row.bloodGroup,
     phone: row.phone,
-    emergencyContact: { name: row.emergencyContactName, phone: row.emergencyContactPhone },
+    email: row.user?.email ?? null,
+    emergencyContact: {
+      name: row.emergencyContactName,
+      relationship: row.emergencyContactRelationship,
+      phone: row.emergencyContactPhone,
+    },
     allergies: row.allergies,
     existingConditions: row.existingConditions,
     currentMedications: row.currentMedications,
@@ -102,10 +123,18 @@ export async function updateProfile(db: Db, auth: AuthContext, input: UpdateProf
   if (input.gender !== undefined) set("gender", "gender", input.gender);
   if (input.bloodGroup !== undefined) set("bloodGroup", "bloodGroup", input.bloodGroup);
   if (input.phone !== undefined) set("phone", "phone", input.phone);
-  if (input.emergencyContact?.name !== undefined) set("emergencyContact.name", "emergencyContactName", input.emergencyContact.name);
-  if (input.emergencyContact?.phone !== undefined) set("emergencyContact.phone", "emergencyContactPhone", input.emergencyContact.phone);
+  if (input.emergencyContact === null) {
+    set("emergencyContact.name", "emergencyContactName", null);
+    set("emergencyContact.relationship", "emergencyContactRelationship", null);
+    set("emergencyContact.phone", "emergencyContactPhone", null);
+  } else if (input.emergencyContact) {
+    if (input.emergencyContact.name !== undefined) set("emergencyContact.name", "emergencyContactName", input.emergencyContact.name);
+    if (input.emergencyContact.relationship !== undefined) set("emergencyContact.relationship", "emergencyContactRelationship", input.emergencyContact.relationship);
+    if (input.emergencyContact.phone !== undefined) set("emergencyContact.phone", "emergencyContactPhone", input.emergencyContact.phone);
+  }
   if (input.allergies !== undefined) set("allergies", "allergies", input.allergies);
-  if (input.existingConditions !== undefined) set("existingConditions", "existingConditions", input.existingConditions);
+  const conditions = input.existingConditions ?? input.conditions;
+  if (conditions !== undefined) set("existingConditions", "existingConditions", conditions);
   if (input.currentMedications !== undefined) set("currentMedications", "currentMedications", input.currentMedications);
   if (input.address !== undefined) set("address", "address", input.address);
 
@@ -144,6 +173,11 @@ export interface HealthCardDto {
   issuer: string;
   notice: string;
   generatedAt: string;
+  issuedAt?: string;
+  qr?: {
+    reference: string;
+    url: string;
+  };
 }
 
 /**
@@ -155,16 +189,22 @@ export async function getHealthCard(db: Db, auth: AuthContext): Promise<HealthCa
   const id = await ownPatientId(db, auth);
   const row = await db.patient.findUniqueOrThrow({
     where: { id },
-    select: { healthId: true, fullName: true, dateOfBirth: true, bloodGroup: true },
+    select: { healthId: true, fullName: true, dateOfBirth: true, bloodGroup: true, createdAt: true },
   });
+  const now = new Date().toISOString();
   return {
     healthId: row.healthId,
     fullName: row.fullName,
     dateOfBirth: row.dateOfBirth ? row.dateOfBirth.toISOString().slice(0, 10) : null,
     bloodGroup: row.bloodGroup,
-    issuer: "HealthHub",
-    notice: "This is a HealthHub identifier. It is not an official national health ID.",
-    generatedAt: new Date().toISOString(),
+    issuer: "Sehat Med",
+    notice: "This is a Sehat Med identifier. It is not an official national health ID.",
+    generatedAt: now,
+    issuedAt: row.createdAt ? row.createdAt.toISOString() : now,
+    qr: {
+      reference: row.healthId,
+      url: `healthhub://qr/${row.healthId}`,
+    },
   };
 }
 
@@ -250,4 +290,214 @@ export async function listAccessHistory(
   });
 
   return { data, page: { limit: query.limit, nextCursor: hasMore ? (items[items.length - 1]?.id ?? null) : null } };
+}
+
+/** Consolidates all patient data into an authorized export payload adhering to privacy/export regulations. */
+export async function exportPatientData(db: Db, auth: AuthContext, ctx: Ctx) {
+  const patientId = await ownPatientId(db, auth);
+
+  const [patient, history, vaccinations, family, schedules, prescriptions, appointments, insurance] =
+    await Promise.all([
+      db.patient.findUnique({
+        where: { id: patientId },
+        include: { user: { select: { email: true, createdAt: true } } },
+      }),
+      db.healthHistoryEntry.findMany({
+        where: { patientId },
+        orderBy: { createdAt: "desc" },
+      }),
+      db.patientVaccination.findMany({
+        where: { patientId },
+        orderBy: { createdAt: "desc" },
+      }),
+      db.familyMember.findMany({
+        where: { patientId },
+        orderBy: { createdAt: "desc" },
+      }),
+      db.medicationSchedule.findMany({
+        where: { patientId },
+        orderBy: { createdAt: "desc" },
+      }),
+      db.prescriptionRecord.findMany({
+        where: { patientId },
+        include: {
+          versions: {
+            include: { medications: true },
+            orderBy: { versionNumber: "desc" },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+      db.appointment.findMany({
+        where: { patientId },
+        include: {
+          slot: {
+            include: {
+              hospital: { select: { name: true, city: true } },
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+      db.patientInsurancePolicy.findMany({
+        where: { patientId },
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
+
+  if (!patient) throw new AppError("NOT_FOUND");
+
+  await recordAudit(db, {
+    action: "patient.data_exported",
+    outcome: "success",
+    actorUserId: auth.userId,
+    patientId,
+    resourceType: "patient",
+    resourceId: patientId,
+    requestId: ctx.requestId,
+  });
+
+  return {
+    exportedAt: new Date().toISOString(),
+    patient: {
+      healthId: patient.healthId,
+      fullName: patient.fullName,
+      email: patient.user.email,
+      phone: patient.phone,
+      dateOfBirth: patient.dateOfBirth?.toISOString().slice(0, 10) ?? null,
+      gender: patient.gender,
+      bloodGroup: patient.bloodGroup,
+      address: patient.address,
+      allergies: patient.allergies,
+      existingConditions: patient.existingConditions,
+      currentMedications: patient.currentMedications,
+      emergencyContact: {
+        name: patient.emergencyContactName,
+        relationship: patient.emergencyContactRelationship,
+        phone: patient.emergencyContactPhone,
+      },
+    },
+    history: history.map((h) => ({
+      title: h.title,
+      notes: h.notes,
+      diagnosedOn: h.diagnosedOn?.toISOString().slice(0, 10) ?? null,
+      source: h.source,
+      verificationStatus: h.verificationStatus,
+    })),
+    vaccinations: vaccinations.map((v) => ({
+      vaccineName: v.vaccineName,
+      category: v.category,
+      status: v.status,
+      administeredDate: v.administeredDate?.toISOString().slice(0, 10) ?? null,
+      notes: v.notes,
+    })),
+    familyMembers: family.map((f) => ({
+      fullName: f.fullName,
+      relationship: f.relationship,
+      vitalStatus: f.vitalStatus,
+      conditions: f.conditions,
+      notes: f.notes,
+    })),
+    medicationSchedules: schedules.map((s) => ({
+      medicationName: s.medicationName,
+      strength: s.strength,
+      dose: s.dose,
+      frequency: s.frequency,
+      startDate: s.startDate.toISOString().slice(0, 10),
+      endDate: s.endDate?.toISOString().slice(0, 10) ?? null,
+      reminderTimes: s.reminderTimes,
+      isActive: s.isActive,
+    })),
+    prescriptions: prescriptions.map((p) => ({
+      id: p.id,
+      sourceType: p.sourceType,
+      processingStatus: p.processingStatus,
+      createdAt: p.createdAt.toISOString(),
+      versions: p.versions.map((v) => ({
+        versionNumber: v.versionNumber,
+        prescriberName: v.prescriberName,
+        verificationStatus: v.verificationStatus,
+        medications: v.medications.map((m) => ({
+          name: m.name,
+          strength: m.strength,
+          dose: m.dose,
+          frequency: m.frequency,
+          instructions: m.instructions,
+        })),
+      })),
+    })),
+    appointments: appointments.map((a) => ({
+      status: a.status,
+      hospitalName: a.slot.hospital.name,
+      city: a.slot.hospital.city,
+      startsAt: a.slot.startsAt.toISOString(),
+      cancelledAt: a.cancelledAt?.toISOString() ?? null,
+    })),
+    insurancePolicies: insurance.map((i) => ({
+      providerName: i.providerName,
+      sumInsured: i.sumInsured,
+      validFrom: i.validFrom?.toISOString().slice(0, 10) ?? null,
+      validTill: i.validTill?.toISOString().slice(0, 10) ?? null,
+    })),
+  };
+}
+
+/** Account deactivation: revokes all active sessions and marks the user inactive while preserving legal audit records. */
+export async function deactivateAccount(db: Db, auth: AuthContext, ctx: Ctx) {
+  const patientId = await ownPatientId(db, auth);
+
+  await db.$transaction(async (tx) => {
+    await tx.session.updateMany({
+      where: { userId: auth.userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    await tx.user.update({
+      where: { id: auth.userId },
+      data: { isActive: false },
+    });
+    await recordAudit(tx, {
+      action: "patient.account_deactivated",
+      outcome: "success",
+      actorUserId: auth.userId,
+      patientId,
+      resourceType: "user",
+      resourceId: auth.userId,
+      requestId: ctx.requestId,
+    });
+  });
+
+  return { success: true, message: "Account has been deactivated and active sessions revoked." };
+}
+
+export async function getTermsStatus(db: Db, auth: AuthContext) {
+  const patientId = await ownPatientId(db, auth);
+  const patient = await db.patient.findUnique({
+    where: { id: patientId },
+    select: { termsAcceptedVersion: true, preferredLanguage: true, timeZone: true },
+  });
+  return {
+    currentTermsVersion: "2026-10-v1",
+    acceptedTermsVersion: patient?.termsAcceptedVersion ?? null,
+    isTermsAccepted: patient?.termsAcceptedVersion === "2026-10-v1",
+    preferredLanguage: patient?.preferredLanguage ?? "en",
+    timeZone: patient?.timeZone ?? "Asia/Kolkata",
+  };
+}
+
+export async function acceptTerms(db: Db, auth: AuthContext, version: string, ctx: Ctx) {
+  const patientId = await ownPatientId(db, auth);
+  await db.patient.update({
+    where: { id: patientId },
+    data: { termsAcceptedVersion: version },
+  });
+  await recordAudit(db, {
+    action: "patient.terms_accepted",
+    outcome: "success",
+    actorUserId: auth.userId,
+    patientId,
+    resourceType: "terms",
+    resourceId: version,
+    requestId: ctx.requestId,
+  });
+  return { success: true, acceptedTermsVersion: version };
 }

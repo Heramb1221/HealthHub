@@ -27,8 +27,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function ListValue({ items }: { items: string[] }) {
-  if (items.length === 0) return <span className="text-muted-foreground">None recorded</span>;
+function ListValue({ items }: { items?: string[] | null }) {
+  if (!items || items.length === 0) return <span className="text-muted-foreground">None recorded</span>;
   return (
     <ul className="list-disc space-y-0.5 pl-5">
       {items.map((item) => (
@@ -90,7 +90,7 @@ export function ProfileView() {
   if (editing) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Edit profile" description="Changes are saved to your HealthHub profile when you select Save changes." />
+        <PageHeader title="Edit profile" description="Changes are saved to your Sehat Med profile when you select Save changes." />
         <ProfileForm
           patient={p}
           onCancel={() => setEditing(false)}
@@ -116,7 +116,7 @@ export function ProfileView() {
       />
 
       <Group title="Identity">
-        <Field label="HealthHub ID">
+        <Field label="Sehat Med ID">
           <span className="flex flex-wrap items-center gap-2">
             <HealthId value={p.healthId} />
             {p.isDemo ? <DemoTag /> : null}
@@ -145,7 +145,7 @@ export function ProfileView() {
           <ListValue items={p.allergies} />
         </Field>
         <Field label="Existing conditions">
-          <ListValue items={p.conditions} />
+          <ListValue items={p.conditions ?? (p as unknown as { existingConditions?: string[] }).existingConditions ?? []} />
         </Field>
         <Field label="Current medicines">
           <ListValue items={p.currentMedications} />

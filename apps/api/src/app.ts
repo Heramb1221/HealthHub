@@ -19,6 +19,13 @@ import { createPatientRouter } from "./modules/patients/routes.js";
 import { createQrRouter } from "./modules/qr/routes.js";
 import { createScheduleRouter } from "./modules/schedules/routes.js";
 import { createPrescriptionRouter } from "./modules/prescriptions/routes.js";
+import { createVaccinationRouter } from "./modules/vaccinations/routes.js";
+import { createFamilyRouter } from "./modules/family/routes.js";
+import { createNotificationRouter } from "./modules/notifications/routes.js";
+import { createSymptomRouter } from "./modules/symptoms/routes.js";
+import { createInsuranceRouter } from "./modules/insurance/routes.js";
+import { createPaymentRouter } from "./modules/payments/routes.js";
+import { createDashboardRouter } from "./modules/dashboard/routes.js";
 import type { ExtractionProvider } from "./extraction/types.js";
 import type { PrivateFileStore } from "./storage/types.js";
 import { createHealthRouter } from "./routes/health.js";
@@ -93,6 +100,13 @@ export function createApp(env: Env, register?: (router: Router) => void, deps: A
     api.use("/admin/hospitals", createAdminHospitalRouter(deps.db, env));
     api.use("/appointments", createAppointmentRouter(deps.db, env));
     api.use("/health-history", createHistoryRouter(deps.db, env));
+    api.use("/vaccinations", createVaccinationRouter(deps.db, env));
+    api.use("/family-members", createFamilyRouter(deps.db, env));
+    api.use("/notifications", createNotificationRouter(deps.db, env));
+    api.use("/symptoms", createSymptomRouter(deps.db, env));
+    api.use("/insurance", createInsuranceRouter(deps.db, env));
+    api.use("/payments", createPaymentRouter(deps.db, env));
+    api.use("/dashboard", createDashboardRouter(deps.db, env));
     if (deps.store) api.use("/prescriptions", createPrescriptionRouter(deps.db, env, deps.store, deps.extraction ?? null));
   }
   register?.(api);

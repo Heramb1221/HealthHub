@@ -167,7 +167,8 @@ export function MedicationsView() {
       return true;
     } catch (error) {
       const { title, detail } = describeError(error);
-      toast.error("That wasn’t recorded", { description: `${title}. ${detail}` });
+      const msg = detail && detail !== title ? detail : title;
+      toast.error("That wasn’t recorded", { description: msg });
       return false;
     }
   }
@@ -195,8 +196,8 @@ export function MedicationsView() {
       ) : schedules.data.length === 0 ? (
         <EmptyState
           icon={CalendarClock}
-          title="No reminders yet"
-          description="Reminders are made from prescription medicines whose name, strength, dose and frequency were read clearly or corrected by you. Medicines that still need review can’t be scheduled."
+          title="No medication reminders yet"
+          description="Your active medications and daily reminders are automatically created when you upload a prescription. You can also add custom medicines anytime."
           action={<AddButton />}
         />
       ) : (

@@ -243,11 +243,12 @@ endpoints. The patient is always the session's own patient; no patient id is
 read from the client.
 
 G2. **Profile object** (`GET` and `PATCH` response):
-`{ id, healthId, fullName, dateOfBirth, gender, bloodGroup, phone,
-emergencyContact: { name, phone }, allergies[], existingConditions[],
+`{ id, healthId, fullName, dateOfBirth, gender, bloodGroup, phone, email,
+emergencyContact: { name, relationship, phone }, allergies[], existingConditions[],
 currentMedications[], address, createdAt, updatedAt }`.
 Unset values are `null` (lists are empty). `dateOfBirth` is a date only,
-`YYYY-MM-DD`. Email, user id, and password data are never included.
+`YYYY-MM-DD`. `email` is populated from the authenticated user account and is read-only.
+User id and password data are never included.
 
 G3. **PATCH rules.**
 - Partial update. Only the fields sent change. `null` clears a nullable field.

@@ -63,6 +63,18 @@ The QR contains a random reference/URL, not medical data or a long-lived bearer 
 - `GET /health-history`
 - `POST /health-history/conditions`
 
+## Vaccinations
+- `GET /vaccinations` (query: `category?`, `status?`, `patientId?`) returns the directory of vaccines in India paired with patient-reported status and counts
+- `POST /vaccinations` body: `{ vaccineName, vaccineId?, category?, status: "taken"|"not_taken", administeredDate?, notes? }`
+- `DELETE /vaccinations/:vaccineName` resets or clears a recorded vaccination status
+
+## Family tree and hereditary health
+- `GET /family-members` (query: `patientId?`) returns list of family members, grouped multi-generational tree hierarchy (grandparents, parents, current, children, other), and hereditary condition risk summaries
+- `POST /family-members` body: `{ fullName, relationship, vitalStatus?, age?, bloodGroup?, conditions?, notes? }`
+- `PATCH /family-members/:id` body: partial updates to member details
+- `DELETE /family-members/:id` removes a family member record
+In accordance with product safety rules, adding a family member does not grant them account or medical record access.
+
 ## Hospitals and appointments
 - `GET /hospitals`
 - `GET /hospitals/:hospitalId`

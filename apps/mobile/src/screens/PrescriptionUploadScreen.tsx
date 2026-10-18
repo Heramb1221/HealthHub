@@ -44,7 +44,7 @@ export function PrescriptionUploadScreen({ navigation }: Props) {
     }
     setCameraDenied(false);
     try {
-      const result = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 0.8, allowsEditing: false });
+      const result = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 0.8, allowsEditing: false, preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible });
       const asset = result.assets?.[0];
       if (!result.canceled && asset) fromAsset(asset);
     } catch {
@@ -56,7 +56,7 @@ export function PrescriptionUploadScreen({ navigation }: Props) {
     setNotice(null);
     setError(null);
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.8, allowsEditing: false });
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.8, allowsEditing: false, preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible });
       const asset = result.assets?.[0];
       if (!result.canceled && asset) fromAsset(asset);
     } catch {
@@ -105,7 +105,7 @@ export function PrescriptionUploadScreen({ navigation }: Props) {
           Don't upload real patient records during this prototype. The file is sent to the HealthHub server you're connected to.
         </Banner>
         <AppText variant="heading" accessibilityRole="header">Choose a prescription</AppText>
-        <AppText muted>Use a flat, well-lit photo with all text in frame, or a PDF. English-language prescriptions work best.</AppText>
+        <AppText muted>Use a flat, well-lit photo with all text in frame, or a PDF (JPEG, PNG, WebP or PDF; very large files may be refused). English-language prescriptions work best.</AppText>
 
         {cameraDenied ? (
           <PermissionDenied what="Camera" why="HealthHub needs the camera only to photograph a prescription when you choose Take photo. You can also pick a photo or PDF instead." />

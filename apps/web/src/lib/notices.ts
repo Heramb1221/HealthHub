@@ -19,11 +19,29 @@ export interface Notice {
  * Notices are derived only from the state of the person's own records (never invented clinical alerts).
  * Each one says what is unfinished and why it matters.
  */
-export function buildNotices(patient: Patient | null, prescriptions: Prescription[] | null): Notice[] {
+export function buildNotices(
+  patient: Patient | null,
+  prescriptions: Prescription[] | null,
+  contraindications?: import("./api/types").ContraindicationReport | null,
+): Notice[] {
   const notices: Notice[] = [];
 
   const latest = prescriptions?.[0];
   if (latest) {
+    if (contraindications && contraindications.hasInteractions && contraindications.alerts.length > 0) {
+      const hasHighRisk = contraindications.alerts.some((a) => a.severity === "high");
+      notices.push({
+        id: "rx-contraindications",
+        tone: hasHighRisk ? "danger" : "warning",
+        icon: ShieldAlert,
+        title: hasHighRisk
+          ? `${contraindications.alerts.length} medication interaction precaution${contraindications.alerts.length === 1 ? "" : "s"} detected`
+          : `${contraindications.alerts.length} interaction caution${contraindications.alerts.length === 1 ? "" : "s"} detected`,
+        body: "Safety precautions were identified between your prescribed medications. Review with your doctor or pharmacist.",
+        action: { href: `/prescriptions/${latest.id}`, label: "View safety details" },
+      });
+    }
+
     if (latest.processingStatus === "failed") {
       notices.push({
         id: "rx-failed",
@@ -39,8 +57,8 @@ export function buildNotices(patient: Patient | null, prescriptions: Prescriptio
         id: "rx-review",
         tone: "warning",
         icon: FileSearch,
-        title: unclear > 0 ? `${unclear} ${unclear === 1 ? "medicine needs" : "medicines need"} your review` : "Your latest prescription isn’t verified",
-        body: "Check the details against your paper prescription. Unclear medicines are kept out of your schedule until you do.",
+        title: unclear > 0 ? `${unclear} ${unclear === 1 ? "medicine detail can be checked" : "medicine details can be checked"}` : "Prescription saved to your records",
+        body: "Medicines have been automatically added to your medication reminders. Check details against your paper prescription anytime.",
         action: { href: `/prescriptions/${latest.id}`, label: "Review details" },
       });
     }

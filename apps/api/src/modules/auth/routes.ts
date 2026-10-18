@@ -6,8 +6,8 @@ import { AppError } from "../../lib/errors.js";
 import { z } from "zod";
 import { parse } from "../../lib/validate.js";
 import { authenticate, requireAuth } from "../../middleware/authenticate.js";
-import { devLoginSchema, loginSchema, registerSchema } from "./schemas.js";
-import { devLogin, login, logout, refresh, register } from "./service.js";
+import { loginSchema, registerSchema } from "./schemas.js";
+import { login, logout, refresh, register } from "./service.js";
 
 export function createAuthRouter(db: Db, env: Env): Router {
   const router = Router();
@@ -50,24 +50,20 @@ export function createAuthRouter(db: Db, env: Env): Router {
     const auth = requireAuth(req);
     const user = await db.user.findUnique({
       where: { id: auth.userId },
-      select: { id: true, email: true, role: true },
+      select: { id: true, email: true, role: true, patient: { select: { fullName: true } } },
     });
     if (!user || !user.role) throw new AppError("UNAUTHENTICATED");
-    res.json({ data: { user } });
-  });
-
-  // DEVELOPMENT ONLY. Not mounted unless explicitly enabled; env validation
-  // already refuses to start with it enabled in production.
-  if (env.DEV_AUTH_ENABLED && env.NODE_ENV !== "production") {
-    router.post("/dev-login", credentialLimiter, async (req, res) => {
-      const input = parse(devLoginSchema, req.body);
-      const result = await devLogin(db, env, input, { requestId: req.requestId });
-      res.setHeader("X-HealthHub-Dev-Only", "true");
-      res.json({
-        data: { ...result, devOnly: true, notice: "Development-only login. Not available in production." },
-      });
+    res.json({
+      data: {
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          displayName: user.patient?.fullName ?? user.email.split("@")[0],
+        },
+      },
     });
-  }
+  });
 
   return router;
 }

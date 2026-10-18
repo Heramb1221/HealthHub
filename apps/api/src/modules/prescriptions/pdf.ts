@@ -27,7 +27,18 @@ export async function generatePrescriptionPdf(
 
   const record = await db.prescriptionRecord.findUniqueOrThrow({
     where: { id: prescriptionId },
-    select: { sourceType: true, patient: { select: { healthId: true } } },
+    select: {
+      sourceType: true,
+      patient: {
+        select: {
+          healthId: true,
+          fullName: true,
+          dateOfBirth: true,
+          gender: true,
+          phone: true,
+        },
+      },
+    },
   });
   const version = await getLatestVersion(db, prescriptionId);
 
@@ -35,6 +46,11 @@ export async function generatePrescriptionPdf(
     healthId: record.patient.healthId,
     prescriptionId,
     sourceType: record.sourceType,
+    patientName: record.patient.fullName,
+    patientGender: record.patient.gender,
+    patientDob: record.patient.dateOfBirth ? record.patient.dateOfBirth.toISOString().slice(0, 10) : null,
+    patientPhone: record.patient.phone,
+    hospitalName: "Apollo Multi-Specialty Hospital & Diagnostics",
     version,
     qrPayload: prescriptionReference(env, prescriptionId),
     generatedAt: now,
@@ -51,6 +67,6 @@ export async function generatePrescriptionPdf(
     metadata: { versionNumber: version.versionNumber },
   });
 
-  // The file name is generated from the id only: no patient name or other personal data.
-  return { bytes, filename: `healthhub-prescription-${prescriptionId.slice(0, 8)}.pdf` };
+  // The file name is generated from the id only: no personal data in filename.
+  return { bytes, filename: `sehatmed-prescription-${prescriptionId.slice(0, 8)}.pdf` };
 }

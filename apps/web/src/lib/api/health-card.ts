@@ -6,8 +6,26 @@ export interface HealthCardApi {
   get(): Promise<HealthCard>;
 }
 
+function normalizeCard(raw: unknown): HealthCard {
+  const card = (raw ?? {}) as Record<string, unknown>;
+  const healthId = String(card.healthId ?? "");
+  const baseUrl = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
+  const rawQr = card.qr as { reference?: string; url?: string } | undefined;
+  const qr = {
+    reference: rawQr?.reference ?? healthId,
+    url: rawQr?.url ?? `${baseUrl}/qr/${encodeURIComponent(healthId)}`,
+  };
+  return {
+    healthId,
+    fullName: String(card.fullName ?? ""),
+    issuedAt: String(card.issuedAt ?? card.generatedAt ?? new Date().toISOString()),
+    qr,
+    isDemo: Boolean(card.isDemo),
+  };
+}
+
 const liveHealthCardApi: HealthCardApi = {
-  get: () => request<HealthCard>("/patients/me/health-card"),
+  get: async () => normalizeCard(await request<HealthCard>("/patients/me/health-card")),
 };
 
 export const healthCardApi: HealthCardApi =

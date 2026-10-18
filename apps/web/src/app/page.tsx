@@ -10,7 +10,7 @@ const CAPABILITIES = [
   {
     icon: FileText,
     title: "Prescriptions",
-    body: "Upload a photo or PDF. HealthHub keeps your original file untouched and shows what it read from it next to the original.",
+    body: "Upload a photo or PDF. Sehat Med keeps your original file untouched and shows what it read from it next to the original.",
   },
   {
     icon: CalendarClock,
@@ -25,7 +25,7 @@ const CAPABILITIES = [
   {
     icon: IdCard,
     title: "Digital health card",
-    body: "A card with your HealthHub ID and a QR code. The QR holds a random reference, never your medical details.",
+    body: "A card with your Sehat Med ID and a QR code. The QR holds a random reference, never your medical details.",
   },
   {
     icon: Hospital,
@@ -36,7 +36,7 @@ const CAPABILITIES = [
 
 const STEPS = [
   { title: "Upload", body: "Add an image or PDF of your prescription. The file is stored privately." },
-  { title: "Read", body: "HealthHub extracts the details and records how confident it is in each one." },
+  { title: "Read", body: "Sehat Med extracts the details and records how confident it is in each one." },
   { title: "Review", body: "You check the details against your paper copy and correct anything wrong. Your corrections are kept alongside the original reading." },
   { title: "Use", body: "Complete details can feed your schedule and health card. Unclear ones stay marked until you review them." },
 ] as const;
@@ -52,7 +52,7 @@ export default function Home() {
           <div className="space-y-6">
             <h1 className="max-w-xl text-4xl leading-tight sm:text-5xl">Your prescriptions and medicines, in one record you control</h1>
             <p className="text-muted-foreground max-w-lg text-lg">
-              Upload a prescription, check what was read from it, and keep your medication schedule and medical history together. HealthHub always shows what
+              Upload a prescription, check what was read from it, and keep your medication schedule and medical history together. Sehat Med always shows what
               has and hasn’t been verified.
             </p>
             <div className="flex flex-wrap gap-3">
@@ -70,7 +70,7 @@ export default function Home() {
         <section aria-labelledby="capabilities" className="border-t">
           <div className="mx-auto grid max-w-6xl gap-10 px-4 py-14 lg:grid-cols-[1fr_2fr]">
             <h2 id="capabilities" className="text-2xl">
-              What you can keep in HealthHub
+              What you can keep in Sehat Med
             </h2>
             <dl className="divide-y">
               {CAPABILITIES.map(({ icon: Icon, title, body }) => (
@@ -105,7 +105,7 @@ export default function Home() {
 
         <section aria-labelledby="limits" className="mx-auto grid max-w-6xl gap-8 px-4 py-14 lg:grid-cols-[1fr_2fr]">
           <h2 id="limits" className="text-2xl">
-            What HealthHub does not do
+            What Sehat Med does not do
           </h2>
           <div className="max-w-prose space-y-6">
             <Alert tone="warning">
@@ -113,7 +113,7 @@ export default function Home() {
               <AlertTitle>Check every reading against your paper prescription</AlertTitle>
               <AlertDescription>
                 <p>
-                  Automatic reading can be wrong. HealthHub does not diagnose, prescribe or change treatment, and a correction you make is not a
+                  Automatic reading can be wrong. Sehat Med does not diagnose, prescribe or change treatment, and a correction you make is not a
                   clinician’s verification. Follow your doctor or pharmacist for how to take any medicine.
                 </p>
               </AlertDescription>

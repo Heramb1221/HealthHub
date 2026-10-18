@@ -10,7 +10,7 @@ export function HealthId({ value }: { value: string }) {
   async function copy() {
     try {
       await navigator.clipboard.writeText(value);
-      toast.success("HealthHub ID copied");
+      toast.success("Sehat Med ID copied");
     } catch {
       toast.error("Couldn’t copy", { description: "Select the ID and copy it manually." });
     }
@@ -19,7 +19,7 @@ export function HealthId({ value }: { value: string }) {
   return (
     <span className="inline-flex items-center gap-2">
       <code className="bg-muted rounded-sm px-2 py-1 font-mono text-base tracking-wider select-all">{value}</code>
-      <Button type="button" variant="ghost" size="sm" onClick={copy} aria-label={`Copy HealthHub ID ${value}`}>
+      <Button type="button" variant="ghost" size="sm" onClick={copy} aria-label={`Copy Sehat Med ID ${value}`}>
         <Copy aria-hidden="true" /> Copy
       </Button>
     </span>

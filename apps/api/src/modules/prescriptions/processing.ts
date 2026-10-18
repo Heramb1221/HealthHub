@@ -14,7 +14,7 @@ interface Ctx {
 
 /** A run stuck in "processing" longer than this (for example after a crash) may be started again. */
 export const PROCESSING_STALE_MS = 5 * 60_000;
-const EXTRACTION_TIMEOUT_MS = 30_000;
+const EXTRACTION_TIMEOUT_MS = 60_000;
 
 /** Raised when patient-entered data appears while a run is in flight; the run must release its claim. */
 class PatientEntriesExistError extends AppError {
@@ -31,6 +31,55 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
     timer = setTimeout(() => reject(new Error("extraction timed out")), ms);
   });
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+export function inferReminderTimes(frequency: string | null | undefined): string[] {
+  if (!frequency) return ["08:00"];
+  const f = frequency.toLowerCase().trim();
+
+  // 1-1-1-1 or four times
+  if (f.includes("1-1-1-1") || f.includes("four times") || f.includes("qds") || f.includes("qid")) {
+    return ["08:00", "12:00", "16:00", "20:00"];
+  }
+
+  // 1-1-1 or thrice or TDS or TID
+  if (f.includes("1-1-1") || f.includes("three times") || f.includes("thrice") || f.includes("tds") || f.includes("tid")) {
+    return ["08:00", "14:00", "20:00"];
+  }
+
+  // 1-0-1 or twice or BD or BID
+  if (f.includes("1-0-1") || f.includes("0-1-1") || f.includes("twice") || f.includes("bd") || f.includes("bid")) {
+    return ["08:00", "20:00"];
+  }
+
+  // Afternoon only (0-1-0)
+  if (f.includes("0-1-0") || f.includes("afternoon")) {
+    return ["14:00"];
+  }
+
+  // Night only (0-0-1 or bedtime or hs)
+  if (f.includes("0-0-1") || f.includes("night") || f.includes("bedtime") || f.includes("hs") || f.includes("at bed")) {
+    return ["20:00"];
+  }
+
+  // Morning only (1-0-0 or morning or OD or once)
+  if (f.includes("1-0-0") || f.includes("morning") || f.includes("od") || f.includes("once")) {
+    return ["08:00"];
+  }
+
+  return ["08:00"];
+}
+
+function parseDurationDays(duration: string | null | undefined): number | null {
+  if (!duration) return null;
+  const match = duration.match(/(\d+)\s*(day|days|week|weeks|month|months)/i);
+  if (!match || !match[1] || !match[2]) return null;
+  const count = parseInt(match[1], 10);
+  const unit = match[2].toLowerCase();
+  if (unit.startsWith("day")) return count;
+  if (unit.startsWith("week")) return count * 7;
+  if (unit.startsWith("month")) return count * 30;
+  return null;
 }
 
 /**
@@ -125,7 +174,7 @@ export async function processPrescription(
       const latest = await tx.prescriptionVersion.aggregate({ where: { prescriptionId }, _max: { versionNumber: true } });
       const versionNumber = (latest._max.versionNumber ?? 0) + 1;
 
-      await tx.prescriptionVersion.create({
+      const createdVersion = await tx.prescriptionVersion.create({
         data: {
           prescriptionId,
           versionNumber,
@@ -138,6 +187,65 @@ export async function processPrescription(
           changedFields: [],
           createdByUserId: null,
           medications: { create: result.medications.map((medication, position) => ({ position, ...medication })) },
+        },
+        include: { medications: true },
+      });
+
+      // Automatically create MedicationSchedule for each read medication
+      const today = new Date();
+      for (const med of createdVersion.medications) {
+        if (!med.name) continue;
+        const reminderTimes = inferReminderTimes(med.frequency);
+        const days = parseDurationDays(med.duration);
+        const endDate = days ? new Date(today.getTime() + days * 86_400_000) : null;
+
+        const existing = await tx.medicationSchedule.findFirst({
+          where: {
+            patientId,
+            isActive: true,
+            medicationName: { equals: med.name, mode: "insensitive" },
+          },
+          select: { id: true },
+        });
+
+        if (!existing) {
+          await tx.medicationSchedule.create({
+            data: {
+              patientId,
+              sourceMedicationId: med.id,
+              medicationName: med.name,
+              strength: med.strength ?? "",
+              dose: med.dose ?? "1 dose",
+              route: med.route,
+              frequency: med.frequency ?? "As prescribed",
+              duration: med.duration,
+              instructions: med.instructions,
+              startDate: today,
+              endDate,
+              reminderTimes,
+              remindersEnabled: true,
+              timezone: "Asia/Kolkata",
+              isActive: true,
+            },
+          });
+        }
+      }
+
+      // Automatically record in Medical History section
+      const doctorTitle = result.prescriberName
+        ? `Prescription: Dr. ${result.prescriberName.replace(/^Dr\.?\s*/i, "")}`
+        : "Prescription Consultation";
+      const medSummary = result.medications.map((m) => m.name).filter(Boolean).join(", ");
+
+      await tx.healthHistoryEntry.create({
+        data: {
+          patientId,
+          kind: "condition",
+          title: doctorTitle,
+          notes: `Prescribed medications: ${medSummary || "Medicines listed"}. Recorded automatically from prescription.`,
+          diagnosedOn: result.prescriptionDate ?? today,
+          source: "patient_reported",
+          verificationStatus: "unverified",
         },
       });
 

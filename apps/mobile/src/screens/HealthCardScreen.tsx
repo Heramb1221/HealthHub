@@ -6,8 +6,9 @@ import { patientApi, prescriptionApi, qrApi } from "../api/endpoints";
 import { describeError } from "../api/errors";
 import type { QrLookup, QrSession } from "../api/types";
 import { useResource } from "../hooks/useResource";
+import { describeAccessEvent } from "../lib/access";
 import { formatCountdown, formatDateOnly, formatDateTime, formatDateTime as fmt, orDash } from "../lib/format";
-import { AppText, Banner, Button, Card, Chip, DemoTag, Field, Row, Screen, Stack } from "../ui/components";
+import { AppText, Banner, Button, Card, Chip, Divider, Field, Row, Screen, Stack } from "../ui/components";
 import { ErrorState, LoadingState } from "../ui/states";
 import { colors, space } from "../ui/theme";
 
@@ -22,6 +23,7 @@ export function HealthCardScreen() {
   const [qrError, setQrError] = useState<string | null>(null);
   const [lookup, setLookup] = useState<QrLookup | null>(null);
   const [lookupBusy, setLookupBusy] = useState(false);
+  const [revoking, setRevoking] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
 
@@ -34,11 +36,14 @@ export function HealthCardScreen() {
 
   if (card.loading) return <Screen><LoadingState label="Loading your health card…" /></Screen>;
   if (card.error && !card.data) return <Screen><ErrorState error={card.error} onRetry={card.reload} /></Screen>;
-  const c = card.data ?? {};
+  const c = card.data;
+  if (!c) return null;
 
   const readable = (list.data?.items ?? []).filter((p) => p.processingStatus === "completed");
+  const revoked = Boolean(session?.revokedAt);
   const expired = session ? new Date(session.expiresAt).getTime() <= now.getTime() : false;
-  const payload = session ? (session.url ?? session.reference ?? session.id) : null;
+  // BACKEND J3: the payload is a link with a random id; it is the only thing the QR code encodes.
+  const payload = session ? session.qrPayload : null;
 
   async function createQr() {
     if (!selected) return;
@@ -55,6 +60,22 @@ export function HealthCardScreen() {
       setQrError(`${info.title}. ${info.detail}`);
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function revokeQr() {
+    if (!session) return;
+    setRevoking(true);
+    setQrError(null);
+    try {
+      setSession(await qrApi.revokeSession(session.id));
+      setLookup(null);
+      void access.reload();
+    } catch (error) {
+      const info = describeError(error);
+      setQrError(`${info.title}. ${info.detail}`);
+    } finally {
+      setRevoking(false);
     }
   }
 
@@ -79,7 +100,6 @@ export function HealthCardScreen() {
         <Card style={{ backgroundColor: colors.primary, borderColor: colors.primary }} >
           <Row style={{ justifyContent: "space-between" }}>
             <AppText variant="caption" color="#c9d6e4">HEALTHHUB HEALTH CARD</AppText>
-            {c.demo ? <DemoTag /> : null}
           </Row>
           <AppText variant="title" color={colors.onPrimary} selectable>{orDash(c.healthId)}</AppText>
           <AppText color={colors.onPrimary}>{orDash(c.fullName)}</AppText>
@@ -89,14 +109,18 @@ export function HealthCardScreen() {
           </Row>
         </Card>
         <Card>
-          <Field label="Emergency contact" value={[c.emergencyContactName, c.emergencyContactPhone].filter(Boolean).join(" · ") || "Not provided"} />
-          <Field label="Allergies (self-reported)" value={c.allergies?.length ? c.allergies.join(", ") : "None listed"} />
-          <AppText variant="caption" muted>This card shows details you entered. It is not an official or national health ID.</AppText>
+          <AppText variant="small" muted>
+            {c.notice ?? "This is a Sehat Med identifier. It is not an official or national health ID."}
+          </AppText>
+          <AppText variant="caption" muted>
+            The card shows identity details only. Allergies, conditions and your emergency contact are in Profile.
+            {c.generatedAt ? ` Generated ${formatDateTime(c.generatedAt)}.` : ""}
+          </AppText>
         </Card>
 
         <AppText variant="heading" accessibilityRole="header">Share a prescription with a QR code</AppText>
         <AppText variant="small" muted>
-          The QR code holds only a random reference, never medical details. It stops working when it expires, and each lookup is recorded below.
+          The QR code holds only a random link, never medical details. Scanning it gives no access by itself: a provider also needs your consent. It stops working when it expires or when you turn it off, and each use is recorded below.
         </AppText>
         {list.loading ? (
           <AppText muted>Loading prescriptions…</AppText>
@@ -119,7 +143,9 @@ export function HealthCardScreen() {
 
         {session && payload ? (
           <Card style={{ alignItems: "center" }}>
-            {expired ? (
+            {revoked ? (
+              <Banner tone="info" title="You turned this QR code off" icon="slash">It no longer works. Create a new one to share again.</Banner>
+            ) : expired ? (
               <Banner tone="warning" title="This QR code has expired" icon="clock">Create a new one to share again.</Banner>
             ) : (
               <>
@@ -127,17 +153,39 @@ export function HealthCardScreen() {
                   <QRCode value={payload} size={200} />
                 </View>
                 <AppText variant="small" muted>Expires in {formatCountdown(session.expiresAt, now)} ({fmt(session.expiresAt)})</AppText>
-                <Button label="Check what this QR shows" variant="secondary" icon="eye" onPress={() => void checkLookup()} loading={lookupBusy} />
+                <Button label="Check what this QR shows" variant="secondary" icon="eye" onPress={() => void checkLookup()} loading={lookupBusy} disabled={revoking} />
+                <Button label="Turn this QR code off" variant="danger" icon="slash" onPress={() => void revokeQr()} loading={revoking} disabled={lookupBusy} />
               </>
             )}
             {lookupError ? <Banner tone="danger" title={lookupError} icon="alert-circle" /> : null}
-            {lookup && !expired ? (
+            {lookup && !expired && !revoked ? (
               <AppText variant="small" accessibilityLiveRegion="polite">
-                QR is active{lookup.prescription?.medications ? ` and would show ${lookup.prescription.medications.length} medicine(s)` : ""}.
+                QR is active. A permitted reader would see this prescription as it is now ({lookup.prescription.medications.length} medicine(s)) with its review status, and nothing from your profile.
               </AppText>
             ) : null}
           </Card>
         ) : null}
+
+        <Card>
+          <AppText variant="heading" accessibilityRole="header">What the QR code holds</AppText>
+          <AppText variant="small">
+            <AppText variant="label">It contains: </AppText>
+            A random reference link to a Sehat Med page.
+          </AppText>
+          <AppText variant="small" muted>
+            <AppText variant="label">It never contains: </AppText>
+            Your name, date of birth, medicines, conditions, allergies, or any permanent passwords/keys.
+          </AppText>
+          <Divider />
+          <AppText variant="label">How protected access works</AppText>
+          <AppText variant="caption" muted>
+            1. Someone scans the code → opens a page with no medical information.{"\n"}
+            2. The viewer must log in with an authorized provider account.{"\n"}
+            3. Sehat Med verifies your consent and stated purpose on the server.{"\n"}
+            4. If permitted, a short-lived scoped session opens.{"\n"}
+            5. Every lookup is recorded in your access history below.
+          </AppText>
+        </Card>
 
         <AppText variant="heading" accessibilityRole="header">Who looked at your records</AppText>
         {access.loading ? (
@@ -149,7 +197,7 @@ export function HealthCardScreen() {
         ) : (
           <Card>
             {access.data?.items.map((e) => (
-              <Field key={e.id} label={formatDateTime(e.occurredAt)} value={`${e.action.replace(/[._]/g, " ")}${e.outcome ? ` · ${e.outcome}` : ""}`} />
+              <Field key={e.id} label={formatDateTime(e.occurredAt)} value={describeAccessEvent(e).text} />
             ))}
           </Card>
         )}

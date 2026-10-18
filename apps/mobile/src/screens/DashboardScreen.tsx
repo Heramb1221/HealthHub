@@ -7,7 +7,7 @@ import { appointmentHospitalName, appointmentStart, nextAppointment } from "../l
 import { formatDateTime } from "../lib/format";
 import { nextReminder } from "../lib/schedule";
 import type { RootStackParamList } from "../navigation/types";
-import { AppText, Banner, Button, Card, Field, ListRow, Screen, Stack } from "../ui/components";
+import { AppText, Banner, Card, Field, ListRow, Screen, Stack } from "../ui/components";
 import { ErrorState, LoadingState } from "../ui/states";
 import { colors, space } from "../ui/theme";
 
@@ -56,9 +56,9 @@ export function DashboardScreen() {
       <Stack>
         <Card style={{ backgroundColor: colors.primary, borderColor: colors.primary }}>
           <AppText variant="caption" color="#c9d6e4">
-            Your HealthHub ID
+            Your Sehat Med ID
           </AppText>
-          <AppText variant="title" color={colors.onPrimary} selectable accessibilityLabel={`Your HealthHub ID is ${patient.healthId}`}>
+          <AppText variant="title" color={colors.onPrimary} selectable accessibilityLabel={`Your Sehat Med ID is ${patient.healthId}`}>
             {patient.healthId}
           </AppText>
           <AppText variant="small" color="#c9d6e4">

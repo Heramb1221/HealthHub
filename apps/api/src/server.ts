@@ -23,10 +23,17 @@ function main(): void {
 
   if (env.EXTRACTION_PROVIDER === "mock") {
     log("warn", "extraction provider is the synthetic-only mock; real prescriptions cannot be processed");
+  } else if (env.EXTRACTION_PROVIDER === "gemini") {
+    log("info", "extraction provider is gemini-vision; real prescriptions will be extracted via Gemini Vision");
   }
 
   const db = createDb(env.DATABASE_URL);
-  const app = createApp(env, undefined, { db, store: new LocalFileStore(env.STORAGE_DIR), extraction: createExtractionProvider(env.EXTRACTION_PROVIDER), checkDatabase: () => isDatabaseReachable(db) });
+  const app = createApp(env, undefined, {
+    db,
+    store: new LocalFileStore(env.STORAGE_DIR),
+    extraction: createExtractionProvider(env.EXTRACTION_PROVIDER, env.GEMINI_API_KEY),
+    checkDatabase: () => isDatabaseReachable(db),
+  });
   const server = app.listen(env.PORT, () => {
     log("info", "api listening", { port: env.PORT, env: env.NODE_ENV });
   });

@@ -3,7 +3,6 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useState } from "react";
 import { View } from "react-native";
 
-import { describeError, isApiError } from "../api/errors";
 import { useAuth } from "../auth/AuthContext";
 import type { AuthStackParamList } from "../navigation/types";
 import { AppText, Banner, Button, Screen, Stack, TextField } from "../ui/components";
@@ -20,15 +19,15 @@ export function WelcomeScreen({ navigation }: Props<"Welcome">) {
       <Stack gap={space.xl}>
         <View style={{ gap: space.md }}>
           <Feather name="shield" size={40} color={colors.primary} />
-          <AppText variant="title">HealthHub</AppText>
+          <AppText variant="title">Sehat Med</AppText>
+          <AppText style={{ fontSize: 13, color: colors.textMuted, fontWeight: "500", marginTop: -6 }}>
+            Bharat ka apna Sathi
+          </AppText>
           <AppText muted>
             Keep your prescriptions, medicine schedule, health history and appointments in one place.
           </AppText>
         </View>
         {notice ? <Banner tone="info" title={notice} icon="info" /> : null}
-        <Banner tone="warning" title="Prototype for testing" icon="alert-triangle">
-          HealthHub is an MVP, not a medical device. Use made-up test data only. It does not give medical advice or change treatment.
-        </Banner>
         <Stack gap={space.md}>
           <Button label="Sign in" onPress={() => navigation.navigate("SignIn")} />
           <Button label="Create an account" variant="secondary" onPress={() => navigation.navigate("Register")} />
@@ -39,10 +38,12 @@ export function WelcomeScreen({ navigation }: Props<"Welcome">) {
 }
 
 function AuthForm({ mode, navigation }: { mode: "signIn" | "register"; navigation: Props<"SignIn" | "Register">["navigation"] }) {
-  const { signIn, register } = useAuth();
+  const { signIn, register, verifyCode } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [code, setCode] = useState("");
+  const [verifying, setVerifying] = useState(false);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [touched, setTouched] = useState(false);
@@ -58,21 +59,74 @@ function AuthForm({ mode, navigation }: { mode: "signIn" | "register"; navigatio
     if (!isValidEmail(email) || (isRegister ? passwordProblem(password) || confirm !== password : !password)) return;
     setBusy(true);
     try {
-      await (isRegister ? register(email, password) : signIn(email, password));
-      // Navigation switches automatically when auth state becomes signedIn.
-    } catch (error) {
-      if (!isRegister && isApiError(error) && error.status === 401) {
-        setFormError("The email or password is incorrect.");
-      } else if (isApiError(error) && error.code === "VALIDATION_ERROR") {
-        setFormError(isRegister ? "Those details weren't accepted. Check the email and password length." : "Check your email and password.");
-      } else if (isApiError(error) && error.code === "CONFLICT") {
-        setFormError("An account with this email may already exist. Try signing in.");
+      if (isRegister) {
+        const res = await register(email, password);
+        if (res && res.needsVerification) {
+          setVerifying(true);
+          setBusy(false);
+          return;
+        }
       } else {
-        const info = describeError(error);
-        setFormError(`${info.title}. ${info.detail}`);
+        await signIn(email, password);
       }
+      // Navigation switches automatically when auth state becomes signedIn.
+    } catch (error: unknown) {
+      const err = error as { errors?: { message?: string; longMessage?: string }[]; message?: string };
+      const msg = err.errors?.[0]?.longMessage || err.errors?.[0]?.message || err.message || "An authentication error occurred.";
+      setFormError(msg);
       setBusy(false);
     }
+  }
+
+  async function submitVerification() {
+    if (!code.trim()) {
+      setFormError("Enter the verification code sent to your email.");
+      return;
+    }
+    setBusy(true);
+    setFormError(null);
+    try {
+      await verifyCode(code);
+    } catch (error: unknown) {
+      const err = error as { errors?: { message?: string; longMessage?: string }[]; message?: string };
+      const msg = err.errors?.[0]?.longMessage || err.errors?.[0]?.message || err.message || "Invalid verification code.";
+      setFormError(msg);
+      setBusy(false);
+    }
+  }
+
+  if (verifying) {
+    return (
+      <Screen safeEdges={["bottom"]}>
+        <Stack>
+          <AppText variant="title" accessibilityRole="header">
+            Verify your email
+          </AppText>
+          <AppText muted>We sent a 6-digit verification code to {email}.</AppText>
+          {formError ? <Banner tone="danger" title={formError} icon="alert-circle" /> : null}
+          <TextField
+            label="Verification code"
+            value={code}
+            onChangeText={setCode}
+            hint="Enter the code sent to your email"
+            keyboardType="number-pad"
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="done"
+            onSubmitEditing={() => void submitVerification()}
+          />
+          <Button label="Verify and continue" onPress={() => void submitVerification()} loading={busy} />
+          <Button
+            label="Back to registration"
+            variant="ghost"
+            onPress={() => {
+              setVerifying(false);
+              setFormError(null);
+            }}
+          />
+        </Stack>
+      </Screen>
+    );
   }
 
   return (
@@ -81,11 +135,6 @@ function AuthForm({ mode, navigation }: { mode: "signIn" | "register"; navigatio
         <AppText variant="title" accessibilityRole="header">
           {isRegister ? "Create your account" : "Sign in"}
         </AppText>
-        {isRegister ? (
-          <Banner tone="warning" title="Use test data only" icon="alert-triangle">
-            This prototype is not approved for real patient records.
-          </Banner>
-        ) : null}
         {formError ? <Banner tone="danger" title={formError} icon="alert-circle" /> : null}
         <TextField
           label="Email"

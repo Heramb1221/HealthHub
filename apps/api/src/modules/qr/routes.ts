@@ -41,5 +41,38 @@ export function createQrRouter(db: Db, env: Env): Router {
     res.json({ data: await revokeQrSession(db, env, requireAuth(req), uuidParam(req.params.sessionId), { requestId: req.requestId }) });
   });
 
+  // Emergency access lookup for First Responders scanning Digital Health Card
+  router.get("/emergency/:healthId", async (req, res) => {
+    const healthId = String(req.params.healthId).trim();
+    const patient = await db.patient.findUnique({
+      where: { healthId },
+      select: {
+        id: true,
+        healthId: true,
+        fullName: true,
+        bloodGroup: true,
+        allergies: true,
+        emergencyContactName: true,
+        emergencyContactRelationship: true,
+        emergencyContactPhone: true,
+      },
+    });
+    if (!patient) throw new AppError("NOT_FOUND");
+    res.json({
+      data: {
+        healthId: patient.healthId,
+        fullName: patient.fullName,
+        bloodGroup: patient.bloodGroup,
+        criticalAllergies: patient.allergies,
+        emergencyContact: {
+          name: patient.emergencyContactName,
+          relationship: patient.emergencyContactRelationship,
+          phone: patient.emergencyContactPhone,
+        },
+        notice: "Emergency informational access only. Critical medical response data.",
+      },
+    });
+  });
+
   return router;
 }

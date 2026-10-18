@@ -5,6 +5,7 @@ import { parse, uuidParam } from "../../lib/validate.js";
 import { authenticate, requireAuth, requireRole } from "../../middleware/authenticate.js";
 import { bookAppointmentSchema, listAppointmentsQuerySchema } from "./schemas.js";
 import { bookAppointment, cancelAppointment, listAppointments } from "./service.js";
+import { notifyAppointmentEvent } from "../notifications/service.js";
 
 /** Appointments belong to one patient. Providers and admins are refused. */
 export function createAppointmentRouter(db: Db, env: Env): Router {
@@ -13,13 +14,19 @@ export function createAppointmentRouter(db: Db, env: Env): Router {
   router.use(requireRole("patient"));
   router.post("/", async (req, res) => {
     const { slotId } = parse(bookAppointmentSchema, req.body);
-    res.status(201).json({ data: await bookAppointment(db, requireAuth(req), slotId, { requestId: req.requestId }) });
+    const appointment = await bookAppointment(db, requireAuth(req), slotId, { requestId: req.requestId });
+    // Fire and forget email notification
+    notifyAppointmentEvent(db, env, appointment.id, "booked");
+    res.status(201).json({ data: appointment });
   });
   router.get("/", async (req, res) => {
     res.json(await listAppointments(db, requireAuth(req), parse(listAppointmentsQuerySchema, req.query)));
   });
   router.post("/:appointmentId/cancel", async (req, res) => {
-    res.json({ data: await cancelAppointment(db, requireAuth(req), uuidParam(req.params.appointmentId), { requestId: req.requestId }) });
+    const appointment = await cancelAppointment(db, requireAuth(req), uuidParam(req.params.appointmentId), { requestId: req.requestId });
+    // Fire and forget email notification
+    notifyAppointmentEvent(db, env, appointment.id, "cancelled");
+    res.json({ data: appointment });
   });
   return router;
 }

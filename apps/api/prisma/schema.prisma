@@ -72,10 +72,37 @@ enum HistorySource {
   patient_reported
 }
 
+enum VaccinationStatus {
+  taken
+  not_taken
+}
+
+enum FamilyRelationship {
+  father
+  mother
+  spouse
+  brother
+  sister
+  son
+  daughter
+  paternal_grandfather
+  paternal_grandmother
+  maternal_grandfather
+  maternal_grandmother
+  other
+}
+
+enum VitalStatus {
+  alive
+  deceased
+  unknown
+}
+
 model User {
   id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email        String   @unique
-  passwordHash String
+  passwordHash String?
+  clerkUserId  String?  @unique
   role         UserRole @default(patient)
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now()) @db.Timestamptz(3)
@@ -116,8 +143,9 @@ model Patient {
   gender                String?
   bloodGroup            String?
   phone                 String?
-  emergencyContactName  String?
-  emergencyContactPhone String?
+  emergencyContactName         String?
+  emergencyContactRelationship String?
+  emergencyContactPhone        String?
   allergies             String[]  @default([])
   existingConditions    String[]  @default([])
   currentMedications    String[]  @default([])
@@ -135,6 +163,15 @@ model Patient {
   appointments  Appointment[]
   qrSessions    QrAccessSession[]
   historyEntries HealthHistoryEntry[]
+  vaccinations   PatientVaccination[]
+  familyMembers  FamilyMember[]
+  preferredLanguage     String?  @default("en")
+  timeZone              String?  @default("Asia/Kolkata")
+  termsAcceptedVersion  String?
+  notificationPreference NotificationPreference?
+  insurancePolicies      PatientInsurancePolicy[]
+  paymentOrders          PaymentOrder[]
+  reviews                HospitalReview[]
 }
 
 model Consent {
@@ -309,6 +346,7 @@ model Hospital {
   updatedAt   DateTime @updatedAt @db.Timestamptz(3)
 
   slots AvailabilitySlot[]
+  reviews HospitalReview[]
 }
 
 model AvailabilitySlot {
@@ -339,6 +377,7 @@ model Appointment {
 
   patient Patient          @relation(fields: [patientId], references: [id], onDelete: Restrict)
   slot    AvailabilitySlot @relation(fields: [slotId], references: [id], onDelete: Restrict)
+  paymentOrders PaymentOrder[]
 
   @@index([patientId, createdAt])
   @@index([slotId])
@@ -383,4 +422,123 @@ model HealthHistoryEntry {
   patient Patient @relation(fields: [patientId], references: [id], onDelete: Restrict)
 
   @@index([patientId, createdAt])
+}
+
+// Self-reported vaccination record. A patient can record whether they have taken
+// a vaccine from the standard directory of vaccines in India or a custom vaccine.
+model PatientVaccination {
+  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId        String            @db.Uuid
+  vaccineId        String?
+  vaccineName      String
+  category         String
+  status           VaccinationStatus
+  administeredDate DateTime?         @db.Date
+  notes            String?
+  createdAt        DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime          @updatedAt @db.Timestamptz(3)
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Restrict)
+
+  @@unique([patientId, vaccineName])
+  @@index([patientId, createdAt])
+}
+
+// Self-reported family member and family health history. A patient can record
+// relatives across generations, living status, and hereditary health conditions.
+// In accordance with product safety rules, adding a family member here does not
+// grant them access to the patient's records or account.
+model FamilyMember {
+  id           String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId    String             @db.Uuid
+  fullName     String
+  relationship FamilyRelationship
+  vitalStatus  VitalStatus        @default(alive)
+  age          Int?
+  bloodGroup   String?
+  conditions   String[]           @default([])
+  notes        String?
+  createdAt    DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime           @updatedAt @db.Timestamptz(3)
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Restrict)
+
+  @@index([patientId, createdAt])
+}
+
+enum PaymentStatus {
+  pending
+  completed
+  failed
+  refunded
+}
+
+model NotificationPreference {
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId             String   @unique @db.Uuid
+  emailEnabled          Boolean  @default(true)
+  appointmentsEnabled   Boolean  @default(true)
+  prescriptionsEnabled  Boolean  @default(true)
+  medicationsEnabled    Boolean  @default(true)
+  securityAlertsEnabled Boolean  @default(true)
+  createdAt             DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime @updatedAt @db.Timestamptz(3)
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Restrict)
+}
+
+model PatientInsurancePolicy {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId        String    @db.Uuid
+  providerName     String
+  policyNumber     String
+  policyHolderName String?
+  sumInsured       String?
+  validFrom        DateTime? @db.Date
+  validTill        DateTime? @db.Date
+  tpaContact       String?
+  notes            String?
+  createdAt        DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime  @updatedAt @db.Timestamptz(3)
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Restrict)
+
+  @@index([patientId, createdAt])
+}
+
+model PaymentOrder {
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId     String        @db.Uuid
+  appointmentId String?       @db.Uuid
+  amountPaise   Int
+  currency      String        @default("INR")
+  status        PaymentStatus @default(pending)
+  orderRef      String        @unique
+  paymentRef    String?
+  isSandbox     Boolean       @default(true)
+  createdAt     DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime      @updatedAt @db.Timestamptz(3)
+
+  patient     Patient      @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  appointment Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  @@index([patientId, createdAt])
+  @@index([appointmentId])
+}
+
+model HospitalReview {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  hospitalId        String   @db.Uuid
+  patientId         String   @db.Uuid
+  rating            Int
+  reviewText        String?
+  isVerifiedPatient Boolean  @default(false)
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @db.Timestamptz(3)
+
+  hospital Hospital @relation(fields: [hospitalId], references: [id], onDelete: Restrict)
+  patient  Patient  @relation(fields: [patientId], references: [id], onDelete: Restrict)
+
+  @@index([hospitalId, createdAt])
+  @@index([patientId])
 }

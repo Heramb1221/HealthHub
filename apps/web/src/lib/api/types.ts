@@ -54,6 +54,27 @@ export interface Prescription {
   sourceFile?: { fileName: string; mimeType: string; sizeBytes: number } | null;
 }
 
+export type AlertSeverity = "high" | "moderate" | "low";
+
+export interface ContraindicationAlert {
+  id: string;
+  severity: AlertSeverity;
+  title: string;
+  medications: string[];
+  mechanism: string;
+  patientAdvice: string;
+  clinicalNote: string;
+}
+
+export interface ContraindicationReport {
+  prescriptionId: string;
+  hasInteractions: boolean;
+  alerts: ContraindicationAlert[];
+  summary: string;
+  disclaimer: string;
+  analyzedAt: string;
+}
+
 /** ASSUMED: list responses. The contract does not define pagination. */
 export interface ListResult<T> {
   items: T[];
@@ -343,4 +364,114 @@ export interface HealthCard {
     url: string;
   };
   isDemo?: boolean;
+}
+
+export type VaccineCategory = "uip" | "iap_private" | "covid19" | "special_travel" | "custom";
+export type VaccinationStatus = "taken" | "not_taken";
+
+export interface PatientVaccination {
+  recordId: string | null;
+  vaccineId: string | null;
+  vaccineName: string;
+  category: VaccineCategory;
+  categoryLabel: string;
+  description: string;
+  status: VaccinationStatus | null;
+  administeredDate: string | null;
+  notes: string | null;
+  isCustom: boolean;
+  updatedAt: string | null;
+}
+
+export interface VaccinationSummary {
+  total: number;
+  taken: number;
+  notTaken: number;
+  unrecorded: number;
+}
+
+export interface VaccinationListResult {
+  data: PatientVaccination[];
+  summary: VaccinationSummary;
+}
+
+export interface RecordVaccinationInput {
+  vaccineName: string;
+  vaccineId?: string | null;
+  category?: VaccineCategory;
+  status: VaccinationStatus;
+  administeredDate?: string | null;
+  notes?: string | null;
+}
+
+export type FamilyRelationship =
+  | "father"
+  | "mother"
+  | "spouse"
+  | "brother"
+  | "sister"
+  | "son"
+  | "daughter"
+  | "paternal_grandfather"
+  | "paternal_grandmother"
+  | "maternal_grandfather"
+  | "maternal_grandmother"
+  | "other";
+
+export type VitalStatus = "alive" | "deceased" | "unknown";
+
+export type Generation = "grandparents" | "parents" | "current" | "children" | "other";
+
+export interface FamilyMember {
+  id: string;
+  fullName: string;
+  relationship: FamilyRelationship;
+  relationshipLabel: string;
+  generation: Generation;
+  vitalStatus: VitalStatus;
+  age: number | null;
+  bloodGroup: string | null;
+  conditions: string[];
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface HereditaryRiskSummary {
+  condition: string;
+  count: number;
+  members: { name: string; relationship: string; relationLabel: string }[];
+}
+
+export interface FamilyTreeResult {
+  data: FamilyMember[];
+  generations: {
+    grandparents: FamilyMember[];
+    parents: FamilyMember[];
+    current: FamilyMember[];
+    children: FamilyMember[];
+    other: FamilyMember[];
+  };
+  hereditaryRisks: HereditaryRiskSummary[];
+  totalMembers: number;
+}
+
+export interface CreateFamilyMemberInput {
+  fullName: string;
+  relationship: FamilyRelationship;
+  vitalStatus?: VitalStatus;
+  age?: number | null;
+  bloodGroup?: string | null;
+  conditions?: string[];
+  notes?: string | null;
+}
+
+export interface UpdateFamilyMemberInput {
+  fullName?: string;
+  relationship?: FamilyRelationship;
+  vitalStatus?: VitalStatus;
+  age?: number | null;
+  bloodGroup?: string | null;
+  conditions?: string[];
+  notes?: string | null;
 }

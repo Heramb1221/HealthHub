@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { HeartPulse } from "lucide-react";
 
@@ -16,10 +18,23 @@ export function CardFace({ card }: { card: HealthCard }) {
     >
       <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0 space-y-5">
-          <p className="text-primary flex items-center gap-2 text-sm font-semibold">
-            <HeartPulse aria-hidden="true" className="text-accent-foreground size-5" />
-            HealthHub · Digital health card
-          </p>
+          <div className="flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.png"
+              alt="Sehat Med"
+              className="size-5 object-contain rounded"
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+                const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                if (fallback) fallback.style.display = "inline-block";
+              }}
+            />
+            <HeartPulse aria-hidden="true" className="text-accent-foreground size-5 hidden" />
+            <p className="text-primary text-sm font-semibold">
+              Sehat Med · Bharat ka apna Sathi
+            </p>
+          </div>
           <div className="space-y-1">
             <p className="text-muted-foreground text-xs">Name</p>
             {card.fullName ? (
@@ -34,10 +49,10 @@ export function CardFace({ card }: { card: HealthCard }) {
             )}
           </div>
           <div className="space-y-1">
-            <p className="text-muted-foreground text-xs">HealthHub ID</p>
+            <p className="text-muted-foreground text-xs">Sehat Med ID</p>
             <HealthId value={card.healthId} />
           </div>
-          <p className="text-muted-foreground text-xs">Issued {formatDate(card.issuedAt)}</p>
+          <p className="text-muted-foreground text-xs">Issued {formatDate(card.issuedAt || (card as unknown as { generatedAt?: string }).generatedAt || new Date().toISOString())}</p>
           {card.isDemo ? (
             <p className="flex flex-wrap items-center gap-2 text-xs">
               <DemoTag /> Not valid for any real service.
@@ -47,11 +62,11 @@ export function CardFace({ card }: { card: HealthCard }) {
 
         <figure className="shrink-0 space-y-2 sm:w-48">
           <QrCode
-            value={card.qr.url}
-            label="QR code for your HealthHub card. It contains a random reference only, not medical information."
+            value={card.qr?.url ?? (typeof window !== "undefined" ? `${window.location.origin}/qr/${card.healthId}` : card.healthId)}
+            label="QR code for your Sehat Med card. It contains a random reference only, not medical information."
             className="border-border size-44 rounded-md border"
           />
-          <figcaption className="text-muted-foreground text-xs">Opens a protected HealthHub page. The code holds a random reference, nothing else.</figcaption>
+          <figcaption className="text-muted-foreground text-xs">Opens a protected Sehat Med page. The code holds a random reference, nothing else.</figcaption>
         </figure>
       </div>
     </section>

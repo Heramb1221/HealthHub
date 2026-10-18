@@ -33,10 +33,14 @@ const dateOfBirth = z.iso
   .refine((value) => value <= new Date().toISOString().slice(0, 10), "in the future")
   .transform((value) => parseDateOnly(value) as Date);
 
+const emptyToNull = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess((v) => (typeof v === "string" && !v.trim() ? null : v), schema);
+
 const emergencyContact = z
   .strictObject({
-    name: text(120).nullable().optional(),
-    phone: phone.nullable().optional(),
+    name: emptyToNull(text(120).nullable().optional()),
+    relationship: emptyToNull(text(60).nullable().optional()),
+    phone: emptyToNull(phone.nullable().optional()),
   })
   .refine((value) => Object.keys(value).length > 0);
 
@@ -47,16 +51,17 @@ const emergencyContact = z
  */
 export const updateProfileSchema = z
   .strictObject({
-    fullName: text(120).nullable().optional(),
-    dateOfBirth: dateOfBirth.nullable().optional(),
-    gender: z.enum(GENDERS).nullable().optional(),
-    bloodGroup: z.enum(BLOOD_GROUPS).nullable().optional(),
-    phone: phone.nullable().optional(),
-    emergencyContact: emergencyContact.optional(),
+    fullName: emptyToNull(text(120).nullable().optional()),
+    dateOfBirth: emptyToNull(dateOfBirth.nullable().optional()),
+    gender: emptyToNull(z.enum(GENDERS).nullable().optional()),
+    bloodGroup: emptyToNull(z.enum(BLOOD_GROUPS).nullable().optional()),
+    phone: emptyToNull(phone.nullable().optional()),
+    emergencyContact: emergencyContact.nullable().optional(),
     allergies: list.optional(),
     existingConditions: list.optional(),
+    conditions: list.optional(),
     currentMedications: list.optional(),
-    address: text(300).nullable().optional(),
+    address: emptyToNull(text(300).nullable().optional()),
   })
   .refine((value) => Object.keys(value).length > 0);
 

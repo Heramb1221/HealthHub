@@ -66,6 +66,41 @@ export function TimesEditor({ times, onChange, error }: { times: string[]; onCha
           {error}
         </p>
       ) : null}
+      <div className="pt-1">
+        <p className="text-xs text-muted-foreground mb-1.5 font-medium">Quick presets:</p>
+        <div className="flex flex-wrap gap-1.5">
+          {[
+            { label: "Morning (08:00)", time: "08:00" },
+            { label: "Noon (12:00)", time: "12:00" },
+            { label: "Afternoon (14:00)", time: "14:00" },
+            { label: "Evening (18:00)", time: "18:00" },
+            { label: "Night (20:00)", time: "20:00" },
+            { label: "Bedtime (22:00)", time: "22:00" },
+          ].map((preset) => (
+            <button
+              key={preset.time}
+              type="button"
+              className={`rounded-md px-2 py-1 text-xs border transition-colors ${
+                times.includes(preset.time)
+                  ? "border-primary bg-primary/10 text-primary font-medium"
+                  : "border-border bg-card text-muted-foreground hover:bg-muted"
+              }`}
+              onClick={() => {
+                if (times.includes(preset.time)) {
+                  if (times.length > 1) {
+                    onChange(times.filter((t) => t !== preset.time));
+                  }
+                } else if (times.length < MAX_TIMES) {
+                  onChange([...times, preset.time].sort());
+                }
+              }}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <Button
         ref={addRef}
         type="button"
@@ -77,7 +112,7 @@ export function TimesEditor({ times, onChange, error }: { times: string[]; onCha
           onChange([...times, ""]);
         }}
       >
-        <Plus aria-hidden="true" /> Add a time
+        <Plus aria-hidden="true" /> Add custom time
       </Button>
     </fieldset>
   );

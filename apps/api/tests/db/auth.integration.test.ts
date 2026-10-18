@@ -129,7 +129,8 @@ describe.skipIf(!TEST_DATABASE_URL)("authentication", () => {
     const protectedGet = (headers: Record<string, string> = {}) => request(app).get("/api/v1/consents").set(headers);
 
     it("returns 401 without a token or with a malformed one", async () => {
-      for (const headers of [{}, { Authorization: "Bearer" }, { Authorization: "Basic abc" }, { Authorization: "Bearer not.a.jwt" }]) {
+      const headerCases: Record<string, string>[] = [{}, { Authorization: "Bearer" }, { Authorization: "Basic abc" }, { Authorization: "Bearer not.a.jwt" }];
+      for (const headers of headerCases) {
         const res = await protectedGet(headers);
         expect(res.status).toBe(401);
         expect(res.body.error.code).toBe("UNAUTHENTICATED");

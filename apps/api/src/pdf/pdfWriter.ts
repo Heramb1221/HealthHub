@@ -123,6 +123,41 @@ export class PdfBuilder {
     this.y -= 4;
   }
 
+  getY(): number {
+    return this.y;
+  }
+
+  setY(newY: number): void {
+    this.y = newY;
+  }
+
+  /** Draws a vector rectangle at specified coordinates */
+  box(x: number, y: number, w: number, h: number, options: { fill?: Rgb; stroke?: Rgb; strokeWidth?: number } = {}): void {
+    const { fill, stroke, strokeWidth } = options;
+    let ops = "";
+    if (strokeWidth !== undefined) {
+      ops += `${num(strokeWidth)} w\n`;
+    }
+    if (fill && stroke) {
+      ops += `${fill.map(num).join(" ")} rg\n${stroke.map(num).join(" ")} RG\n${num(x)} ${num(y)} ${num(w)} ${num(h)} re B\n`;
+    } else if (fill) {
+      ops += `${fill.map(num).join(" ")} rg\n${num(x)} ${num(y)} ${num(w)} ${num(h)} re f\n`;
+    } else if (stroke) {
+      ops += `${stroke.map(num).join(" ")} RG\n${num(x)} ${num(y)} ${num(w)} ${num(h)} re S\n`;
+    }
+    this.emit(ops);
+  }
+
+  /** Direct text placement at exact x, y coordinate */
+  textAt(text: string, x: number, y: number, options: { size?: number; bold?: boolean; color?: Rgb } = {}): void {
+    const size = options.size ?? 10;
+    const bold = options.bold ?? false;
+    const color = options.color ?? [0, 0, 0];
+    this.emit(
+      `BT /${bold ? "F2" : "F1"} ${num(size)} Tf ${color.map(num).join(" ")} rg ${num(x)} ${num(y)} Td (${toPdfText(text)}) Tj ET`,
+    );
+  }
+
   /** Draws a QR matrix (true = dark) with a 4-module quiet zone, kept on one page. */
   qr(matrix: boolean[][], moduleSize: number): void {
     const quiet = 4;

@@ -142,3 +142,140 @@ export async function listAvailability(
     page: { limit: query.limit, nextCursor: hasMore ? (items[items.length - 1]?.id ?? null) : null },
   };
 }
+
+/** Admin-only schedule management: creates availability slots for a hospital. */
+export async function addAvailabilitySlots(
+  db: Db,
+  auth: AuthContext,
+  hospitalId: string,
+  slots: Array<{ startsAt: Date; endsAt: Date }>,
+  ctx: Ctx,
+): Promise<{ createdCount: number }> {
+  if (!isAdmin(auth)) throw new AppError("FORBIDDEN");
+  const hospital = await db.hospital.findUnique({ where: { id: hospitalId } });
+  if (!hospital) throw new AppError("NOT_FOUND");
+
+  const created = await db.$transaction(async (tx) => {
+    let count = 0;
+    for (const slot of slots) {
+      if (slot.endsAt <= slot.startsAt) continue;
+      const res = await tx.availabilitySlot.upsert({
+        where: { hospitalId_startsAt: { hospitalId, startsAt: slot.startsAt } },
+        create: { hospitalId, startsAt: slot.startsAt, endsAt: slot.endsAt },
+        update: {},
+      });
+      if (res) count++;
+    }
+
+    await recordAudit(tx, {
+      action: "hospital.slots_created",
+      outcome: "success",
+      actorUserId: auth.userId,
+      resourceType: "hospital",
+      resourceId: hospitalId,
+      requestId: ctx.requestId,
+      metadata: { count },
+    });
+
+    return count;
+  });
+
+  return { createdCount: created };
+}
+
+export interface ReviewDto {
+  id: string;
+  rating: number;
+  reviewText: string | null;
+  isVerifiedPatient: boolean;
+  createdAt: string;
+  patientName: string;
+}
+
+export async function listHospitalReviews(
+  db: Db,
+  hospitalId: string,
+): Promise<{ ratingAverage: number; reviewCount: number; reviews: ReviewDto[] }> {
+  const reviews = await db.hospitalReview.findMany({
+    where: { hospitalId },
+    include: {
+      patient: { select: { fullName: true } },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 50,
+  });
+
+  const reviewCount = reviews.length;
+  const ratingAverage = reviewCount > 0
+    ? Number((reviews.reduce((acc, r) => acc + r.rating, 0) / reviewCount).toFixed(1))
+    : 0;
+
+  return {
+    ratingAverage,
+    reviewCount,
+    reviews: reviews.map((r) => ({
+      id: r.id,
+      rating: r.rating,
+      reviewText: r.reviewText,
+      isVerifiedPatient: r.isVerifiedPatient,
+      createdAt: r.createdAt.toISOString(),
+      patientName: r.patient.fullName ? `${r.patient.fullName.charAt(0)}***` : "Patient",
+    })),
+  };
+}
+
+export async function createHospitalReview(
+  db: Db,
+  auth: AuthContext,
+  hospitalId: string,
+  input: { rating: number; reviewText?: string | null },
+  ctx: Ctx,
+): Promise<ReviewDto> {
+  const patient = await db.patient.findUnique({
+    where: { userId: auth.userId },
+    select: { id: true, fullName: true },
+  });
+  if (!patient) throw new AppError("NOT_FOUND");
+
+  const hospital = await db.hospital.findUnique({ where: { id: hospitalId } });
+  if (!hospital) throw new AppError("NOT_FOUND");
+
+  // Check if patient has visited/booked at this hospital
+  const hasVisited = await db.appointment.findFirst({
+    where: {
+      patientId: patient.id,
+      slot: { hospitalId },
+    },
+    select: { id: true },
+  });
+
+  const created = await db.hospitalReview.create({
+    data: {
+      hospitalId,
+      patientId: patient.id,
+      rating: Math.max(1, Math.min(5, Math.round(input.rating))),
+      reviewText: input.reviewText?.slice(0, 500) ?? null,
+      isVerifiedPatient: Boolean(hasVisited),
+    },
+  });
+
+  await recordAudit(db, {
+    action: "hospital.review_created",
+    outcome: "success",
+    actorUserId: auth.userId,
+    patientId: patient.id,
+    resourceType: "hospital_review",
+    resourceId: created.id,
+    requestId: ctx.requestId,
+    metadata: { hospitalId, rating: created.rating, isVerified: created.isVerifiedPatient },
+  });
+
+  return {
+    id: created.id,
+    rating: created.rating,
+    reviewText: created.reviewText,
+    isVerifiedPatient: created.isVerifiedPatient,
+    createdAt: created.createdAt.toISOString(),
+    patientName: patient.fullName ? `${patient.fullName.charAt(0)}***` : "Patient",
+  };
+}

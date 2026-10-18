@@ -15,6 +15,8 @@ export interface PrescriptionsApi {
   /** Saves the patient's corrections as a new version. Never edits the original file or earlier versions. */
   correct(id: string, input: CorrectionInput): Promise<Prescription>;
   downloadPdf(id: string): Promise<{ blob: Blob; filename?: string }>;
+  downloadFile(id: string): Promise<{ blob: Blob; filename?: string }>;
+  contraindications(id: string): Promise<import("./types").ContraindicationReport>;
 }
 
 const path = (id: string) => `/prescriptions/${encodeURIComponent(id)}`;
@@ -45,6 +47,8 @@ const livePrescriptionsApi: PrescriptionsApi = {
   },
   correct: (id, input) => request<Prescription>(`${path(id)}/extracted-fields`, { method: "PATCH", json: input }),
   downloadPdf: (id) => requestBlob(`${path(id)}/pdf`),
+  downloadFile: (id) => requestBlob(`${path(id)}/file`),
+  contraindications: (id) => request<import("./types").ContraindicationReport>(`${path(id)}/contraindications`),
 };
 
 export const prescriptionsApi: PrescriptionsApi =
