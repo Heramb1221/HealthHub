@@ -168,9 +168,30 @@ export interface Hospital {
   timings?: string | null;
   locationUrl?: string | null;
   specialties: string[];
+  ratingAverage?: number;
+  reviewCount?: number;
   /** false = deactivated by an administrator */
   active: boolean;
+  isActive?: boolean;
   isDemo?: boolean;
+}
+
+export interface HospitalReview {
+  id: string;
+  hospitalId?: string;
+  patientId?: string;
+  rating: number;
+  reviewText: string | null;
+  isVerifiedPatient: boolean;
+  createdAt: string;
+  patientName: string;
+}
+
+export interface HospitalReviewsResult {
+  ratingAverage: number;
+  reviewCount: number;
+  userReview?: HospitalReview | null;
+  reviews: HospitalReview[];
 }
 
 /**
@@ -198,6 +219,9 @@ export interface AvailabilitySlot {
   hospitalId: string;
   startsAt: string;
   endsAt: string;
+  status?: "open" | "booked" | "holding" | "held_by_me";
+  expiresAt?: string;
+  secondsRemaining?: number;
 }
 
 export interface Appointment {
@@ -254,6 +278,7 @@ export interface MedicationSchedule {
 
 export interface CreateScheduleInput {
   prescriptionId: string;
+  versionNumber?: number;
   /** Position in the prescription's current medication list. The server verifies it. */
   medicationIndex: number;
   medicationName: string;
@@ -362,6 +387,14 @@ export interface PrescriptionVersion {
 export interface HealthCard {
   healthId: string;
   fullName: string;
+  dateOfBirth?: string | null;
+  gender?: string | null;
+  bloodGroup?: string | null;
+  phone?: string | null;
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
+  issuer?: string;
+  notice?: string;
   /** ISO timestamp the card (and its QR reference) was issued */
   issuedAt: string;
   qr: {
@@ -482,3 +515,185 @@ export interface UpdateFamilyMemberInput {
   conditions?: string[];
   notes?: string | null;
 }
+
+// ==========================================
+// AI Symptom Checker & Clinical Triage Types
+// ==========================================
+
+export type TriageUrgency = "emergency" | "urgent" | "routine" | "self_care";
+
+export interface QuestionOption {
+  id: string;
+  label: string;
+  isRedFlag?: boolean;
+  indicatesSeverity?: "mild" | "moderate" | "severe";
+  associatedCondition?: string;
+}
+
+export interface RuleQuestion {
+  id: string;
+  category: "duration" | "characteristics" | "red_flags" | "associated_symptoms" | "history";
+  question: string;
+  subtext?: string;
+  options: QuestionOption[];
+}
+
+export interface SymptomAnswer {
+  questionId: string;
+  questionText: string;
+  selectedOptionId: string;
+  selectedOptionLabel: string;
+}
+
+export interface MatchedRuleDetail {
+  ruleName: string;
+  condition: string;
+  reason: string;
+}
+
+export interface SymptomAssessmentInput {
+  symptoms: string[];
+  description?: string;
+  durationDays?: number;
+  severity?: "mild" | "moderate" | "severe";
+  patientAge?: number;
+  answers?: SymptomAnswer[];
+}
+
+export interface PossibleExplanation {
+  condition: string;
+  likelihood: "high" | "moderate" | "low" | "possible";
+  description: string;
+}
+
+export interface SymptomAssessmentResult {
+  urgency: TriageUrgency;
+  urgencyLabel: string;
+  redFlags: string[];
+  possibleExplanations: PossibleExplanation[];
+  matchedRules?: MatchedRuleDetail[];
+  answeredQuestions?: SymptomAnswer[];
+  recommendedAction: string;
+  followUpQuestions: string[];
+  clinicalDisclaimer: string;
+  analyzedAt: string;
+  provider: "clinical_rules" | "gemini_triage";
+}
+
+// ==========================================
+// Health Insurance & Policy Directory Types
+// ==========================================
+
+export interface InsuranceProviderInfo {
+  id: string;
+  name: string;
+  code: string;
+  type: "stand_alone_health" | "general_insurer" | "public_sector";
+  cashlessHelpline: string;
+  customerSupportPhone: string;
+  website: string;
+  tpaDeskEmail: string;
+  popularPlans: string[];
+  lastVerified: string;
+}
+
+export interface PatientInsurancePolicy {
+  id: string;
+  providerName: string;
+  maskedPolicyNumber: string;
+  rawPolicyNumberLastFour: string;
+  policyHolderName: string | null;
+  sumInsured: string | null;
+  validFrom: string | null;
+  validTill: string | null;
+  tpaContact: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface CreatePolicyInput {
+  providerName: string;
+  policyNumber: string;
+  policyHolderName?: string;
+  sumInsured?: string;
+  validFrom?: string;
+  validTill?: string;
+  tpaContact?: string;
+  notes?: string;
+}
+
+// ==========================================
+// Payment Gateway & Checkout Types
+// ==========================================
+
+export interface CreatePaymentOrderInput {
+  appointmentId: string;
+  amountPaise?: number;
+  currency?: "INR";
+}
+
+export interface PaymentOrder {
+  id: string;
+  orderRef: string;
+  amountPaise: number;
+  amountRupees: string;
+  currency: string;
+  status: "pending" | "completed" | "failed" | "refunded";
+  isSandbox: boolean;
+  keyId?: string | null;
+  hospitalName: string;
+  slotTime: string;
+  patientName?: string;
+  patientPhone?: string;
+  createdAt: string;
+}
+
+export interface VerifyPaymentInput {
+  orderRef: string;
+  paymentRef?: string;
+  signature?: string;
+  simulateFailure?: boolean;
+}
+
+export interface PaymentVerificationResult {
+  id: string;
+  orderRef: string;
+  paymentRef: string | null;
+  status: "completed" | "failed";
+  receiptNumber: string | null;
+  amountRupees: string;
+  currency?: string;
+  isSandbox: boolean;
+  verifiedAt?: string;
+}
+
+export interface PaymentHistoryItem {
+  id: string;
+  orderRef: string;
+  paymentRef: string | null;
+  amountPaise: number;
+  amountRupees: string;
+  currency: string;
+  status: string;
+  isSandbox: boolean;
+  hospitalName: string;
+  appointmentTime: string | null;
+  createdAt: string;
+}
+
+export interface CalendarStatus {
+  isConfigured: boolean;
+  connected: boolean;
+  email?: string | null;
+  provider?: "google_oauth" | "clerk" | null;
+}
+
+export interface CalendarSyncResult {
+  syncedCount: number;
+  events: Array<{
+    medicationName: string;
+    time: string;
+    calendarLink?: string;
+  }>;
+}
+

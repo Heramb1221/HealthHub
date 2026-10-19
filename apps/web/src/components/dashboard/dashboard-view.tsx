@@ -167,6 +167,12 @@ export function DashboardView() {
             </div>
             <div className="flex flex-wrap gap-2 self-start sm:self-center">
               <Button asChild variant="outline" size="sm">
+                <Link href="/symptoms">Check symptoms</Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/insurance">Insurance</Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
                 <Link href="/health-card">Health card</Link>
               </Button>
               <Button asChild variant="outline" size="sm">

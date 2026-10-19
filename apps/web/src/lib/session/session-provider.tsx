@@ -7,6 +7,7 @@ import { useAuth, useUser, useClerk } from "@clerk/nextjs";
 import { LoadingState } from "@/components/feedback/states";
 import { ErrorState } from "@/components/feedback/states";
 import { authApi } from "@/lib/api/auth";
+import { patientsApi } from "@/lib/api/patients";
 import { setAuthToken } from "@/lib/api/http";
 import type { AuthUser } from "@/lib/api/types";
 
@@ -69,6 +70,13 @@ export function SessionGate({ children }: { children: React.ReactNode }) {
         if (cancelled) return;
         if (user) {
           setState({ status: "signed-in", user });
+          if (user.role === "patient" && pathname !== "/profile") {
+            const profile = await patientsApi.getMe().catch(() => null);
+            if (profile && !profile.fullName) {
+              router.replace("/profile?onboarding=true");
+              return;
+            }
+          }
         } else {
           router.replace(`/sign-in?next=${encodeURIComponent(pathname)}`);
         }

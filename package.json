@@ -1,0 +1,35 @@
+{
+  "name": "healthhub",
+  "version": "0.1.0",
+  "private": true,
+  "description": "HealthHub - India-first patient health-record and care-navigation platform",
+  "scripts": {
+    "dev:api": "npm --prefix apps/api run dev",
+    "dev:web": "npm --prefix apps/web run dev",
+    "dev:mobile": "npm --prefix apps/mobile start",
+    "typecheck:api": "npm --prefix apps/api run typecheck",
+    "typecheck:web": "npm --prefix apps/web run typecheck",
+    "typecheck:mobile": "npm --prefix apps/mobile run typecheck",
+    "typecheck:contracts": "npm --prefix packages/contracts run typecheck",
+    "typecheck:all": "npm run typecheck:contracts && npm run typecheck:api && npm run typecheck:web && npm run typecheck:mobile",
+    "lint:api": "npm --prefix apps/api run lint",
+    "lint:web": "npm --prefix apps/web run lint",
+    "lint:mobile": "npm --prefix apps/mobile run lint",
+    "lint:all": "npm run lint:api && npm run lint:web && npm run lint:mobile",
+    "test:api": "npm --prefix apps/api test",
+    "test:mobile": "npm --prefix apps/mobile test",
+    "test:all": "npm run test:api && npm run test:mobile",
+    "build:api": "npm --prefix apps/api run build",
+    "build:web": "npm --prefix apps/web run build",
+    "build:mobile": "npm --prefix apps/mobile run export:check",
+    "build:all": "npm run build:api && npm run build:web && npm run build:mobile",
+    "seed:demo": "npm --prefix apps/api run seed:demo"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

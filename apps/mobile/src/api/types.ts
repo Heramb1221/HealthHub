@@ -319,6 +319,24 @@ export interface Hospital {
   specialties?: string[];
   isActive?: boolean;
   isDemo?: boolean;
+  ratingAverage?: number;
+  reviewCount?: number;
+}
+
+export interface HospitalReview {
+  id: string;
+  rating: number;
+  reviewText: string | null;
+  isVerifiedPatient: boolean;
+  createdAt: string;
+  patientName: string;
+}
+
+export interface HospitalReviewsResult {
+  ratingAverage: number;
+  reviewCount: number;
+  userReview?: HospitalReview | null;
+  reviews: HospitalReview[];
 }
 
 /** PROPOSED B3 */
@@ -326,7 +344,9 @@ export interface AvailabilitySlot {
   id: string;
   startsAt: string;
   endsAt: string;
-  status: "open" | "booked";
+  status: "open" | "booked" | "holding" | "held_by_me";
+  expiresAt?: string;
+  secondsRemaining?: number;
 }
 
 /** PROPOSED B3 body: the patient comes from the session; the client never sends patient, price, or status. */
@@ -457,3 +477,156 @@ export interface UpdateFamilyMemberBody {
   conditions?: string[];
   notes?: string | null;
 }
+
+// ---------- AI Symptom Checker ----------
+export type TriageUrgency = "emergency" | "urgent" | "routine" | "self_care";
+
+export interface QuestionOption {
+  id: string;
+  label: string;
+  isRedFlag?: boolean;
+  indicatesSeverity?: "mild" | "moderate" | "severe";
+  associatedCondition?: string;
+}
+
+export interface RuleQuestion {
+  id: string;
+  category: "duration" | "characteristics" | "red_flags" | "associated_symptoms" | "history";
+  question: string;
+  subtext?: string;
+  options: QuestionOption[];
+}
+
+export interface SymptomAnswer {
+  questionId: string;
+  questionText: string;
+  selectedOptionId: string;
+  selectedOptionLabel: string;
+}
+
+export interface MatchedRuleDetail {
+  ruleName: string;
+  condition: string;
+  reason: string;
+}
+
+export interface SymptomAssessmentInput {
+  symptoms: string[];
+  description?: string;
+  durationDays?: number;
+  severity?: "mild" | "moderate" | "severe";
+  patientAge?: number;
+  answers?: SymptomAnswer[];
+}
+
+export interface PossibleExplanation {
+  condition: string;
+  likelihood: "high" | "moderate" | "low" | "possible";
+  description: string;
+}
+
+export interface SymptomAssessmentResult {
+  urgency: TriageUrgency;
+  urgencyLabel: string;
+  redFlags: string[];
+  possibleExplanations: PossibleExplanation[];
+  matchedRules?: MatchedRuleDetail[];
+  answeredQuestions?: SymptomAnswer[];
+  recommendedAction: string;
+  followUpQuestions: string[];
+  clinicalDisclaimer: string;
+  analyzedAt: string;
+  provider: "clinical_rules" | "gemini_triage";
+}
+
+// ---------- Health Insurance ----------
+export interface InsuranceProviderInfo {
+  id: string;
+  name: string;
+  code: string;
+  type: "stand_alone_health" | "general_insurer" | "public_sector";
+  cashlessHelpline: string;
+  customerSupportPhone: string;
+  website: string;
+  tpaDeskEmail: string;
+  popularPlans: string[];
+  lastVerified: string;
+}
+
+export interface PatientInsurancePolicy {
+  id: string;
+  providerName: string;
+  maskedPolicyNumber: string;
+  rawPolicyNumberLastFour: string;
+  policyHolderName: string | null;
+  sumInsured: string | null;
+  validFrom: string | null;
+  validTill: string | null;
+  tpaContact: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface CreatePolicyBody {
+  providerName: string;
+  policyNumber: string;
+  policyHolderName?: string;
+  sumInsured?: string;
+  validFrom?: string;
+  validTill?: string;
+  tpaContact?: string;
+  notes?: string;
+}
+
+// ---------- Payments ----------
+export interface CreatePaymentOrderBody {
+  appointmentId: string;
+  amountPaise?: number;
+  currency?: "INR";
+}
+
+export interface PaymentOrder {
+  id: string;
+  orderRef: string;
+  amountPaise: number;
+  amountRupees: string;
+  currency: string;
+  status: "pending" | "completed" | "failed" | "refunded";
+  isSandbox: boolean;
+  hospitalName: string;
+  slotTime: string;
+  createdAt: string;
+}
+
+export interface VerifyPaymentBody {
+  orderRef: string;
+  paymentRef?: string;
+  simulateFailure?: boolean;
+}
+
+export interface PaymentVerificationResult {
+  id: string;
+  orderRef: string;
+  paymentRef: string | null;
+  status: "completed" | "failed";
+  receiptNumber: string | null;
+  amountRupees: string;
+  currency?: string;
+  isSandbox: boolean;
+  verifiedAt?: string;
+}
+
+export interface PaymentHistoryItem {
+  id: string;
+  orderRef: string;
+  paymentRef: string | null;
+  amountPaise: number;
+  amountRupees: string;
+  currency: string;
+  status: string;
+  isSandbox: boolean;
+  hospitalName: string;
+  appointmentTime: string | null;
+  createdAt: string;
+}
+

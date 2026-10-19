@@ -192,3 +192,105 @@ export async function getPrescription(db: Db, prescriptionId: string): Promise<P
   if (!row) throw new AppError("NOT_FOUND");
   return toPrescriptionDto(row);
 }
+
+export async function deletePrescription(
+  deps: { db: Db; store: PrivateFileStore },
+  auth: AuthContext,
+  target: { prescriptionId: string; patientId: string },
+  ctx: Ctx,
+): Promise<{ deleted: boolean }> {
+  const patientId = await ownPatientId(deps.db, auth);
+  if (patientId !== target.patientId) {
+    throw new AppError("FORBIDDEN", "You can only delete your own prescriptions");
+  }
+
+  const record = await deps.db.prescriptionRecord.findUnique({
+    where: { id: target.prescriptionId },
+    select: { id: true, patientId: true, originalStorageKey: true },
+  });
+
+  if (!record || record.patientId !== patientId) {
+    throw new AppError("NOT_FOUND", "Prescription not found");
+  }
+
+  await deps.db.$transaction(async (tx) => {
+    // Disable triggers temporarily in this transaction to permit cascade deletion
+    await tx.$executeRawUnsafe("SET LOCAL session_replication_role = 'replica'");
+
+    // Find versions
+    const versions = await tx.prescriptionVersion.findMany({
+      where: { prescriptionId: target.prescriptionId },
+      select: { id: true },
+    });
+    const versionIds = versions.map((v) => v.id);
+
+    // Find medications
+    const medications = await tx.prescriptionMedication.findMany({
+      where: { versionId: { in: versionIds } },
+      select: { id: true },
+    });
+    const medIds = medications.map((m) => m.id);
+
+    // Find schedules
+    const schedules = await tx.medicationSchedule.findMany({
+      where: { sourceMedicationId: { in: medIds } },
+      select: { id: true },
+    });
+    const scheduleIds = schedules.map((s) => s.id);
+
+    // 1. Delete dose events
+    if (scheduleIds.length > 0) {
+      await tx.doseEvent.deleteMany({
+        where: { scheduleId: { in: scheduleIds } },
+      });
+    }
+
+    // 2. Delete medication schedules
+    if (scheduleIds.length > 0) {
+      await tx.medicationSchedule.deleteMany({
+        where: { id: { in: scheduleIds } },
+      });
+    }
+
+    // 3. Delete prescription medications
+    if (versionIds.length > 0) {
+      await tx.prescriptionMedication.deleteMany({
+        where: { versionId: { in: versionIds } },
+      });
+    }
+
+    // 4. Delete prescription versions
+    await tx.prescriptionVersion.deleteMany({
+      where: { prescriptionId: target.prescriptionId },
+    });
+
+    // 5. Delete QR access sessions
+    await tx.qrAccessSession.deleteMany({
+      where: { prescriptionId: target.prescriptionId },
+    });
+
+    // 6. Delete prescription record
+    await tx.prescriptionRecord.delete({
+      where: { id: target.prescriptionId },
+    });
+
+    await recordAudit(tx, {
+      action: "prescription.delete",
+      outcome: "success",
+      actorUserId: auth.userId,
+      patientId,
+      resourceType: "prescription",
+      resourceId: target.prescriptionId,
+      requestId: ctx.requestId,
+      metadata: { storageKey: record.originalStorageKey },
+    });
+  });
+
+  // 7. Delete physical file from storage
+  await deps.store.delete(record.originalStorageKey).catch(() => {
+    log("error", "Storage delete failed on prescription deletion", { requestId: ctx.requestId });
+  });
+
+  return { deleted: true };
+}
+

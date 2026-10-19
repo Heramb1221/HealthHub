@@ -3,6 +3,7 @@ import { AppError } from "../../lib/errors.js";
 import type { AuthContext } from "../../middleware/authenticate.js";
 import { recordAudit } from "../audit/audit.js";
 import { ownPatientId } from "../patients/ownPatient.js";
+import { clearSlotHold, getSlotHoldStatus } from "./slotHold.js";
 
 interface Ctx {
   requestId: string;
@@ -48,6 +49,11 @@ export async function bookAppointment(db: Db, auth: AuthContext, slotId: string,
   if (!slot.hospital.isActive) throw new AppError("CONFLICT", "This hospital is not taking bookings");
   if (slot.startsAt.getTime() <= Date.now()) throw new AppError("CONFLICT", "This slot has already started or passed");
 
+  const hold = getSlotHoldStatus(slotId, patientId);
+  if (hold.isHeld && !hold.heldByMe) {
+    throw new AppError("CONFLICT", "This slot is temporarily held by another patient. Please choose another time.");
+  }
+
   try {
     const row = await db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT "id" FROM "Patient" WHERE "id" = ${patientId}::uuid FOR UPDATE`;
@@ -68,6 +74,7 @@ export async function bookAppointment(db: Db, auth: AuthContext, slotId: string,
       });
       return created;
     });
+    clearSlotHold(slotId);
     return toDto(row);
   } catch (err) {
     if (isUniqueViolation(err)) throw new AppError("CONFLICT", "This slot is no longer available");

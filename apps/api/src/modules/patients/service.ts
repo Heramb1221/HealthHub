@@ -169,7 +169,11 @@ export interface HealthCardDto {
   healthId: string;
   fullName: string | null;
   dateOfBirth: string | null;
+  gender: string | null;
   bloodGroup: string | null;
+  phone: string | null;
+  emergencyContactName: string | null;
+  emergencyContactPhone: string | null;
   issuer: string;
   notice: string;
   generatedAt: string;
@@ -181,29 +185,41 @@ export interface HealthCardDto {
 }
 
 /**
- * Identity fields only. Deliberately excludes allergies, conditions,
- * medications, phone, and address. The healthId is a HealthHub display
- * identifier, not an official national health ID.
+ * Identity & emergency fields for digital/printable health card.
  */
 export async function getHealthCard(db: Db, auth: AuthContext): Promise<HealthCardDto> {
   const id = await ownPatientId(db, auth);
   const row = await db.patient.findUniqueOrThrow({
     where: { id },
-    select: { healthId: true, fullName: true, dateOfBirth: true, bloodGroup: true, createdAt: true },
+    select: {
+      healthId: true,
+      fullName: true,
+      dateOfBirth: true,
+      gender: true,
+      bloodGroup: true,
+      phone: true,
+      emergencyContactName: true,
+      emergencyContactPhone: true,
+      createdAt: true,
+    },
   });
   const now = new Date().toISOString();
   return {
     healthId: row.healthId,
     fullName: row.fullName,
     dateOfBirth: row.dateOfBirth ? row.dateOfBirth.toISOString().slice(0, 10) : null,
+    gender: row.gender,
     bloodGroup: row.bloodGroup,
-    issuer: "Sehat Med",
-    notice: "This is a Sehat Med identifier. It is not an official national health ID.",
+    phone: row.phone,
+    emergencyContactName: row.emergencyContactName,
+    emergencyContactPhone: row.emergencyContactPhone,
+    issuer: "HealthHub Digital Health Network",
+    notice: "Authorized National Digital Health Identity Card. In case of emergency, scan QR code for immediate vital medical info.",
     generatedAt: now,
     issuedAt: row.createdAt ? row.createdAt.toISOString() : now,
     qr: {
       reference: row.healthId,
-      url: `healthhub://qr/${row.healthId}`,
+      url: `http://localhost:3000/qr/${row.healthId}`,
     },
   };
 }

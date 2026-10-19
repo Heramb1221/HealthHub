@@ -53,6 +53,7 @@ File upload responses should return processing status and resource ID, not expos
 ## QR access
 - `POST /qr/access-sessions` create a short-lived scoped access session after policy/consent checks
 - `GET /qr/access-sessions/:sessionId` return only permitted information
+- `DELETE /qr/access-sessions/:sessionId` revoke active QR access session
 The QR contains a random reference/URL, not medical data or a long-lived bearer secret. Expiry, revocation, and audit behavior must be explicit.
 
 ## Medication and history
@@ -75,17 +76,29 @@ The QR contains a random reference/URL, not medical data or a long-lived bearer 
 - `DELETE /family-members/:id` removes a family member record
 In accordance with product safety rules, adding a family member does not grant them account or medical record access.
 
-## Hospitals and appointments
+## Hospitals, slots, and appointments
 - `GET /hospitals`
 - `GET /hospitals/:hospitalId`
 - `POST /admin/hospitals`
 - `PATCH /admin/hospitals/:hospitalId`
 - `POST /admin/hospitals/:hospitalId/deactivate`
 - `GET /hospitals/:hospitalId/availability`
+- `POST /hospitals/:hospitalId/slots/:slotId/hold` (reserves a 15-minute slot for checkout, TTL 5 mins)
+- `POST /hospitals/:hospitalId/slots/:slotId/release` (releases a held slot)
+- `GET /hospitals/:hospitalId/reviews`
+- `POST /hospitals/:hospitalId/reviews` (body: `{ rating: 1-5, reviewText?: string }`)
 - `POST /appointments`
 - `GET /appointments`
 - `POST /appointments/:appointmentId/cancel`
 Appointment creation must validate server-side availability and use a transaction/constraint to prevent double booking.
+
+## Symptom checker (Educational / Non-diagnostic triage)
+- `POST /symptoms/assess` (body: `{ symptoms: string[], age?: number, gender?: string }`)
+- `POST /symptoms/follow-up` (body: `{ sessionId, answers: Record<string, string> }`)
+AI must never autonomously diagnose or prescribe.
+
+## System & Diagnostics
+- `GET /health` returns `{ status: "ok"|"degraded", database: "connected"|"disconnected", timestamp }`
 
 ## Payments
 Payment routes are not required for the core MVP. If a sandbox is added:

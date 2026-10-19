@@ -17,6 +17,7 @@ export interface PrescriptionsApi {
   downloadPdf(id: string): Promise<{ blob: Blob; filename?: string }>;
   downloadFile(id: string): Promise<{ blob: Blob; filename?: string }>;
   contraindications(id: string): Promise<import("./types").ContraindicationReport>;
+  delete(id: string): Promise<{ deleted: boolean }>;
 }
 
 const path = (id: string) => `/prescriptions/${encodeURIComponent(id)}`;
@@ -49,6 +50,7 @@ const livePrescriptionsApi: PrescriptionsApi = {
   downloadPdf: (id) => requestBlob(`${path(id)}/pdf`),
   downloadFile: (id) => requestBlob(`${path(id)}/file`),
   contraindications: (id) => request<import("./types").ContraindicationReport>(`${path(id)}/contraindications`),
+  delete: (id) => request<{ deleted: boolean }>(path(id), { method: "DELETE" }),
 };
 
 export const prescriptionsApi: PrescriptionsApi =

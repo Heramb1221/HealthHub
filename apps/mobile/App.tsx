@@ -3,6 +3,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ClerkProvider } from "@clerk/expo";
 
 import { AuthProvider } from "./src/auth/AuthContext";
+import { LanguageProvider } from "./src/i18n/LanguageContext";
 import { tokenCache } from "./src/auth/tokenCache";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 
@@ -13,10 +14,13 @@ export default function App() {
     <SafeAreaProvider>
       <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
         <AuthProvider>
-          <StatusBar style="dark" />
-          <RootNavigator />
+          <LanguageProvider>
+            <StatusBar style="dark" />
+            <RootNavigator />
+          </LanguageProvider>
         </AuthProvider>
       </ClerkProvider>
     </SafeAreaProvider>
   );
 }
+

@@ -108,6 +108,14 @@ function AppointmentList() {
               onPress={() => nav.navigate("Hospital", { id: a.hospital.id })}
             />
           ) : null}
+          {a.status === "confirmed" && upcoming.includes(a) ? (
+            <Button
+              label="Pay consultation fee"
+              variant="primary"
+              icon="credit-card"
+              onPress={() => nav.navigate("Payments")}
+            />
+          ) : null}
           {a.status === "confirmed" && upcoming.includes(a) ? <Button label="Cancel appointment" variant="danger" onPress={() => confirmCancel(a)} loading={busy === a.id} /> : null}
         </Card>
   );

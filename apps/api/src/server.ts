@@ -31,7 +31,7 @@ function main(): void {
   const app = createApp(env, undefined, {
     db,
     store: new LocalFileStore(env.STORAGE_DIR),
-    extraction: createExtractionProvider(env.EXTRACTION_PROVIDER, env.GEMINI_API_KEY),
+    extraction: createExtractionProvider(env.EXTRACTION_PROVIDER, env.GEMINI_API_KEY, env.GEMINI_MODEL),
     checkDatabase: () => isDatabaseReachable(db),
   });
   const server = app.listen(env.PORT, () => {
@@ -47,4 +47,6 @@ function main(): void {
   process.on("SIGINT", shutdown);
 }
 
+// Server entrypoint with Google Calendar OAuth & Resend integration
 main();
+

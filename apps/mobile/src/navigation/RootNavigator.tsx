@@ -20,6 +20,9 @@ import { ProfileScreen } from "../screens/ProfileScreen";
 import { SharingScreen } from "../screens/SharingScreen";
 import { VaccinationScreen } from "../screens/VaccinationScreen";
 import { FamilyTreeScreen } from "../screens/FamilyTreeScreen";
+import { SymptomCheckerScreen } from "../screens/SymptomCheckerScreen";
+import { InsuranceScreen } from "../screens/InsuranceScreen";
+import { PaymentsScreen } from "../screens/PaymentsScreen";
 import { RegisterScreen, SignInScreen, WelcomeScreen } from "../screens/AuthScreens";
 import { AppText, Banner, Button, Screen, Stack } from "../ui/components";
 import { LoadingState } from "../ui/states";
@@ -106,6 +109,9 @@ export function RootNavigator() {
         <RootStack.Screen name="Sharing" component={SharingScreen} options={{ title: "Sharing and access" }} />
         <RootStack.Screen name="Hospital" component={HospitalScreen} options={{ title: "Hospital" }} />
         <RootStack.Screen name="AddSchedule" component={AddScheduleScreen} options={{ title: "Add to schedule" }} />
+        <RootStack.Screen name="SymptomChecker" component={SymptomCheckerScreen} options={{ title: "AI Symptom Checker" }} />
+        <RootStack.Screen name="Insurance" component={InsuranceScreen} options={{ title: "Health Insurance" }} />
+        <RootStack.Screen name="Payments" component={PaymentsScreen} options={{ title: "Payments & Invoices" }} />
       </RootStack.Navigator>
     </NavigationContainer>
   );

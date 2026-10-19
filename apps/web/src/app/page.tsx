@@ -41,7 +41,13 @@ const STEPS = [
   { title: "Use", body: "Complete details can feed your schedule and health card. Unclear ones stay marked until you review them." },
 ] as const;
 
-const NOT_YET = ["Drug interaction checks", "Symptom checking", "Payments", "Insurance coverage checks", "National health ID integration"];
+const NOT_YET = [
+  "Autonomous medical diagnosis or altering physician prescriptions",
+  "Live bank settlement (sandbox mode only)",
+  "Real insurance underwriting decisions",
+  "Government ABDM mandatory registry data linking",
+];
+
 
 export default function Home() {
   return (

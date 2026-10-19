@@ -263,3 +263,129 @@ export async function notifyPrescriptionEvent(db: Db, env: Env, prescriptionId: 
     // Non-blocking
   }
 }
+
+export async function notifyContraindicationAlerts(
+  db: Db,
+  env: Env,
+  prescriptionId: string,
+  report: {
+    alerts: Array<{
+      severity: string;
+      medications: string[];
+      title: string;
+      mechanism?: string;
+      patientAdvice?: string;
+      clinicalNote?: string;
+      description?: string;
+      recommendation?: string;
+    }>;
+    summary?: string;
+  },
+) {
+  try {
+    if (!report.alerts || report.alerts.length === 0) return;
+
+    const rx = await db.prescriptionRecord.findUnique({
+      where: { id: prescriptionId },
+      include: {
+        patient: {
+          select: {
+            id: true,
+            fullName: true,
+            healthId: true,
+            user: { select: { email: true } },
+            notificationPreference: true,
+          },
+        },
+        versions: {
+          orderBy: { versionNumber: "desc" },
+          take: 1,
+          select: { prescriberName: true },
+        },
+      },
+    });
+
+    if (!rx || !rx.patient) return;
+    const pref = rx.patient.notificationPreference;
+    if (pref && (!pref.emailEnabled || !pref.prescriptionsEnabled)) return;
+
+    const recipient = rx.patient.user.email;
+    const patientName = rx.patient.fullName || "Patient";
+    const prescriber = rx.versions[0]?.prescriberName || "Prescription Document";
+
+    const alertsHtml = report.alerts
+      .map((alert) => {
+        const isHigh = alert.severity === "high";
+        const borderColor = isHigh ? "#dc2626" : alert.severity === "moderate" ? "#f59e0b" : "#3b82f6";
+        const badgeBg = isHigh ? "#fee2e2" : alert.severity === "moderate" ? "#fef3c7" : "#dbeafe";
+        const badgeColor = isHigh ? "#991b1b" : alert.severity === "moderate" ? "#92400e" : "#1e40af";
+        const desc = alert.description || alert.mechanism || alert.clinicalNote || "";
+        const rec = alert.recommendation || alert.patientAdvice || "";
+
+        return `
+          <div style="background-color: #f8fafc; border-left: 4px solid ${borderColor}; padding: 14px; margin-bottom: 12px; border-radius: 4px;">
+            <div style="margin-bottom: 6px;">
+              <strong style="color: #0f172a; font-size: 14px;">${alert.title}</strong>
+              <span style="background-color: ${badgeBg}; color: ${badgeColor}; font-size: 11px; font-weight: 700; text-transform: uppercase; padding: 2px 8px; border-radius: 12px; margin-left: 8px;">
+                ${alert.severity} priority
+              </span>
+            </div>
+            <p style="margin: 0 0 6px 0; color: #334155; font-size: 13px;">
+              <strong>Interacting Medicines:</strong> ${alert.medications.join(" + ")}
+            </p>
+            ${desc ? `<p style="margin: 0 0 6px 0; color: #475569; font-size: 13px;">${desc}</p>` : ""}
+            ${rec ? `<p style="margin: 0; color: #0f766e; font-size: 13px; font-weight: 500;"><strong>Recommendation:</strong> ${rec}</p>` : ""}
+          </div>
+        `;
+      })
+      .join("");
+
+    const textContent = report.alerts
+      .map((a) => {
+        const desc = a.description || a.mechanism || a.clinicalNote || "";
+        const rec = a.recommendation || a.patientAdvice || "";
+        return `[${a.severity.toUpperCase()}] ${a.title} (${a.medications.join(" + ")}): ${desc} - Recommendation: ${rec}`;
+      })
+      .join("\n\n");
+
+    const html = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 620px; margin: 0 auto; padding: 24px; border: 1px solid #fed7aa; border-radius: 8px;">
+        <div style="background-color: #fff7ed; border-left: 4px solid #ea580c; padding: 12px 16px; margin-bottom: 20px; border-radius: 4px;">
+          <h2 style="color: #9a3412; margin: 0 0 4px 0; font-size: 18px;">Clinical Safety Alert: Medication Interaction Detected</h2>
+          <p style="color: #c2410c; margin: 0; font-size: 13px; font-weight: 500;">
+            Immediate attention required before starting your scheduled doses.
+          </p>
+        </div>
+
+        <p style="color: #475569; font-size: 15px;">Hello ${patientName},</p>
+        <p style="color: #475569; font-size: 14px; line-height: 1.5;">
+          HealthHub's automated pharmacology safety check detected potential drug-drug interactions or clinical contraindications in your prescription (${prescriber}).
+        </p>
+
+        <p style="color: #334155; font-size: 14px; font-weight: 600; margin-top: 18px; margin-bottom: 8px;">
+          Flagged Interactions (${report.alerts.length}):
+        </p>
+
+        ${alertsHtml}
+
+        <div style="background-color: #f1f5f9; padding: 12px; margin-top: 20px; border-radius: 6px; font-size: 12px; color: #64748b; line-height: 1.4;">
+          <strong>Clinical Disclaimer:</strong> This automated check is informational and assists clinical safety. Never stop, change, or combine prescription medications without consulting your prescribing doctor or licensed healthcare provider.
+        </div>
+
+        <p style="color: #94a3b8; font-size: 12px; margin-top: 20px; border-top: 1px solid #f1f5f9; padding-top: 12px;">
+          HealthHub &bull; Patient ID: ${rx.patient.healthId}
+        </p>
+      </div>
+    `;
+
+    await sendResendEmail(env, {
+      to: recipient,
+      subject: "⚠️ HealthHub Medication Safety Alert: Potential Drug Interaction Detected",
+      html,
+      text: `Hello ${patientName},\n\nHealthHub detected potential drug interactions in your prescription (${prescriber}):\n\n${textContent}\n\nPlease consult your prescribing physician or pharmacist before taking these medications together.\n\nHealthHub.`,
+    });
+  } catch {
+    // Non-blocking
+  }
+}
+

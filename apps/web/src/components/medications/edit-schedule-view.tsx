@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, LoaderCircle, TriangleAlert } from "lucide-react";
+import { ArrowLeft, ExternalLink, LoaderCircle, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 
 import { EmptyState, ErrorState, LoadingState } from "@/components/feedback/states";
@@ -16,6 +16,7 @@ import { describeError, isApiError } from "@/lib/api/errors";
 import { medicationSchedulesApi } from "@/lib/api/medication-schedules";
 import { prescriptionsApi } from "@/lib/api/prescriptions";
 import type { MedicationSchedule } from "@/lib/api/types";
+import { createGoogleCalendarWebUrl } from "@/lib/calendar";
 import { formatDate } from "@/lib/format";
 import { errorFor, focusFirstInvalid, validateByPath, type FieldErrors } from "@/lib/forms";
 import { CONCERN_TEXT, scheduleConcern } from "@/lib/schedule";
@@ -113,7 +114,7 @@ function EditForm({ schedule, concern }: { schedule: MedicationSchedule; concern
         </span>
       </label>
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" disabled={pending}>
           {pending ? (
             <>
@@ -124,6 +125,23 @@ function EditForm({ schedule, concern }: { schedule: MedicationSchedule; concern
           )}
         </Button>
         <Button asChild variant="outline">
+          <a
+            href={createGoogleCalendarWebUrl({
+              medicationName: schedule.medicationName,
+              strength: schedule.strength,
+              dose: schedule.dose,
+              frequency: schedule.frequency,
+              time: times[0] || "08:00",
+              startDate: schedule.startDate,
+              endDate: endDate || null,
+            })}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <ExternalLink className="mr-1 size-3.5" aria-hidden="true" /> Add to Google Calendar
+          </a>
+        </Button>
+        <Button asChild variant="ghost">
           <Link href="/medications">Cancel</Link>
         </Button>
       </div>

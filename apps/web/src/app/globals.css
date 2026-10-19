@@ -110,4 +110,22 @@
       transition-duration: 0.01ms !important;
     }
   }
+
+  @media print {
+    @page {
+      size: A4 portrait;
+      margin: 12mm;
+    }
+    body {
+      background: #ffffff !important;
+      color: #000000 !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .printable-pan-sheet {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+  }
 }
+

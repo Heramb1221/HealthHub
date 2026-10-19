@@ -17,6 +17,8 @@ import {
 } from "../lib/reminders";
 import { enabledReminderTimes } from "../lib/schedule";
 import { isValidDateOnly, isValidTimeOfDay, listToText, parseList } from "../lib/validation";
+import { sendWhatsAppReminder } from "../lib/whatsapp";
+import { useLanguage } from "../i18n/LanguageContext";
 import type { RootStackParamList } from "../navigation/types";
 import { AppText, Badge, Banner, Button, Card, Divider, Row, Screen, Stack, TextField } from "../ui/components";
 import { EmptyState, ErrorState, LoadingState, PermissionDenied } from "../ui/states";
@@ -60,6 +62,7 @@ export function MedicationScreen() {
 }
 
 function ScheduleCard({ schedule, onUpdated }: { schedule: MedicationSchedule; onUpdated: (s: MedicationSchedule) => void }) {
+  const { t } = useLanguage();
   const [reported, setReported] = useState<Record<string, DoseStatus>>({});
   const [busyTime, setBusyTime] = useState<string | null>(null);
   const [doseError, setDoseError] = useState<string | null>(null);
@@ -186,8 +189,20 @@ function ScheduleCard({ schedule, onUpdated }: { schedule: MedicationSchedule; o
                       <Badge label={`You marked ${done}`} tone={done === "taken" ? "success" : "neutral"} icon={done === "taken" ? "check" : "skip-forward"} />
                     ) : !schedule.isActive ? null : (
                       <Row>
-                        <Button label="Taken" variant="secondary" onPress={() => void report(time, "taken")} loading={busyTime === `${time}:taken`} disabled={busyTime !== null} accessibilityHint={`Record that you took the ${label} dose`} />
-                        <Button label="Skipped" variant="ghost" onPress={() => void report(time, "skipped")} loading={busyTime === `${time}:skipped`} disabled={busyTime !== null} accessibilityHint={`Record that you skipped the ${label} dose`} />
+                        <Button
+                          label="WhatsApp"
+                          variant="ghost"
+                          icon="share-2"
+                          onPress={() => void sendWhatsAppReminder({
+                            medicationName: med.name || "Medicine",
+                            dosage: med.dose || med.strength || "1 dose",
+                            timeStr: label || time,
+                            instructions: med.frequency || undefined,
+                          })}
+                          accessibilityHint={`Share ${med.name || "medicine"} reminder via WhatsApp`}
+                        />
+                        <Button label={t("take_dose", "Taken")} variant="secondary" onPress={() => void report(time, "taken")} loading={busyTime === `${time}:taken`} disabled={busyTime !== null} accessibilityHint={`Record that you took the ${label} dose`} />
+                        <Button label={t("skip_dose", "Skipped")} variant="ghost" onPress={() => void report(time, "skipped")} loading={busyTime === `${time}:skipped`} disabled={busyTime !== null} accessibilityHint={`Record that you skipped the ${label} dose`} />
                       </Row>
                     )}
                   </Row>

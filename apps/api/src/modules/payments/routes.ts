@@ -19,23 +19,37 @@ const createOrderSchema = z.strictObject({
 const verifyPaymentSchema = z.strictObject({
   orderRef: z.string().min(5).max(100),
   paymentRef: z.string().max(100).optional(),
+  signature: z.string().max(256).optional(),
   simulateFailure: z.boolean().optional(),
 });
 
 export function createPaymentRouter(db: Db, env: Env): Router {
   const router = Router();
+
+  // Public config for frontend checkout integration
+  router.get("/config", (_req, res) => {
+    res.json({
+      data: {
+        keyId: env.RAZORPAY_KEY_ID || null,
+        isLiveRazorpay: Boolean(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET),
+        currency: "INR",
+      },
+    });
+  });
+
   router.use(authenticate(db, env));
+
   router.use(requireRole("patient"));
 
   router.post("/orders", async (req, res) => {
     const input = parse(createOrderSchema, req.body);
-    const order = await createPaymentOrder(db, requireAuth(req), input, { requestId: req.requestId });
+    const order = await createPaymentOrder(db, env, requireAuth(req), input, { requestId: req.requestId });
     res.status(201).json({ data: order });
   });
 
   router.post("/verify", async (req, res) => {
     const input = parse(verifyPaymentSchema, req.body);
-    const result = await verifyPayment(db, requireAuth(req), input, { requestId: req.requestId });
+    const result = await verifyPayment(db, env, requireAuth(req), input, { requestId: req.requestId });
     res.json({ data: result });
   });
 

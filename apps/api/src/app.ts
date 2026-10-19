@@ -26,7 +26,10 @@ import { createSymptomRouter } from "./modules/symptoms/routes.js";
 import { createInsuranceRouter } from "./modules/insurance/routes.js";
 import { createPaymentRouter } from "./modules/payments/routes.js";
 import { createDashboardRouter } from "./modules/dashboard/routes.js";
+import { calendarRouter } from "./modules/calendar/routes.js";
+import { createLocalizationRouter } from "./modules/localization/routes.js";
 import type { ExtractionProvider } from "./extraction/types.js";
+
 import type { PrivateFileStore } from "./storage/types.js";
 import { createHealthRouter } from "./routes/health.js";
 
@@ -107,7 +110,10 @@ export function createApp(env: Env, register?: (router: Router) => void, deps: A
     api.use("/insurance", createInsuranceRouter(deps.db, env));
     api.use("/payments", createPaymentRouter(deps.db, env));
     api.use("/dashboard", createDashboardRouter(deps.db, env));
+    api.use("/calendar", calendarRouter(deps.db, env));
+    api.use("/localization", createLocalizationRouter(env));
     if (deps.store) api.use("/prescriptions", createPrescriptionRouter(deps.db, env, deps.store, deps.extraction ?? null));
+
   }
   register?.(api);
   app.use(API_PREFIX, api);

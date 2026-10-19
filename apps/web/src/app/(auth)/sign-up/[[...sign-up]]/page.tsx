@@ -8,7 +8,7 @@ export default async function SignUpPage({ searchParams }: { searchParams: Promi
   return (
     <div className="flex flex-col items-center justify-center">
       <SignUp
-        fallbackRedirectUrl={next || "/dashboard"}
+        fallbackRedirectUrl={next || "/profile?onboarding=true"}
         signInUrl="/sign-in"
       />
     </div>

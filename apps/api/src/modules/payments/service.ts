@@ -1,6 +1,8 @@
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
+import type { Env } from "../../config/env.js";
 import type { Db } from "../../db/client.js";
 import { AppError } from "../../lib/errors.js";
+import { log } from "../../lib/logger.js";
 import type { AuthContext } from "../../middleware/authenticate.js";
 import { recordAudit } from "../audit/audit.js";
 
@@ -13,18 +15,20 @@ export interface CreateOrderInput {
 export interface VerifyPaymentInput {
   orderRef: string;
   paymentRef?: string;
+  signature?: string;
   simulateFailure?: boolean;
 }
 
 export async function createPaymentOrder(
   db: Db,
+  env: Env,
   auth: AuthContext,
   input: CreateOrderInput,
   ctx: { requestId: string },
 ) {
   const patient = await db.patient.findUnique({
     where: { userId: auth.userId },
-    select: { id: true },
+    select: { id: true, fullName: true, phone: true },
   });
   if (!patient) throw new AppError("NOT_FOUND");
 
@@ -51,9 +55,46 @@ export async function createPaymentOrder(
     throw new AppError("CONFLICT", "Payment has already been completed for this appointment");
   }
 
-  const orderRef = `order_demo_${randomUUID().replace(/-/g, "").slice(0, 16)}`;
-  const amountPaise = input.amountPaise ?? 50000; // ₹500 standard demo fee
+  const amountPaise = input.amountPaise ?? 50000; // ₹500 standard fee
   const currency = input.currency ?? "INR";
+  let orderRef = `order_demo_${randomUUID().replace(/-/g, "").slice(0, 16)}`;
+  let isSandbox = true;
+
+  // Real Razorpay Order Creation via REST API if configured
+  if (env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET) {
+    try {
+      const basicAuth = Buffer.from(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`).toString("base64");
+      const rzpRes = await fetch("https://api.razorpay.com/v1/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Basic ${basicAuth}`,
+        },
+        body: JSON.stringify({
+          amount: amountPaise,
+          currency,
+          receipt: `rcpt_${appointment.id.replace(/-/g, "").slice(0, 14)}`,
+          notes: {
+            appointmentId: appointment.id,
+            hospitalName: appointment.slot.hospital.name,
+            patientId: patient.id,
+          },
+        }),
+      });
+
+      if (rzpRes.ok) {
+        const rzpData = (await rzpRes.json()) as { id: string };
+        orderRef = rzpData.id;
+        isSandbox = env.RAZORPAY_KEY_ID.startsWith("rzp_test_");
+        log("info", "Razorpay order created successfully", { orderId: orderRef, appointmentId: appointment.id });
+      } else {
+        const errorText = await rzpRes.text();
+        log("warn", "Razorpay API order creation failed, falling back to simulated order", { error: errorText });
+      }
+    } catch (err) {
+      log("warn", "Failed to reach Razorpay API", { error: String(err) });
+    }
+  }
 
   const order = await db.paymentOrder.create({
     data: {
@@ -63,7 +104,7 @@ export async function createPaymentOrder(
       currency,
       status: "pending",
       orderRef,
-      isSandbox: true,
+      isSandbox,
     },
   });
 
@@ -86,14 +127,18 @@ export async function createPaymentOrder(
     currency: order.currency,
     status: order.status,
     isSandbox: order.isSandbox,
+    keyId: env.RAZORPAY_KEY_ID || null,
     hospitalName: appointment.slot.hospital.name,
     slotTime: appointment.slot.startsAt.toISOString(),
+    patientName: patient.fullName || "Valued Patient",
+    patientPhone: patient.phone || "",
     createdAt: order.createdAt.toISOString(),
   };
 }
 
 export async function verifyPayment(
   db: Db,
+  env: Env,
   auth: AuthContext,
   input: VerifyPaymentInput,
   ctx: { requestId: string },
@@ -122,8 +167,28 @@ export async function verifyPayment(
     };
   }
 
+  let isSuccess = !input.simulateFailure;
+
+  // Cryptographic Razorpay Signature Verification
+  if (input.signature && input.paymentRef && env.RAZORPAY_KEY_SECRET) {
+    const textToSign = `${input.orderRef}|${input.paymentRef}`;
+    const expectedSignature = createHmac("sha256", env.RAZORPAY_KEY_SECRET)
+      .update(textToSign)
+      .digest("hex");
+
+    if (input.signature !== expectedSignature) {
+      log("warn", "Razorpay signature mismatch", {
+        orderRef: input.orderRef,
+        provided: input.signature,
+        expected: expectedSignature,
+      });
+      throw new AppError("FORBIDDEN", "Cryptographic signature verification failed");
+    }
+    isSuccess = true;
+    log("info", "Razorpay payment signature cryptographically verified", { orderRef: input.orderRef, paymentId: input.paymentRef });
+  }
+
   const paymentRef = input.paymentRef || `pay_demo_${randomUUID().replace(/-/g, "").slice(0, 14)}`;
-  const isSuccess = !input.simulateFailure;
   const newStatus = isSuccess ? "completed" : "failed";
 
   const updated = await db.paymentOrder.update({

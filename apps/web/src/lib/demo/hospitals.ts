@@ -2,7 +2,7 @@ import { ApiError } from "@/lib/api/errors";
 import type { AppointmentsApi } from "@/lib/api/appointments";
 import type { HospitalsApi } from "@/lib/api/hospitals";
 import type { AdminHospitalsApi } from "@/lib/api/admin-hospitals";
-import type { Appointment, AuthUser, AvailabilitySlot, Hospital, HospitalInput } from "@/lib/api/types";
+import type { Appointment, AuthUser, AvailabilitySlot, Hospital, HospitalInput, HospitalReview } from "@/lib/api/types";
 
 import { currentUser, isSeeded, requirePatient } from "./records";
 
@@ -271,6 +271,139 @@ export const demoHospitalsApi: HospitalsApi = {
     const store = load();
     return generatedSlots(hospitalId, now).filter((s) => !isTaken(s.id, store, now));
   },
+
+  async holdSlot() {
+    return { held: true, expiresAt: new Date(Date.now() + 300000).toISOString(), secondsRemaining: 300 };
+  },
+
+  async releaseSlot() {
+    return { released: true };
+  },
+
+  async reviews(hospitalId) {
+    const user = await currentUser();
+    const key = `healthhub:demo:reviews:${hospitalId}`;
+    let stored: HospitalReview[] = [];
+    try {
+      const item = typeof window !== "undefined" ? localStorage.getItem(key) : null;
+      stored = item ? JSON.parse(item) : [];
+    } catch {
+      stored = [];
+    }
+    const defaults: HospitalReview[] = DEFAULT_DEMO_REVIEWS[hospitalId] || [
+      {
+        id: `rev-default-1`,
+        hospitalId,
+        patientId: "sample-p",
+        patientName: "A***",
+        rating: 5,
+        reviewText: "Great facilities and supportive medical staff.",
+        isVerifiedPatient: true,
+        createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+      },
+      {
+        id: `rev-default-2`,
+        hospitalId,
+        patientId: "sample-p2",
+        patientName: "M***",
+        rating: 4,
+        reviewText: "Smooth consultation and prompt attention.",
+        isVerifiedPatient: false,
+        createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
+      },
+    ];
+
+    const all = [...stored, ...defaults];
+    const reviewCount = all.length;
+    const ratingAverage = reviewCount > 0 ? Number((all.reduce((s, r) => s + r.rating, 0) / reviewCount).toFixed(1)) : 0;
+    const userReview = stored.find((r) => r.patientId === user.id) ?? null;
+
+    return {
+      ratingAverage,
+      reviewCount,
+      userReview,
+      reviews: all,
+    };
+  },
+
+  async submitReview(hospitalId, input) {
+    const user = await currentUser();
+    requirePatient(user);
+    const key = `healthhub:demo:reviews:${hospitalId}`;
+    let stored: HospitalReview[] = [];
+    try {
+      const item = typeof window !== "undefined" ? localStorage.getItem(key) : null;
+      stored = item ? JSON.parse(item) : [];
+    } catch {
+      stored = [];
+    }
+
+    const rating = Math.max(1, Math.min(5, Math.round(input.rating)));
+    const reviewText = input.reviewText?.trim().slice(0, 500) || null;
+    const existingIndex = stored.findIndex((r) => r.patientId === user.id);
+
+    const review: HospitalReview = {
+      id: existingIndex >= 0 ? stored[existingIndex].id : `demo-rev-${crypto.randomUUID().slice(0, 8)}`,
+      hospitalId,
+      patientId: user.id,
+      patientName: user.email ? `${user.email.charAt(0).toUpperCase()}***` : "Patient",
+      rating,
+      reviewText,
+      isVerifiedPatient: true,
+      createdAt: new Date().toISOString(),
+    };
+
+    if (existingIndex >= 0) {
+      stored[existingIndex] = review;
+    } else {
+      stored.unshift(review);
+    }
+
+    try {
+      if (typeof window !== "undefined") localStorage.setItem(key, JSON.stringify(stored));
+    } catch {
+      // Ignore
+    }
+
+    return review;
+  },
+};
+
+const DEFAULT_DEMO_REVIEWS: Record<string, HospitalReview[]> = {
+  "demo-hospital-vanita": [
+    {
+      id: "rev-v1",
+      hospitalId: "demo-hospital-vanita",
+      patientId: "patient-1",
+      patientName: "R***",
+      rating: 5,
+      reviewText: "Quick consultation and very polite nursing staff. Clean emergency ward.",
+      isVerifiedPatient: true,
+      createdAt: "2026-10-15T10:30:00.000Z",
+    },
+    {
+      id: "rev-v2",
+      hospitalId: "demo-hospital-vanita",
+      patientId: "patient-2",
+      patientName: "P***",
+      rating: 4,
+      reviewText: "Doctors took the time to explain the diagnosis clearly. Waiting time was around 15 minutes.",
+      isVerifiedPatient: true,
+      createdAt: "2026-10-11T14:15:00.000Z",
+    },
+  ],
+  "demo-hospital-orchid": [
+    {
+      id: "rev-o1",
+      hospitalId: "demo-hospital-orchid",
+      patientId: "patient-3",
+      patientName: "S***",
+      rating: 5,
+      reviewText: "Excellent cardiology and diagnostics setup. Highly professional doctors.",
+      isVerifiedPatient: true,
+      createdAt: "2026-10-14T09:20:00.000Z",
+    },
+  ],
 };
 
 export const demoAppointmentsApi: AppointmentsApi = {

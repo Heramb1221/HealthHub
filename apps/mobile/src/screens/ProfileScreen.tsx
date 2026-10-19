@@ -13,6 +13,9 @@ import { useServerValue } from "../hooks/useServerValue";
 import { formatDateOnly, orDash } from "../lib/format";
 import { BLOOD_GROUPS, GENDER_OPTIONS, genderLabel } from "../lib/profileOptions";
 import { blankToNull, dateOfBirthProblem, listProblem, listToText, parseList, phoneProblem } from "../lib/validation";
+import { useLanguage } from "../i18n/LanguageContext";
+import { SUPPORTED_LANGUAGES } from "../i18n/languages";
+import { LanguageModal } from "../ui/LanguageModal";
 import type { RootStackParamList } from "../navigation/types";
 import { AppText, Badge, Banner, Button, Card, Chip, Divider, Field, ListRow, Row, Screen, Stack, TextField } from "../ui/components";
 import { ErrorState, LoadingState } from "../ui/states";
@@ -51,6 +54,8 @@ function toForm(p: Patient): Form {
 export function ProfileScreen() {
   const { state, signOut } = useAuth();
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { language, t } = useLanguage();
+  const [langModalVisible, setLangModalVisible] = useState(false);
   const res = useResource((signal) => patientApi.me(signal));
   const [patient, setPatient] = useServerValue<Patient>(res.data);
   const [editing, setEditing] = useState(false);
@@ -61,6 +66,13 @@ export function ProfileScreen() {
   const [signingOut, setSigningOut] = useState(false);
 
   const email = state.status === "signedIn" ? state.user.email : "";
+
+  const isOnboarding = Boolean(patient && !patient.fullName);
+
+  if (patient && !patient.fullName && !editing && form === null) {
+    setForm(toForm(patient));
+    setEditing(true);
+  }
 
   if (res.loading && !patient) return <Screen><LoadingState label="Loading your profile…" /></Screen>;
   if (res.error && !patient) return <Screen><ErrorState error={res.error} onRetry={res.reload} /></Screen>;
@@ -118,9 +130,15 @@ export function ProfileScreen() {
       <Screen>
         <Stack>
           {saveError ? <Banner tone="danger" title={saveError} icon="alert-circle" /> : null}
-          <Banner tone="info" title="What you enter here is self-reported" icon="info">
-            It is not verified by a clinician. Allergies and conditions are for your own records.
-          </Banner>
+          {isOnboarding ? (
+            <Banner tone="info" title="Welcome to HealthHub!" icon="info">
+              Please complete your profile to activate your medical account and access appointments and records.
+            </Banner>
+          ) : (
+            <Banner tone="info" title="What you enter here is self-reported" icon="info">
+              It is not verified by a clinician. Allergies and conditions are for your own records.
+            </Banner>
+          )}
           <TextField label="Full name" value={form.fullName} onChangeText={set("fullName")} autoComplete="name" />
           <TextField label="Date of birth" value={form.dateOfBirth} onChangeText={set("dateOfBirth")} error={dobError} hint="YYYY-MM-DD, for example 1998-04-23" keyboardType="numbers-and-punctuation" />
           <Stack gap={8}>
@@ -147,8 +165,15 @@ export function ProfileScreen() {
           <TextField label="Existing conditions" value={form.existingConditions} onChangeText={set("existingConditions")} error={listErrors?.existingConditions ?? null} hint="Separate with commas" multiline />
           <TextField label="Current medications" value={form.currentMedications} onChangeText={set("currentMedications")} error={listErrors?.currentMedications ?? null} hint="Separate with commas. Self-reported; not used for dose instructions." multiline />
           <TextField label="Address" value={form.address} onChangeText={set("address")} multiline />
-          <Button label="Save changes" onPress={() => void save()} loading={saving} disabled={hasErrors} />
-          <Button label="Cancel" variant="ghost" onPress={() => { setEditing(false); setSaveError(null); }} disabled={saving} />
+          <Button
+            label={isOnboarding ? "Complete Profile & Continue" : "Save changes"}
+            onPress={() => void save()}
+            loading={saving}
+            disabled={hasErrors}
+          />
+          {!isOnboarding ? (
+            <Button label="Cancel" variant="ghost" onPress={() => { setEditing(false); setSaveError(null); }} disabled={saving} />
+          ) : null}
         </Stack>
       </Screen>
     );
@@ -180,6 +205,11 @@ export function ProfileScreen() {
           <Field label="Current medications" value={patient.currentMedications.length ? patient.currentMedications.join(", ") : "None listed"} />
         </Card>
         <Card style={{ gap: 0 }}>
+          <ListRow
+            title={t("bhashini_language", "Regional Language (Bhashini AI)")}
+            subtitle={`${SUPPORTED_LANGUAGES.find((l) => l.code === language)?.nativeName ?? "English"} (Govt of India Bhashini)`}
+            onPress={() => setLangModalVisible(true)}
+          />
           <ListRow title="Sharing and access" subtitle="See and revoke who can view your records" onPress={() => nav.navigate("Sharing")} />
           <ListRow title="Digital health card" onPress={() => nav.navigate("HealthCard")} />
           <ListRow title="Medical history" onPress={() => nav.navigate("History")} />
@@ -210,6 +240,7 @@ export function ProfileScreen() {
         <AppText variant="caption" muted style={{ paddingTop: space.sm }}>
           Signing out ends your session on the server and clears this phone's stored sign-in and local reminders.
         </AppText>
+        <LanguageModal visible={langModalVisible} onClose={() => setLangModalVisible(false)} />
       </Stack>
     </Screen>
   );

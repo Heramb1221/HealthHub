@@ -2,13 +2,15 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowLeft, Download, Eye, LoaderCircle, PencilLine, RefreshCw, ShieldCheck, TriangleAlert, UserPen } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, BellRing, Download, Eye, LoaderCircle, PencilLine, RefreshCw, ShieldCheck, Trash2, TriangleAlert, UserPen } from "lucide-react";
 import { toast } from "sonner";
 
 import { EmptyState, ErrorState, LoadingState } from "@/components/feedback/states";
 import { PageHeader } from "@/components/layout/page-header";
 import { CorrectionForm } from "@/components/prescriptions/correction-form";
 import { MedicationList } from "@/components/prescriptions/medication-list";
+import { MedicationSetupWizard } from "@/components/prescriptions/medication-setup-wizard";
 import { VersionHistory } from "@/components/prescriptions/version-history";
 import { ContraindicationAlerts } from "@/components/prescriptions/contraindication-alerts";
 import { DemoTag } from "@/components/status/demo-tag";
@@ -16,6 +18,7 @@ import { ProcessingBadge, VerificationBadge } from "@/components/status/verifica
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { describeError, isApiError } from "@/lib/api/errors";
+import { medicationSchedulesApi } from "@/lib/api/medication-schedules";
 import { prescriptionsApi } from "@/lib/api/prescriptions";
 import type { Prescription } from "@/lib/api/types";
 import { formatDate } from "@/lib/format";
@@ -26,7 +29,19 @@ import { useResource } from "@/lib/use-resource";
 const POLL_MS = 2000;
 const SLOW_AFTER_MS = 60_000;
 
-function StatusBanner({ rx, onRetry, retrying, slow }: { rx: Prescription; onRetry: () => void; retrying: boolean; slow: boolean }) {
+function StatusBanner({
+  rx,
+  onRetry,
+  retrying,
+  slow,
+  onOpenWizard,
+}: {
+  rx: Prescription;
+  onRetry: () => void;
+  retrying: boolean;
+  slow: boolean;
+  onOpenWizard?: () => void;
+}) {
   if (rx.processingStatus === "pending" || rx.processingStatus === "processing") {
     return (
       <Alert tone="info" role="status">
@@ -82,7 +97,17 @@ function StatusBanner({ rx, onRetry, retrying, slow }: { rx: Prescription; onRet
       <ShieldCheck aria-hidden="true" />
       <AlertTitle>Prescription extracted & added to medication reminders</AlertTitle>
       <AlertDescription>
-        <p>All identified medicines have been automatically added to your Medication Schedule. You can adjust reminder times or correct any details anytime.</p>
+        <p>All identified medicines have been automatically added to your Medication Schedule. You can review reminder times, adjust your schedule, and sync them to Google Calendar.</p>
+        {rx.medications.length > 0 && onOpenWizard ? (
+          <div className="mt-3 flex flex-wrap items-center gap-2.5">
+            <Button size="sm" onClick={onOpenWizard}>
+              <BellRing className="mr-1.5 size-3.5" aria-hidden="true" /> Set Up Reminder Times & Google Calendar
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/medications">View in Medication Reminders</Link>
+            </Button>
+          </div>
+        ) : null}
       </AlertDescription>
     </Alert>
   );
@@ -124,14 +149,33 @@ function RecordDetails({ rx, onViewFile }: { rx: Prescription; onViewFile: () =>
 }
 
 export function PrescriptionDetail({ id }: { id: string }) {
+  const router = useRouter();
   const rx = useResource(() => prescriptionsApi.get(id), id);
   const [editing, setEditing] = React.useState(false);
+  const [wizardOpen, setWizardOpen] = React.useState(false);
   const [downloading, setDownloading] = React.useState(false);
   const [openingFile, setOpeningFile] = React.useState(false);
   const [retrying, setRetrying] = React.useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
   const [tick, setTick] = React.useState(0);
   const startedAt = React.useRef<number | null>(null);
+  const prevStatusRef = React.useRef<string | null>(null);
+  const autoPromptedRef = React.useRef(false);
   const [slow, setSlow] = React.useState(false);
+
+  async function handleDelete() {
+    setDeleting(true);
+    try {
+      await prescriptionsApi.delete(id);
+      toast.success("Prescription deleted successfully");
+      router.push("/prescriptions");
+    } catch (error) {
+      const { title, detail } = describeError(error);
+      toast.error("Failed to delete prescription", { description: `${title}. ${detail}` });
+      setDeleting(false);
+    }
+  }
 
   const status = rx.status === "ready" ? rx.data.processingStatus : null;
   const stamp = rx.status === "ready" ? rx.data.updatedAt : "";
@@ -153,6 +197,23 @@ export function PrescriptionDetail({ id }: { id: string }) {
     return () => clearTimeout(timer);
   }, [status, id, tick, setData]);
 
+  // Prompt the medication reminder setup wizard as soon as the prescription reading finishes
+  React.useEffect(() => {
+    if (
+      status === "completed" &&
+      rx.status === "ready" &&
+      rx.data.medications.length > 0 &&
+      !autoPromptedRef.current
+    ) {
+      if (prevStatusRef.current === "pending" || prevStatusRef.current === "processing") {
+        autoPromptedRef.current = true;
+        setWizardOpen(true);
+      }
+    }
+    prevStatusRef.current = status;
+  }, [status, rx]);
+
+  const schedules = useResource(() => medicationSchedulesApi.list(), `schedules:${id}:${status}`);
   const versions = useResource(() => prescriptionsApi.versions(id), `${id}:${status}:${stamp}`);
   useDocumentTitle(rx.status === "ready" ? (rx.data.prescriptionDate ? `Prescription from ${formatDate(rx.data.prescriptionDate)}` : "Prescription (undated)") : null);
 
@@ -271,11 +332,23 @@ export function PrescriptionDetail({ id }: { id: string }) {
                 {downloading ? <LoaderCircle className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <Download aria-hidden="true" />} Download PDF
               </Button>
             ) : null}
+            {canCorrect && p.medications.length > 0 ? (
+              <Button onClick={() => setWizardOpen(true)}>
+                <BellRing aria-hidden="true" /> Set Up Reminders
+              </Button>
+            ) : null}
             {canCorrect ? (
-              <Button onClick={() => setEditing(true)}>
+              <Button variant="outline" onClick={() => setEditing(true)}>
                 <PencilLine aria-hidden="true" /> Correct details
               </Button>
             ) : null}
+            <Button
+              variant="outline"
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
+              onClick={() => setConfirmDeleteOpen(true)}
+            >
+              <Trash2 className="size-4" aria-hidden="true" /> Delete
+            </Button>
           </>
         }
       />
@@ -285,7 +358,7 @@ export function PrescriptionDetail({ id }: { id: string }) {
         {p.isDemo ? <DemoTag /> : null}
       </div>
 
-      <StatusBanner rx={p} onRetry={retry} retrying={retrying} slow={slow} />
+      <StatusBanner rx={p} onRetry={retry} retrying={retrying} slow={slow} onOpenWizard={() => setWizardOpen(true)} />
 
       <div className="grid gap-10 lg:grid-cols-[2fr_1fr]">
         <div className="min-w-0 space-y-10">
@@ -335,6 +408,88 @@ export function PrescriptionDetail({ id }: { id: string }) {
           <RecordDetails rx={p} onViewFile={viewOriginalFile} />
         </aside>
       </div>
+
+      {wizardOpen ? (
+        <MedicationSetupWizard
+          key={`${p.id}-${p.updatedAt}-${schedules.status === "ready" ? "ready" : "loading"}`}
+          open={wizardOpen}
+          onClose={() => setWizardOpen(false)}
+          prescription={p}
+          existingSchedules={schedules.status === "ready" ? schedules.data : []}
+          onCompleted={() => {
+            rx.reload();
+            schedules.reload();
+          }}
+        />
+      ) : null}
+
+      {confirmDeleteOpen ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-prescription-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
+        >
+          <div className="bg-card w-full max-w-md rounded-xl border p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <span className="bg-destructive/10 text-destructive flex size-9 items-center justify-center rounded-full">
+                <Trash2 className="size-5" aria-hidden="true" />
+              </span>
+              <div>
+                <h2 id="delete-prescription-title" className="text-base font-semibold text-foreground">
+                  Delete Prescription
+                </h2>
+                <p className="text-muted-foreground text-xs">
+                  Permanent removal of health record
+                </p>
+              </div>
+            </div>
+
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              Are you sure you want to delete this prescription? This will permanently remove:
+            </p>
+
+            <ul className="text-muted-foreground list-disc pl-5 text-xs space-y-1">
+              <li>The uploaded original prescription document</li>
+              <li>All extracted medication details and history</li>
+              <li>Any medication reminders created from this prescription</li>
+            </ul>
+
+            <div className="rounded-lg bg-destructive/10 p-3 text-destructive text-xs font-medium">
+              This action cannot be undone.
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setConfirmDeleteOpen(false)}
+                disabled={deleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleDelete}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <>
+                    <LoaderCircle className="animate-spin size-4 mr-1.5" aria-hidden="true" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="size-4 mr-1.5" aria-hidden="true" />
+                    Delete Prescription
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

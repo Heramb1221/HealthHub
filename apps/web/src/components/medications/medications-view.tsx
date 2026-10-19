@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { BellOff, CalendarClock, Check, CircleSlash, Pencil, Plus, TriangleAlert } from "lucide-react";
+import { Bell, BellOff, Calendar, CalendarClock, Check, CircleSlash, Download, LoaderCircle, MessageCircle, Pencil, Plus, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 
 import { isNoPatientError, NoPatientProfile } from "@/components/feedback/no-patient";
@@ -13,13 +13,19 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { calendarApi } from "@/lib/api/calendar";
 import { describeError } from "@/lib/api/errors";
 import { medicationSchedulesApi } from "@/lib/api/medication-schedules";
 import { prescriptionsApi } from "@/lib/api/prescriptions";
 import type { MedicationSchedule } from "@/lib/api/types";
+import { downloadMedicationIcsFile, type MedicationCalendarItem } from "@/lib/calendar";
 import { formatClock, formatDate, formatDayLong, formatTime } from "@/lib/format";
 import { CONCERN_TEXT, scheduleConcern, slotsForDay, type DoseSlot } from "@/lib/schedule";
 import { useResource } from "@/lib/use-resource";
+import { buildWhatsAppReminderUrl } from "@/lib/whatsapp";
+import { isBrowserNotificationGranted, requestBrowserNotificationPermission, triggerBrowserMedicationAlarm } from "@/lib/browser-notifications";
+import { useLanguage } from "@/lib/i18n/language-context";
+
 
 function AddButton() {
   return (
@@ -132,6 +138,22 @@ function DoseRow({
             <Button variant="outline" size="sm" disabled={pending} onClick={() => record("skipped")} aria-label={`Mark ${label} as skipped`}>
               <CircleSlash aria-hidden="true" /> Skipped
             </Button>
+            <Button asChild variant="ghost" size="sm" className="text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50">
+              <a
+                href={buildWhatsAppReminderUrl({
+                  medicationName: schedule.medicationName,
+                  dosage: schedule.dose,
+                  timeStr: formatTime(at),
+                })}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Send WhatsApp reminder"
+                aria-label={`Send WhatsApp reminder for ${label}`}
+              >
+                <MessageCircle className="size-3.5 text-emerald-600" aria-hidden="true" />
+                <span className="hidden sm:inline">WhatsApp</span>
+              </a>
+            </Button>
             {changing ? (
               <Button variant="ghost" size="sm" disabled={pending} onClick={() => setChanging(false)}>
                 Cancel
@@ -146,6 +168,7 @@ function DoseRow({
     </li>
   );
 }
+
 
 export function MedicationsView() {
   const [now, setNow] = React.useState(() => new Date());
@@ -181,12 +204,123 @@ export function MedicationsView() {
     }
   }
 
+  const [syncingCalendar, setSyncingCalendar] = React.useState(false);
+
+  async function handleSyncCalendar() {
+    setSyncingCalendar(true);
+    try {
+      const status = await calendarApi.getStatus();
+      if (!status.connected) {
+        if (!status.isConfigured) {
+          toast.info("Google Calendar API is not configured on the server. You can export using the .ics file button.");
+          return;
+        }
+        const { url } = await calendarApi.getGoogleAuthUrl();
+        if (url.startsWith("#")) {
+          toast.success("Google Calendar connected (Demo)");
+        } else {
+          window.location.href = url;
+          return;
+        }
+      }
+
+      const res = await calendarApi.syncSchedules({});
+      toast.success(`Synced ${res.syncedCount} medication reminders to Google Calendar!`);
+    } catch (err) {
+      const { title, detail } = describeError(err);
+      toast.error("Could not sync with Google Calendar", { description: `${title}. ${detail}` });
+    } finally {
+      setSyncingCalendar(false);
+    }
+  }
+
+  function handleExportIcs() {
+    if (schedules.status !== "ready" || schedules.data.length === 0) return;
+    const items: MedicationCalendarItem[] = schedules.data.flatMap((s) =>
+      s.times.map((time) => ({
+        medicationName: s.medicationName,
+        strength: s.strength,
+        dose: s.dose,
+        frequency: s.frequency,
+        time,
+        startDate: s.startDate,
+        endDate: s.endDate,
+      })),
+    );
+    downloadMedicationIcsFile(items, "healthhub-all-medications.ics");
+    toast.success("Exported schedules to .ics calendar file");
+  }
+
+  const { t } = useLanguage();
+  const [deviceAlarmsActive, setDeviceAlarmsActive] = React.useState(() => isBrowserNotificationGranted());
+
+  async function handleToggleDeviceAlarms() {
+    const granted = await requestBrowserNotificationPermission();
+    setDeviceAlarmsActive(granted);
+    if (granted) {
+      toast.success(t("active_alarms", "Device alarms active for scheduled doses"), {
+        description: "Your browser will trigger notification alarms at your scheduled dose times.",
+      });
+      triggerBrowserMedicationAlarm({
+        medicationName: "HealthHub Reminder",
+        dose: "Alarm Active",
+        instructions: "Scheduled dose alarms will trigger automatically.",
+      });
+    } else {
+      toast.info("Browser notifications unavailable or blocked in settings.");
+    }
+  }
+
+  const actions = (
+    <div className="flex flex-wrap items-center gap-2">
+      {schedules.status === "ready" && schedules.data.length > 0 ? (
+        <>
+          <Button
+            type="button"
+            variant={deviceAlarmsActive ? "secondary" : "outline"}
+            size="sm"
+            onClick={handleToggleDeviceAlarms}
+            title="Enable local device alarms and browser notifications"
+          >
+            <Bell className={`mr-1.5 size-4 ${deviceAlarmsActive ? "text-primary" : ""}`} aria-hidden="true" />
+            {deviceAlarmsActive ? t("device_alarms", "Device Alarms: On") : t("enable_notifications", "Enable Alarms")}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleSyncCalendar}
+            disabled={syncingCalendar}
+          >
+            {syncingCalendar ? (
+              <LoaderCircle className="mr-1.5 size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <Calendar className="mr-1.5 size-4" aria-hidden="true" />
+            )}
+            Sync Google Calendar
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleExportIcs}
+          >
+            <Download className="mr-1.5 size-4" aria-hidden="true" />
+            Export .ics
+          </Button>
+        </>
+      ) : null}
+      <AddButton />
+    </div>
+  );
+
+
   return (
     <div className="space-y-10">
       <PageHeader
         title="Medication schedule"
         description="Reminders for medicines you’ve checked against your paper prescription. Taken and skipped are recorded by you; HealthHub doesn’t check them."
-        actions={<AddButton />}
+        actions={actions}
       />
 
       {schedules.status === "loading" ? (

@@ -8,6 +8,8 @@ import type {
   AvailabilitySlot,
   CreateAppointmentBody,
   CreateFamilyMemberBody,
+  CreatePaymentOrderBody,
+  CreatePolicyBody,
   CreateQrSessionBody,
   CreateScheduleBody,
   DoseEvent,
@@ -18,19 +20,29 @@ import type {
   HealthCard,
   HistoryEntry,
   Hospital,
+  HospitalReview,
+  HospitalReviewsResult,
+  InsuranceProviderInfo,
   MedicationSchedule,
   Patient,
+  PatientInsurancePolicy,
   PatientUpdate,
   PatientVaccination,
+  PaymentHistoryItem,
+  PaymentOrder,
+  PaymentVerificationResult,
   Prescription,
   PrescriptionVersion,
   QrLookup,
   QrSession,
   RecordVaccinationBody,
+  SymptomAssessmentInput,
+  SymptomAssessmentResult,
   UpdateFamilyMemberBody,
   UpdateScheduleBody,
   UploadFile,
   VaccinationListResult,
+  VerifyPaymentBody,
 } from "./types.ts";
 
 /** Typed service modules. UI components call these, never `fetch` directly. Paths follow docs/API_CONTRACT.md. */
@@ -106,6 +118,14 @@ export const hospitalApi = {
   list: (signal?: AbortSignal) => requestList<Hospital>("/hospitals", opts(signal)),
   get: (id: string, signal?: AbortSignal) => request<Hospital>(`/hospitals/${enc(id)}`, opts(signal)),
   availability: (id: string, signal?: AbortSignal) => requestList<AvailabilitySlot>(`/hospitals/${enc(id)}/availability`, opts(signal)),
+  holdSlot: (hospitalId: string, slotId: string) =>
+    request<{ held: boolean; expiresAt: string; secondsRemaining: number }>(`/hospitals/${enc(hospitalId)}/slots/${enc(slotId)}/hold`, { method: "POST" }),
+  releaseSlot: (hospitalId: string, slotId: string) =>
+    request<{ released: boolean }>(`/hospitals/${enc(hospitalId)}/slots/${enc(slotId)}/release`, { method: "POST" }),
+  reviews: (hospitalId: string, signal?: AbortSignal) =>
+    request<HospitalReviewsResult>(`/hospitals/${enc(hospitalId)}/reviews`, opts(signal)),
+  submitReview: (hospitalId: string, body: { rating: number; reviewText?: string }) =>
+    request<HospitalReview>(`/hospitals/${enc(hospitalId)}/reviews`, { method: "POST", json: body }),
 };
 
 export const appointmentApi = {
@@ -134,6 +154,29 @@ export const familyApi = {
     request<{ success: boolean; deletedId: string }>(`/family-members/${enc(id)}`, { method: "DELETE" }),
 };
 
+export const symptomApi = {
+  assess: (body: SymptomAssessmentInput) =>
+    request<SymptomAssessmentResult>("/symptoms/assess", { method: "POST", json: body }),
+};
+
+export const insuranceApi = {
+  providers: (signal?: AbortSignal) => requestList<InsuranceProviderInfo>("/insurance/providers", opts(signal)),
+  policies: (signal?: AbortSignal) => requestList<PatientInsurancePolicy>("/insurance/policies", opts(signal)),
+  createPolicy: (body: CreatePolicyBody) =>
+    request<PatientInsurancePolicy>("/insurance/policies", { method: "POST", json: body }),
+  deletePolicy: (id: string) =>
+    request<{ success: boolean }>(`/insurance/policies/${enc(id)}`, { method: "DELETE" }),
+};
+
+export const paymentApi = {
+  createOrder: (body: CreatePaymentOrderBody) =>
+    request<PaymentOrder>("/payments/orders", { method: "POST", json: body }),
+  verifyPayment: (body: VerifyPaymentBody) =>
+    request<PaymentVerificationResult>("/payments/verify", { method: "POST", json: body }),
+  listHistory: (signal?: AbortSignal) =>
+    requestList<PaymentHistoryItem>("/payments/history", opts(signal)),
+};
+
 export type { Page };
 
 function opts(signal?: AbortSignal): { signal?: AbortSignal } {
@@ -143,3 +186,4 @@ function opts(signal?: AbortSignal): { signal?: AbortSignal } {
 function enc(id: string): string {
   return encodeURIComponent(id);
 }
+

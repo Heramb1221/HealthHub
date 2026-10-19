@@ -114,6 +114,7 @@ model User {
   auditEvents          AuditEvent[]
   versionsAuthored     PrescriptionVersion[]
   qrSessionsCreated    QrAccessSession[]
+  googleOAuthToken     GoogleOAuthToken?
 }
 
 // Server-side session so logout can revoke a token (id is the token's jti).
@@ -544,4 +545,18 @@ model HospitalReview {
 
   @@index([hospitalId, createdAt])
   @@index([patientId])
+}
+
+model GoogleOAuthToken {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String    @unique @db.Uuid
+  accessToken  String
+  refreshToken String?
+  expiryDate   DateTime? @db.Timestamptz(3)
+  scope        String?
+  email        String?
+  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime  @updatedAt @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

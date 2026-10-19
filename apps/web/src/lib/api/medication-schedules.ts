@@ -82,7 +82,7 @@ const liveSchedulesApi: MedicationSchedulesApi = {
   async create(input) {
     const payload = {
       prescriptionId: input.prescriptionId,
-      versionNumber: 1,
+      versionNumber: input.versionNumber ?? 1,
       medicationPosition: input.medicationIndex,
       startDate: input.startDate,
       endDate: input.endDate || null,

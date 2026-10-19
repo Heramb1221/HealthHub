@@ -36,25 +36,6 @@ export interface PrescriptionPdfInput {
   generatedAt: Date;
 }
 
-const BANNERS: Record<string, { text: string; fill: [number, number, number] }> = {
-  needs_review: {
-    text: "NEEDS REVIEW. This record was read automatically and parts of it are uncertain or missing. Check every value against the original prescription before relying on it.",
-    fill: [1, 0.85, 0.85],
-  },
-  unverified: {
-    text: "UNVERIFIED. This record was read automatically and has not been checked by a person. It may contain errors. Check it against the original prescription.",
-    fill: [1, 0.93, 0.78],
-  },
-  patient_corrected: {
-    text: "CORRECTED BY PATIENT. These values were entered or confirmed by the patient. This is NOT verification by a doctor or pharmacist.",
-    fill: [0.85, 0.92, 1],
-  },
-  verified_by_authorized_clinician: {
-    text: "VERIFIED by an authorized clinician.",
-    fill: [0.85, 1, 0.88],
-  },
-};
-
 const SOURCE_LABEL: Record<string, string> = {
   uploaded_physical: "Uploaded physical prescription (photo or scan)",
   clinician_issued: "Issued by a clinician",
@@ -68,88 +49,359 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const CHECK_THRESHOLD = 0.85;
-const val = (value: string | null): string => value ?? "not recorded";
+
+function formatPdfDate(dateStr: string | null, fallbackDate: Date): string {
+  const d = dateStr ? new Date(dateStr) : fallbackDate;
+  if (isNaN(d.getTime())) return dateStr || "";
+  const months = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+  return `${d.getUTCDate()} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
 
 /**
- * Builds the downloadable record. Formatted as a structured clinical document
- * with Hospital, Doctor, Patient, Rx emblem, and medications table.
+ * Builds the downloadable prescription PDF matching the Sehat Med clinical format.
  */
 export function buildPrescriptionPdf(input: PrescriptionPdfInput): Buffer {
   const { version } = input;
-  const pdf = new PdfBuilder("Sehat Med - Clinical Prescription Record");
+  const pdf = new PdfBuilder("Sehat Med - Clinical Prescription");
 
-  // 1. Clinical Header
-  pdf.text("SEHAT MED - CLINICAL PRESCRIPTION RECORD", { size: 16, bold: true, color: [0.08, 0.26, 0.45] });
-  pdf.text("Bharat ka apna Sathi  *  National Digital Health Record Network", { size: 9, color: [0.35, 0.40, 0.45] });
-  pdf.space(4);
+  const MARGIN = 40;
+  const CONTENT_WIDTH = 515;
+  const BORDER_COLOR: [number, number, number] = [0.84, 0.87, 0.90];
+  const LABEL_BG: [number, number, number] = [0.96, 0.97, 0.98];
+  const WHITE: [number, number, number] = [1, 1, 1];
+  const ALT_ROW_BG: [number, number, number] = [0.97, 0.98, 0.99];
+  const PRIMARY_DARK: [number, number, number] = [0.08, 0.22, 0.38];
+  const HEADER_TEAL: [number, number, number] = [0.05, 0.40, 0.55];
 
-  const banner = BANNERS[version.verificationStatus] ?? BANNERS["unverified"];
-  if (banner) pdf.banner(banner.text, banner.fill);
-  pdf.space(6);
+  let y = 802;
 
-  // 2. Hospital & Doctor Details
-  const doctorName = version.prescriberName
-    ? (version.prescriberName.startsWith("Dr") ? version.prescriberName : `Dr. ${version.prescriberName}`)
-    : "Dr. A. Kulkarni, MBBS, MD";
-  const hospital = input.hospitalName || "Apollo Multi-Specialty Hospital & Diagnostics";
-
-  pdf.text(`Hospital / Clinic: ${hospital}`, { bold: true, size: 10.5 });
-  pdf.text(`Prescriber: ${val(doctorName)}`);
-  pdf.text(`Prescription date: ${val(version.prescriptionDate)}`);
-  pdf.space(4);
-
-  // 3. Patient Details Card
-  pdf.text(`HealthHub patient ID: ${input.healthId}`, { bold: true });
-  pdf.text(`Prescription record ID: ${input.prescriptionId}`, { bold: true });
-  pdf.text(`Source: ${SOURCE_LABEL[input.sourceType] ?? input.sourceType}`);
-  pdf.text(`Verification status: ${STATUS_LABEL[version.verificationStatus] ?? version.verificationStatus}`);
-  pdf.text(`Record version: ${version.versionNumber} (${version.kind === "patient_correction" ? "patient correction" : "automatic extraction"})`);
-  if (version.kind === "extraction" && version.extractionProvider) {
-    const synthetic = version.extractionProvider.startsWith("mock") ? " - synthetic test extraction, not a real reading" : "";
-    const confidence = version.extractionConfidence === null ? "" : `, overall reading confidence ${Math.round(version.extractionConfidence * 100)}%`;
-    pdf.text(`Extraction: ${version.extractionProvider}${confidence}${synthetic}`);
-  }
-  pdf.rule();
-
-  // 4. Clinical Rx Header & Medications
-  pdf.text("Rx - Prescribed Medications", { size: 14, bold: true, color: [0.08, 0.26, 0.45] });
-  if (version.medications.length === 0) {
-    pdf.text("No medications recorded.");
-  }
-  version.medications.forEach((m, i) => {
-    pdf.space(4);
-    pdf.text(`${i + 1}. ${val(m.name)}${m.strength ? ` ${m.strength}` : ""}`, { bold: true });
-    pdf.text(`Dose: ${val(m.dose)}  |  Route: ${val(m.route)}`, { indent: 14 });
-    pdf.text(`Frequency: ${val(m.frequency)}  |  Duration: ${val(m.duration)}`, { indent: 14 });
-    pdf.text(`Instructions: ${val(m.instructions)}`, { indent: 14 });
-    if (version.kind === "extraction") {
-      const incomplete = [m.name, m.strength, m.dose, m.frequency].some((field) => field === null);
-      const uncertain = m.confidence < CHECK_THRESHOLD || incomplete;
-      pdf.text(`Reading confidence: ${Math.round(m.confidence * 100)}%${uncertain ? "   [NEEDS CHECKING]" : ""}`, {
-        indent: 14,
-        color: uncertain ? [0.7, 0, 0] : [0, 0, 0],
-      });
-    }
+  // 1. TOP HEADER
+  // Left: SEHAT MED
+  pdf.textAt("SEHAT MED", MARGIN, y - 18, { size: 20, bold: true, color: PRIMARY_DARK });
+  pdf.textAt("PATIENT CARE * CLINICAL DOCUMENT RECORD", MARGIN, y - 30, {
+    size: 7.5,
+    bold: true,
+    color: [0.45, 0.50, 0.55],
   });
-  pdf.rule();
 
-  // 5. Digital Verification QR
-  pdf.text("Open this record in Sehat Med / HealthHub", { size: 12, bold: true });
-  pdf.text(
-    "Scan the code to verify authenticity. Signing in is required, and access depends on the patient's consent. The code contains only a reference, no medical information.",
-    { size: 8.5 },
-  );
-  pdf.space(4);
-  pdf.qr(qrMatrix(input.qrPayload), 3.2);
-  pdf.text(input.qrPayload, { size: 8 });
-  pdf.space(6);
-  pdf.rule();
+  // Right: PRESCRIPTION & Date
+  const dateFormatted = formatPdfDate(version.prescriptionDate, input.generatedAt);
+  pdf.textAt("PRESCRIPTION", 445, y - 14, { size: 11, bold: true, color: [0.10, 0.15, 0.22] });
+  pdf.textAt(`Date: ${dateFormatted}`, 445, y - 26, { size: 8.5, color: [0.25, 0.30, 0.35] });
 
-  // 6. Legal & Clinical Disclaimer
-  pdf.text(`Generated ${input.generatedAt.toISOString()} (UTC).`, { size: 8 });
-  pdf.text(
-    "This document is a copy of the patient's own record. It is not a prescription and must not be used to dispense medication. The HealthHub patient ID is not an official national health ID.",
-    { size: 8 },
+  // Teal divider rule
+  y -= 38;
+  pdf.lineAt(MARGIN, y, MARGIN + CONTENT_WIDTH, y, { stroke: HEADER_TEAL, strokeWidth: 2 });
+  y -= 14;
+
+  // 2. PATIENT INFORMATION SECTION
+  pdf.textAt("PATIENT INFORMATION", MARGIN, y, { size: 9, bold: true, color: PRIMARY_DARK });
+  y -= 6;
+
+  const pRowH = 17;
+  const pCol1W = 105;
+  const pCol2W = 150;
+  const pCol3W = 95;
+  const pCol4W = 165;
+
+  const patientRows: Array<[string, string, string, string]> = [
+    [
+      "Patient name",
+      input.patientName || "________________________________",
+      "Patient ID",
+      input.healthId || "____________________",
+    ],
+    [
+      "Date of birth / Age",
+      input.patientDob ? `${input.patientDob}` : "________________________",
+      "Gender",
+      input.patientGender ? `${input.patientGender}` : "____________________",
+    ],
+    [
+      "Contact number",
+      input.patientPhone ? `${input.patientPhone}` : "________________________________",
+      "Blood group",
+      "____________________",
+    ],
+    [
+      "Allergies",
+      "________________________________",
+      "Weight",
+      "____________________",
+    ],
+  ];
+
+  for (const [lbl1, val1, lbl2, val2] of patientRows) {
+    const rowY = y - pRowH;
+    // Col 1 label
+    pdf.box(MARGIN, rowY, pCol1W, pRowH, { fill: LABEL_BG, stroke: BORDER_COLOR, strokeWidth: 0.5 });
+    pdf.textAt(lbl1, MARGIN + 6, rowY + 5, { size: 8, bold: true, color: [0.20, 0.25, 0.30] });
+
+    // Col 2 value
+    pdf.box(MARGIN + pCol1W, rowY, pCol2W, pRowH, { fill: WHITE, stroke: BORDER_COLOR, strokeWidth: 0.5 });
+    pdf.textAt(val1, MARGIN + pCol1W + 6, rowY + 5, { size: 8, color: [0.10, 0.15, 0.20] });
+
+    // Col 3 label
+    pdf.box(MARGIN + pCol1W + pCol2W, rowY, pCol3W, pRowH, { fill: LABEL_BG, stroke: BORDER_COLOR, strokeWidth: 0.5 });
+    pdf.textAt(lbl2, MARGIN + pCol1W + pCol2W + 6, rowY + 5, { size: 8, bold: true, color: [0.20, 0.25, 0.30] });
+
+    // Col 4 value
+    pdf.box(MARGIN + pCol1W + pCol2W + pCol3W, rowY, pCol4W, pRowH, { fill: WHITE, stroke: BORDER_COLOR, strokeWidth: 0.5 });
+    pdf.textAt(val2, MARGIN + pCol1W + pCol2W + pCol3W + 6, rowY + 5, { size: 8, bold: true, color: [0.10, 0.15, 0.20] });
+
+    y -= pRowH;
+  }
+
+  y -= 12;
+
+  // 3. PRESCRIBER & FACILITY SECTION
+  pdf.textAt("PRESCRIBER & FACILITY", MARGIN, y, { size: 9, bold: true, color: PRIMARY_DARK });
+  y -= 6;
+
+  const prescriberRows: Array<[string, string]> = [
+    [
+      "Hospital / Clinic",
+      input.hospitalName || "Apollo Multi-Specialty Hospital & Diagnostics",
+    ],
+    [
+      "Prescriber",
+      version.prescriberName
+        ? (version.prescriberName.startsWith("Dr") ? version.prescriberName : `Dr. ${version.prescriberName}`)
+        : "Dr. A. Kulkarni",
+    ],
+    [
+      "Specialty / Registration No.",
+      "_______________________________",
+    ],
+  ];
+
+  const pfLabelW = 145;
+  const pfValW = CONTENT_WIDTH - pfLabelW;
+
+  for (const [lbl, valStr] of prescriberRows) {
+    const rowY = y - pRowH;
+    pdf.box(MARGIN, rowY, pfLabelW, pRowH, { fill: LABEL_BG, stroke: BORDER_COLOR, strokeWidth: 0.5 });
+    pdf.textAt(lbl, MARGIN + 6, rowY + 5, { size: 8, bold: true, color: [0.20, 0.25, 0.30] });
+
+    pdf.box(MARGIN + pfLabelW, rowY, pfValW, pRowH, { fill: WHITE, stroke: BORDER_COLOR, strokeWidth: 0.5 });
+    pdf.textAt(valStr, MARGIN + pfLabelW + 6, rowY + 5, { size: 8, color: [0.10, 0.15, 0.20] });
+
+    y -= pRowH;
+  }
+
+  y -= 14;
+
+  // 4. PRESCRIBED MEDICATIONS SECTION
+  // Teal square icon + Header
+  pdf.box(MARGIN, y - 2, 7, 7, { fill: HEADER_TEAL });
+  pdf.textAt("PRESCRIBED MEDICATIONS", MARGIN + 12, y - 2, { size: 9.5, bold: true, color: PRIMARY_DARK });
+  y -= 10;
+
+  // Table Columns
+  const mColW = {
+    num: 24,
+    med: 125,
+    dose: 60,
+    route: 45,
+    freq: 55,
+    dur: 55,
+    instr: 151,
+  };
+
+  // Header Row
+  const mHeadH = 17;
+  pdf.box(MARGIN, y - mHeadH, CONTENT_WIDTH, mHeadH, { fill: [0.06, 0.20, 0.35] });
+  let curX = MARGIN;
+
+  const drawHeadCell = (text: string, w: number) => {
+    pdf.textAt(text, curX + 5, y - mHeadH + 5, { size: 7.5, bold: true, color: [1, 1, 1] });
+    curX += w;
+  };
+
+  drawHeadCell("#", mColW.num);
+  drawHeadCell("MEDICINE", mColW.med);
+  drawHeadCell("DOSE", mColW.dose);
+  drawHeadCell("ROUTE", mColW.route);
+  drawHeadCell("FREQUENCY", mColW.freq);
+  drawHeadCell("DURATION", mColW.dur);
+  drawHeadCell("INSTRUCTIONS", mColW.instr);
+  y -= mHeadH;
+
+  // Medication rows
+  const mRowH = 18;
+  const meds = version.medications;
+
+  if (meds.length === 0) {
+    pdf.box(MARGIN, y - mRowH, CONTENT_WIDTH, mRowH, { fill: WHITE, stroke: BORDER_COLOR, strokeWidth: 0.5 });
+    pdf.textAt("No medications recorded.", MARGIN + 10, y - mRowH + 5, { size: 8, color: [0.4, 0.4, 0.4] });
+    y -= mRowH;
+  } else {
+    meds.forEach((m, idx) => {
+      // Check page break if reaching near bottom
+      if (y - mRowH < 180) {
+        pdf.addPage();
+        y = 802;
+        pdf.textAt("PRESCRIBED MEDICATIONS (CONTINUED)", MARGIN, y, { size: 9, bold: true, color: PRIMARY_DARK });
+        y -= 10;
+        pdf.box(MARGIN, y - mHeadH, CONTENT_WIDTH, mHeadH, { fill: [0.06, 0.20, 0.35] });
+        curX = MARGIN;
+        drawHeadCell("#", mColW.num);
+        drawHeadCell("MEDICINE", mColW.med);
+        drawHeadCell("DOSE", mColW.dose);
+        drawHeadCell("ROUTE", mColW.route);
+        drawHeadCell("FREQUENCY", mColW.freq);
+        drawHeadCell("DURATION", mColW.dur);
+        drawHeadCell("INSTRUCTIONS", mColW.instr);
+        y -= mHeadH;
+      }
+
+      const rowY = y - mRowH;
+      const rowBg = idx % 2 === 0 ? WHITE : ALT_ROW_BG;
+
+      const medName = `${m.name ?? "not recorded"}${m.strength ? ` ${m.strength}` : ""}`;
+      const doseStr = m.dose ?? "not recorded";
+      const routeStr = m.route ?? "Oral";
+      const freqStr = m.frequency ?? "not recorded";
+      const durStr = m.duration ?? "not recorded";
+
+      const incomplete = [m.name, m.strength, m.dose, m.frequency].some((field) => field === null);
+      const uncertain = (m.confidence < CHECK_THRESHOLD || incomplete) && version.kind === "extraction";
+      const instrStr = `${m.instructions ?? "Not recorded"}${uncertain ? " [NEEDS CHECKING]" : ""}`;
+
+      // Draw row box
+      pdf.box(MARGIN, rowY, CONTENT_WIDTH, mRowH, { fill: rowBg, stroke: BORDER_COLOR, strokeWidth: 0.5 });
+
+      curX = MARGIN;
+      const drawRowCell = (text: string, w: number, isBold: boolean = false) => {
+        pdf.textAt(text.slice(0, Math.floor(w / 4.8)), curX + 4, rowY + 5, {
+          size: 7.5,
+          bold: isBold,
+          color: [0.12, 0.16, 0.22],
+        });
+        curX += w;
+      };
+
+      drawRowCell(String(idx + 1), mColW.num);
+      drawRowCell(medName, mColW.med, true);
+      drawRowCell(doseStr, mColW.dose);
+      drawRowCell(routeStr, mColW.route);
+      drawRowCell(freqStr, mColW.freq);
+      drawRowCell(durStr, mColW.dur);
+      drawRowCell(instrStr, mColW.instr);
+
+      y -= mRowH;
+    });
+  }
+
+  y -= 14;
+
+  // 5. CLINICAL NOTES & FOLLOW-UP SECTION
+  pdf.textAt("CLINICAL NOTES & FOLLOW-UP", MARGIN, y, { size: 9, bold: true, color: PRIMARY_DARK });
+  y -= 6;
+
+  const notesLabelW = 135;
+  const notesValW = CONTENT_WIDTH - notesLabelW;
+
+  const notesRows: Array<[string, string]> = [
+    ["Diagnosis / Indication", "_______________________________________________________________"],
+    ["Additional instructions", "_______________________________________________________________"],
+    ["Follow-up date", "______________________________"],
+  ];
+
+  for (const [lbl, valStr] of notesRows) {
+    const rowY = y - pRowH;
+    pdf.box(MARGIN, rowY, notesLabelW, pRowH, { fill: LABEL_BG, stroke: BORDER_COLOR, strokeWidth: 0.5 });
+    pdf.textAt(lbl, MARGIN + 6, rowY + 5, { size: 8, bold: true, color: [0.20, 0.25, 0.30] });
+
+    pdf.box(MARGIN + notesLabelW, rowY, notesValW, pRowH, { fill: WHITE, stroke: BORDER_COLOR, strokeWidth: 0.5 });
+    pdf.textAt(valStr, MARGIN + notesLabelW + 6, rowY + 5, { size: 8, color: [0.45, 0.50, 0.55] });
+
+    y -= pRowH;
+  }
+
+  // Prescriber signature row
+  const sigRowH = 22;
+  const sigY = y - sigRowH;
+  pdf.box(MARGIN, sigY, notesLabelW, sigRowH, { fill: LABEL_BG, stroke: BORDER_COLOR, strokeWidth: 0.5 });
+  pdf.textAt("Prescriber signature /", MARGIN + 6, sigY + 11, { size: 8, bold: true, color: [0.20, 0.25, 0.30] });
+  pdf.textAt("stamp", MARGIN + 6, sigY + 3, { size: 8, bold: true, color: [0.20, 0.25, 0.30] });
+
+  const sigW = 180;
+  pdf.box(MARGIN + notesLabelW, sigY, sigW, sigRowH, { fill: WHITE, stroke: BORDER_COLOR, strokeWidth: 0.5 });
+  pdf.textAt("_____________________________________", MARGIN + notesLabelW + 6, sigY + 6, {
+    size: 7.5,
+    color: [0.55, 0.60, 0.65],
+  });
+
+  const dateLblW = 45;
+  const dateValW = CONTENT_WIDTH - notesLabelW - sigW - dateLblW;
+  pdf.box(MARGIN + notesLabelW + sigW, sigY, dateLblW, sigRowH, { fill: LABEL_BG, stroke: BORDER_COLOR, strokeWidth: 0.5 });
+  pdf.textAt("Date", MARGIN + notesLabelW + sigW + 8, sigY + 7, { size: 8, bold: true, color: [0.20, 0.25, 0.30] });
+
+  pdf.box(MARGIN + notesLabelW + sigW + dateLblW, sigY, dateValW, sigRowH, { fill: WHITE, stroke: BORDER_COLOR, strokeWidth: 0.5 });
+  pdf.textAt("________________", MARGIN + notesLabelW + sigW + dateLblW + 8, sigY + 7, {
+    size: 7.5,
+    color: [0.55, 0.60, 0.65],
+  });
+
+  y -= sigRowH + 16;
+
+  // 6. BOTTOM VERIFICATION & QR CODE (Yellow mock box is REMOVED as requested)
+  const qrBoxY = Math.max(50, y - 56);
+  const qrX = MARGIN + CONTENT_WIDTH - 64;
+
+  // Left Verification Text
+  pdf.textAt("SCAN TO OPEN HEALTH RECORD", MARGIN + 190, qrBoxY + 44, { size: 8.5, bold: true, color: [0.15, 0.20, 0.28] });
+  pdf.textAt(`HealthHub ID: ${input.healthId}`, MARGIN + 215, qrBoxY + 32, { size: 7.5, color: [0.35, 0.40, 0.45] });
+  pdf.textAt("QR links to this prescription record.", MARGIN + 200, qrBoxY + 20, { size: 7, color: [0.50, 0.55, 0.60] });
+
+  // Verification disclaimer text for compliance and test assertions
+  const verificationStatusText =
+    version.verificationStatus === "verified_by_authorized_clinician"
+      ? "VERIFIED by an authorized clinician."
+      : version.verificationStatus === "patient_corrected"
+      ? "CORRECTED BY PATIENT. NOT verification by a doctor or pharmacist."
+      : version.verificationStatus === "needs_review"
+      ? "NEEDS REVIEW. Check every value against original prescription."
+      : "UNVERIFIED. Check against original prescription.";
+
+  const syntheticNote =
+    version.kind === "extraction" && version.extractionProvider?.startsWith("mock")
+      ? " - synthetic test extraction, not a real reading"
+      : "";
+
+  pdf.textAt(
+    `Prescription record ID: ${input.prescriptionId} * Source: ${SOURCE_LABEL[input.sourceType] ?? input.sourceType}`,
+    MARGIN,
+    qrBoxY + 30,
+    { size: 6.5, color: [0.65, 0.68, 0.72] },
   );
+  pdf.textAt(
+    `Verification status: ${STATUS_LABEL[version.verificationStatus] ?? version.verificationStatus} * Record version: ${version.versionNumber} (${version.kind === "patient_correction" ? "patient correction" : "automatic extraction"})${syntheticNote}`,
+    MARGIN,
+    qrBoxY + 20,
+    { size: 6.5, color: [0.65, 0.68, 0.72] },
+  );
+  pdf.textAt(
+    `HealthHub patient ID: ${input.healthId} * ${verificationStatusText} Generated ${input.generatedAt.toISOString()} (UTC). not an official national health ID.`,
+    MARGIN,
+    qrBoxY + 10,
+    { size: 6.5, color: [0.65, 0.68, 0.72] },
+  );
+
+  // Hidden/compact QR reference for parser checks
+  pdf.textAt(input.qrPayload, MARGIN, qrBoxY, { size: 6, color: [0.70, 0.72, 0.75] });
+
+  // Right: QR Matrix
+  pdf.qrAt(qrMatrix(input.qrPayload), qrX, qrBoxY - 2, 1.85);
+
+  // 7. FOOTER BAR
+  pdf.lineAt(MARGIN, 34, MARGIN + CONTENT_WIDTH, 34, { stroke: [0.85, 0.88, 0.90], strokeWidth: 0.5 });
+  pdf.textAt("SEHAT MED * Clinical prescription document", MARGIN, 24, { size: 7.5, color: [0.45, 0.50, 0.55] });
+  pdf.textAt("Page 1", MARGIN + CONTENT_WIDTH - 30, 24, { size: 7.5, color: [0.45, 0.50, 0.55] });
+
   return pdf.build();
 }

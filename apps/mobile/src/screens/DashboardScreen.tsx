@@ -1,13 +1,19 @@
+import { useState } from "react";
+import { TouchableOpacity, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { Feather } from "@expo/vector-icons";
 
 import { appointmentApi, medicationApi, patientApi, prescriptionApi } from "../api/endpoints";
 import { useResource } from "../hooks/useResource";
 import { appointmentHospitalName, appointmentStart, nextAppointment } from "../lib/appointments";
 import { formatDateTime } from "../lib/format";
 import { nextReminder } from "../lib/schedule";
+import { useLanguage } from "../i18n/LanguageContext";
+import { SUPPORTED_LANGUAGES } from "../i18n/languages";
+import { LanguageModal } from "../ui/LanguageModal";
 import type { RootStackParamList } from "../navigation/types";
-import { AppText, Banner, Card, Field, ListRow, Screen, Stack } from "../ui/components";
+import { AppText, Banner, Card, Field, ListRow, Row, Screen, Stack } from "../ui/components";
 import { ErrorState, LoadingState } from "../ui/states";
 import { colors, space } from "../ui/theme";
 
@@ -23,6 +29,8 @@ async function settle<T>(p: Promise<T>): Promise<Settled<T>> {
 
 export function DashboardScreen() {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { language, t } = useLanguage();
+  const [langModalVisible, setLangModalVisible] = useState(false);
   const res = useResource(async (signal) => {
     const [patient, prescriptions, schedules, appointments] = await Promise.all([
       settle(patientApi.me(signal)),
@@ -54,6 +62,34 @@ export function DashboardScreen() {
   return (
     <Screen refreshing={res.refreshing} onRefresh={res.refresh}>
       <Stack>
+        <Row style={{ justifyContent: "space-between", alignItems: "center" }}>
+          <View>
+            <AppText variant="caption" muted>BHARAT DIGITAL HEALTH MISSION</AppText>
+          </View>
+          <TouchableOpacity
+            onPress={() => setLangModalVisible(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Change regional language"
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              backgroundColor: colors.surface,
+              borderWidth: 1,
+              borderColor: colors.border,
+              paddingHorizontal: space.sm,
+              paddingVertical: 5,
+              borderRadius: 16,
+              gap: 6,
+            }}
+          >
+            <Feather name="globe" size={13} color={colors.primary} />
+            <AppText variant="caption" style={{ fontWeight: "700", color: colors.primary }}>
+              {SUPPORTED_LANGUAGES.find((l) => l.code === language)?.nativeName ?? "English"}
+            </AppText>
+            <Feather name="chevron-down" size={13} color={colors.textMuted} />
+          </TouchableOpacity>
+        </Row>
+
         <Card style={{ backgroundColor: colors.primary, borderColor: colors.primary }}>
           <AppText variant="caption" color="#c9d6e4">
             Your Sehat Med ID
@@ -113,10 +149,15 @@ export function DashboardScreen() {
         </Card>
 
         <Card style={{ gap: 0 }}>
-          <ListRow title="Upload a prescription" subtitle="Photo or PDF" onPress={() => nav.navigate("PrescriptionUpload")} />
-          <ListRow title="Medical history" onPress={() => nav.navigate("History")} />
-          <ListRow title="Digital health card and QR" onPress={() => nav.navigate("HealthCard")} />
+          <ListRow title={t("prescriptions", "Upload a prescription")} subtitle="Photo or PDF" onPress={() => nav.navigate("PrescriptionUpload")} />
+          <ListRow title={t("symptom_checker", "AI Symptom Checker")} subtitle="Clinical triage & emergency screening" onPress={() => nav.navigate("SymptomChecker")} />
+          <ListRow title={t("insurance", "Health Insurance")} subtitle="Policy vault & cashless helplines" onPress={() => nav.navigate("Insurance")} />
+          <ListRow title={t("payments", "Consultation Payments")} subtitle="Pay consultation fees & receipts" onPress={() => nav.navigate("Payments")} />
+          <ListRow title={t("history", "Medical history")} onPress={() => nav.navigate("History")} />
+          <ListRow title={t("health_card", "Digital health card and QR")} onPress={() => nav.navigate("HealthCard")} />
         </Card>
+
+        <LanguageModal visible={langModalVisible} onClose={() => setLangModalVisible(false)} />
       </Stack>
     </Screen>
   );

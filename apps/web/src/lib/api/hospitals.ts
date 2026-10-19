@@ -1,6 +1,6 @@
 
 import { asList, request } from "./http";
-import type { AvailabilitySlot, Hospital } from "./types";
+import type { AvailabilitySlot, Hospital, HospitalReview, HospitalReviewsResult } from "./types";
 
 export interface HospitalsApi {
   /** Hospitals a patient can book with, A to Z. */
@@ -13,24 +13,69 @@ export interface HospitalsApi {
   listAll(): Promise<Hospital[]>;
   /** Open, future slots for one hospital, earliest first. The server decides what is open. */
   availability(hospitalId: string): Promise<AvailabilitySlot[]>;
+  holdSlot(hospitalId: string, slotId: string): Promise<{ held: boolean; expiresAt: string; secondsRemaining: number }>;
+  releaseSlot(hospitalId: string, slotId: string): Promise<{ released: boolean }>;
+  reviews(hospitalId: string): Promise<HospitalReviewsResult>;
+  submitReview(hospitalId: string, input: { rating: number; reviewText?: string }): Promise<HospitalReview>;
+}
+
+function normalizeHospital(h: Hospital & { active?: boolean; isActive?: boolean }): Hospital {
+  const active = Boolean(h.active ?? h.isActive ?? true);
+  return {
+    ...h,
+    active,
+    isActive: active,
+  };
 }
 
 const path = (id: string) => `/hospitals/${encodeURIComponent(id)}`;
 
 const liveHospitalsApi: HospitalsApi = {
   async list() {
-    const items = asList(await request<Hospital[] | { items: Hospital[] }>("/hospitals"));
+    const raw = asList(await request<Hospital[] | { items: Hospital[] }>("/hospitals"));
+    const items = raw.map(normalizeHospital);
     // Never offer a deactivated hospital for booking, even if the server returned it.
     return items.filter((h) => h.active !== false).sort((a, b) => a.name.localeCompare(b.name));
   },
-  get: (id) => request<Hospital>(path(id)),
+  async get(id) {
+    const raw = await request<Hospital | { data: Hospital }>(path(id));
+    const data = raw && typeof raw === "object" && "data" in raw ? (raw as { data: Hospital }).data : raw;
+    return normalizeHospital(data as Hospital);
+  },
   async listAll() {
-    const items = asList(await request<Hospital[] | { items: Hospital[] }>("/hospitals"));
-    return [...items].sort((a, b) => a.name.localeCompare(b.name));
+    const raw = asList(await request<Hospital[] | { items: Hospital[] }>("/hospitals"));
+    return raw.map(normalizeHospital).sort((a, b) => a.name.localeCompare(b.name));
   },
   async availability(hospitalId) {
-    const items = asList(await request<AvailabilitySlot[] | { items: AvailabilitySlot[] }>(`${path(hospitalId)}/availability`));
-    return [...items].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+    const raw = await request<AvailabilitySlot[] | { data: AvailabilitySlot[] }>(`${path(hospitalId)}/availability?limit=200`);
+    const items = asList(raw);
+    return items.map((s) => ({
+      ...s,
+      hospitalId,
+    })).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  },
+  async holdSlot(hospitalId, slotId) {
+    return request<{ held: boolean; expiresAt: string; secondsRemaining: number }>(
+      `${path(hospitalId)}/slots/${encodeURIComponent(slotId)}/hold`,
+      { method: "POST" },
+    );
+  },
+  async releaseSlot(hospitalId, slotId) {
+    return request<{ released: boolean }>(
+      `${path(hospitalId)}/slots/${encodeURIComponent(slotId)}/release`,
+      { method: "POST" },
+    );
+  },
+  async reviews(hospitalId) {
+    const raw = await request<HospitalReviewsResult | { data: HospitalReviewsResult }>(`${path(hospitalId)}/reviews`);
+    return raw && typeof raw === "object" && "data" in raw ? (raw as { data: HospitalReviewsResult }).data : (raw as HospitalReviewsResult);
+  },
+  async submitReview(hospitalId, input) {
+    const raw = await request<HospitalReview | { data: HospitalReview }>(`${path(hospitalId)}/reviews`, {
+      method: "POST",
+      json: input,
+    });
+    return raw && typeof raw === "object" && "data" in raw ? (raw as { data: HospitalReview }).data : (raw as HospitalReview);
   },
 };
 

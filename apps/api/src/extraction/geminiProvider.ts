@@ -1,6 +1,12 @@
+import { log } from "../lib/logger.js";
 import { ExtractionUnrecognizedError, type ExtractionInput, type ExtractionProvider } from "./types.js";
 
-const DEFAULT_MODEL = "gemini-flash-latest";
+const DEFAULT_MODEL = "gemini-3.5-flash";
+const FALLBACK_MODELS = [
+  "gemini-3.5-flash",
+  "gemini-3.5-flash-lite",
+  "gemini-3.1-flash-lite",
+];
 
 const PROMPT = `You are a clinical document transcription assistant in a medical records platform.
 Your task is to transcribe and extract prescription details and medication instructions from the provided document image or PDF.
@@ -51,60 +57,74 @@ export class GeminiExtractionProvider implements ExtractionProvider {
     const base64Data = input.bytes.toString("base64");
     const mimeType = input.mimeType || "image/jpeg";
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`;
+    const candidateModels = [this.model, ...FALLBACK_MODELS.filter((m) => m !== this.model)];
+    let lastError: Error | null = null;
 
-    let response: Response;
-    try {
-      response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                { text: PROMPT },
-                {
-                  inlineData: {
-                    mimeType,
-                    data: base64Data,
+    for (const model of candidateModels) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`;
+
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  { text: PROMPT },
+                  {
+                    inlineData: {
+                      mimeType,
+                      data: base64Data,
+                    },
                   },
-                },
-              ],
+                ],
+              },
+            ],
+            generationConfig: {
+              responseMimeType: "application/json",
+              temperature: 0.1,
             },
-          ],
-          generationConfig: {
-            responseMimeType: "application/json",
-            temperature: 0.1,
-          },
-        }),
-        signal: AbortSignal.timeout(50000),
-      });
-    } catch (err) {
-      throw new Error(`Gemini API request failed: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
+          }),
+          signal: AbortSignal.timeout(50000),
+        });
+      } catch (err) {
+        lastError = new Error(`Gemini API request failed for ${model}: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
+        log("warn", "gemini request network error, trying fallback if available", { model });
+        continue;
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => "");
+        lastError = new Error(`Gemini API error (HTTP ${response.status}) on ${model}: ${errorText.slice(0, 300)}`);
+        if (response.status === 429 || response.status === 404 || response.status === 503) {
+          log("warn", "gemini model unavailable or quota reached, trying fallback", { model, status: response.status });
+          continue;
+        }
+        throw lastError;
+      }
+
+      const json = (await response.json()) as {
+        candidates?: Array<{
+          content?: {
+            parts?: Array<{ text?: string }>;
+          };
+        }>;
+      };
+
+      const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) {
+        throw new ExtractionUnrecognizedError();
+      }
+
+      try {
+        return JSON.parse(text);
+      } catch (err) {
+        throw new ExtractionUnrecognizedError({ cause: err });
+      }
     }
 
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => "");
-      throw new Error(`Gemini API error (HTTP ${response.status}): ${errorText.slice(0, 300)}`);
-    }
-
-    const json = (await response.json()) as {
-      candidates?: Array<{
-        content?: {
-          parts?: Array<{ text?: string }>;
-        };
-      }>;
-    };
-
-    const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) {
-      throw new ExtractionUnrecognizedError();
-    }
-
-    try {
-      return JSON.parse(text);
-    } catch (err) {
-      throw new ExtractionUnrecognizedError({ cause: err });
-    }
+    throw lastError ?? new Error("All Gemini extraction models failed");
   }
 }

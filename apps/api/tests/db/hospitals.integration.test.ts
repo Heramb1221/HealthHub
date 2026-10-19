@@ -8,7 +8,7 @@ import { TEST_DATABASE_URL, closeHarness, openHarness, type Harness } from "./he
 import { bearer, buildApp, loginToken, registerPatient, seedUser, testEnv } from "./appHelpers.js";
 
 const HOUR = 3_600_000;
-const HOSPITAL_KEYS = ["address", "city", "createdAt", "id", "isActive", "isDemo", "locationUrl", "name", "phone", "specialties", "timings", "updatedAt", "website"];
+const HOSPITAL_KEYS = ["address", "city", "createdAt", "id", "isActive", "isDemo", "locationUrl", "name", "phone", "ratingAverage", "reviewCount", "specialties", "timings", "updatedAt", "website"];
 
 describe.skipIf(!TEST_DATABASE_URL)("hospital directory and availability", () => {
   let h: Harness;

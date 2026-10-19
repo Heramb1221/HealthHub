@@ -12,11 +12,11 @@ import { requirePatientAccess } from "../access/patientAccess.js";
 import { correctionSchema, correctPrescription } from "./corrections.js";
 import { generatePrescriptionPdf } from "./pdf.js";
 import { processPrescription } from "./processing.js";
-import { createPrescription, getPrescription, listPrescriptions } from "./service.js";
+import { createPrescription, deletePrescription, getPrescription, listPrescriptions } from "./service.js";
 import { parseUpload } from "./upload.js";
 import { getLatestVersion, listVersions } from "./versions.js";
 import { checkPrescriptionContraindications } from "./contraindications.js";
-import { notifyPrescriptionEvent } from "../notifications/service.js";
+import { notifyContraindicationAlerts, notifyPrescriptionEvent } from "../notifications/service.js";
 
 const listQuerySchema = z.strictObject({
   limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -89,7 +89,12 @@ export function createPrescriptionRouter(
 
   // Contraindications and drug-drug interaction safety analysis.
   router.get("/:prescriptionId/contraindications", accessGuard(), async (req, res) => {
-    res.json({ data: await checkPrescriptionContraindications(db, uuidParam(req.params.prescriptionId), env) });
+    const pId = uuidParam(req.params.prescriptionId);
+    const contra = await checkPrescriptionContraindications(db, pId, env);
+    if (contra.hasInteractions) {
+      void notifyContraindicationAlerts(db, env, pId, contra).catch(() => {});
+    }
+    res.json({ data: contra });
   });
 
   // History is owner-only: the patient role is required first, so providers
@@ -111,6 +116,11 @@ export function createPrescriptionRouter(
     );
     // Fire and forget prescription completion notification
     notifyPrescriptionEvent(db, env, prescription.id);
+    void checkPrescriptionContraindications(db, prescription.id, env).then((contra) => {
+      if (contra.hasInteractions) {
+        return notifyContraindicationAlerts(db, env, prescription.id, contra);
+      }
+    }).catch(() => {});
     res.json({ data: prescription });
   });
 
@@ -126,6 +136,11 @@ export function createPrescriptionRouter(
       input,
       { requestId: req.requestId },
     );
+    void checkPrescriptionContraindications(db, uuidParam(req.params.prescriptionId), env).then((contra) => {
+      if (contra.hasInteractions) {
+        return notifyContraindicationAlerts(db, env, uuidParam(req.params.prescriptionId), contra);
+      }
+    }).catch(() => {});
     res.status(201).json({ data: version });
   });
 
@@ -160,6 +175,19 @@ export function createPrescriptionRouter(
     res.setHeader("Cache-Control", "private, no-cache");
     res.setHeader("Content-Length", String(bytes.length));
     res.end(bytes);
+  });
+
+  // Owner-only deletion of a prescription record and associated data
+  router.delete("/:prescriptionId", requireRole("patient"), accessGuard(), async (req, res) => {
+    const access = req.access;
+    if (!access) throw new AppError("FORBIDDEN");
+    const result = await deletePrescription(
+      { db, store },
+      requireAuth(req),
+      { prescriptionId: uuidParam(req.params.prescriptionId), patientId: access.patientId },
+      { requestId: req.requestId },
+    );
+    res.json({ data: result });
   });
 
   return router;

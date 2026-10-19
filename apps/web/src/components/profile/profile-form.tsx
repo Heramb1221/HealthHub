@@ -25,7 +25,17 @@ function Fieldset({ legend, description, children }: { legend: string; descripti
   );
 }
 
-export function ProfileForm({ patient, onCancel, onSaved }: { patient: Patient; onCancel: () => void; onSaved: (patient: Patient) => void }) {
+export function ProfileForm({
+  patient,
+  isOnboarding = false,
+  onCancel,
+  onSaved,
+}: {
+  patient: Patient;
+  isOnboarding?: boolean;
+  onCancel: () => void;
+  onSaved: (patient: Patient) => void;
+}) {
   const [errors, setErrors] = React.useState<FieldErrors>({});
   const [formError, setFormError] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState(false);
@@ -66,6 +76,15 @@ export function ProfileForm({ patient, onCancel, onSaved }: { patient: Patient; 
 
   return (
     <form ref={firstRef} onSubmit={onSubmit} noValidate className="max-w-3xl space-y-10">
+      {isOnboarding ? (
+        <Alert tone="info">
+          <AlertTitle>Welcome to HealthHub! Complete your profile</AlertTitle>
+          <AlertDescription>
+            Please fill in your legal name, date of birth, blood group, and emergency contact to activate your patient account and unlock appointments, prescriptions, and health records.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       {formError ? (
         <Alert tone="danger">
           <TriangleAlert aria-hidden="true" />
@@ -111,13 +130,17 @@ export function ProfileForm({ patient, onCancel, onSaved }: { patient: Patient; 
             <>
               <LoaderCircle className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> Saving
             </>
+          ) : isOnboarding ? (
+            "Complete Profile & Continue"
           ) : (
             "Save changes"
           )}
         </Button>
-        <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>
-          Cancel
-        </Button>
+        {!isOnboarding ? (
+          <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>
+            Cancel
+          </Button>
+        ) : null}
       </div>
     </form>
   );

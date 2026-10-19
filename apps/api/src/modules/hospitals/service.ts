@@ -2,6 +2,8 @@ import type { Db } from "../../db/client.js";
 import { AppError } from "../../lib/errors.js";
 import type { AuthContext } from "../../middleware/authenticate.js";
 import { recordAudit } from "../audit/audit.js";
+import { ownPatientId } from "../patients/ownPatient.js";
+import { acquireSlotHold, getHospitalSlotHolds, releaseSlotHold } from "../appointments/slotHold.js";
 
 interface Ctx {
   requestId: string;
@@ -21,10 +23,21 @@ export interface HospitalDto {
   isActive: boolean;
   /** True for seeded demo data. Clients must show it as demo, never as a real hospital. */
   isDemo: boolean;
+  ratingAverage?: number;
+  reviewCount?: number;
   createdAt: string; updatedAt: string;
 }
 
-export const toHospitalDto = (row: Row): HospitalDto => ({ ...row, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() });
+export const toHospitalDto = (
+  row: Row,
+  stats?: { ratingAverage: number; reviewCount: number },
+): HospitalDto => ({
+  ...row,
+  ratingAverage: stats?.ratingAverage ?? 0,
+  reviewCount: stats?.reviewCount ?? 0,
+  createdAt: row.createdAt.toISOString(),
+  updatedAt: row.updatedAt.toISOString(),
+});
 
 const isAdmin = (auth: AuthContext) => auth.role === "admin";
 
@@ -49,14 +62,47 @@ export async function listHospitals(
   });
   const hasMore = rows.length > query.limit;
   const items = hasMore ? rows.slice(0, query.limit) : rows;
-  return { data: items.map(toHospitalDto), page: { limit: query.limit, nextCursor: hasMore ? (items[items.length - 1]?.id ?? null) : null } };
+
+  const hospitalIds = items.map((h) => h.id);
+  const reviewAggs =
+    hospitalIds.length > 0
+      ? await db.hospitalReview.groupBy({
+          by: ["hospitalId"],
+          _avg: { rating: true },
+          _count: { _all: true },
+          where: { hospitalId: { in: hospitalIds } },
+        })
+      : [];
+
+  const aggMap = new Map(
+    reviewAggs.map((a) => [
+      a.hospitalId,
+      {
+        ratingAverage: a._avg.rating ? Number(a._avg.rating.toFixed(1)) : 0,
+        reviewCount: a._count._all,
+      },
+    ]),
+  );
+
+  return {
+    data: items.map((row) => toHospitalDto(row, aggMap.get(row.id))),
+    page: { limit: query.limit, nextCursor: hasMore ? (items[items.length - 1]?.id ?? null) : null },
+  };
 }
 
 /** A deactivated hospital looks like it does not exist, except to an admin. */
 export async function getHospital(db: Db, auth: AuthContext, id: string): Promise<HospitalDto> {
   const row = await db.hospital.findFirst({ where: { id, ...(isAdmin(auth) ? {} : { isActive: true }) }, select: SELECT });
   if (!row) throw new AppError("NOT_FOUND");
-  return toHospitalDto(row);
+  const agg = await db.hospitalReview.aggregate({
+    where: { hospitalId: id },
+    _avg: { rating: true },
+    _count: { _all: true },
+  });
+  return toHospitalDto(row, {
+    ratingAverage: agg._avg.rating ? Number(agg._avg.rating.toFixed(1)) : 0,
+    reviewCount: agg._count._all,
+  });
 }
 
 export async function createHospital(
@@ -143,9 +189,16 @@ export async function deactivateHospital(db: Db, auth: AuthContext, id: string, 
   });
 }
 
-export interface SlotDto { id: string; startsAt: string; endsAt: string; status: "open" | "booked" }
+export interface SlotDto {
+  id: string;
+  startsAt: string;
+  endsAt: string;
+  status: "open" | "booked" | "holding" | "held_by_me";
+  expiresAt?: string;
+  secondsRemaining?: number;
+}
 
-/** Upcoming slots with only open/booked: never who booked them. Inactive hospitals show no slots to non-admins. */
+/** Upcoming slots with real-time states (open/booked/holding/held_by_me). Inactive hospitals show no slots to non-admins. */
 export async function listAvailability(
   db: Db,
   auth: AuthContext,
@@ -164,12 +217,67 @@ export async function listAvailability(
     take: query.limit + 1,
     ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
   });
+
+  let patientId: string | null = null;
+  try {
+    patientId = await ownPatientId(db, auth);
+  } catch {
+    // Non-patient
+  }
+
+  const activeHolds = getHospitalSlotHolds(hospitalId, patientId);
   const hasMore = rows.length > query.limit;
   const items = hasMore ? rows.slice(0, query.limit) : rows;
+
   return {
-    data: items.map((r): SlotDto => ({ id: r.id, startsAt: r.startsAt.toISOString(), endsAt: r.endsAt.toISOString(), status: r.appointments.length > 0 ? "booked" : "open" })),
+    data: items.map((r): SlotDto => {
+      if (r.appointments.length > 0) {
+        return { id: r.id, startsAt: r.startsAt.toISOString(), endsAt: r.endsAt.toISOString(), status: "booked" };
+      }
+      const hold = activeHolds.get(r.id);
+      if (hold) {
+        return {
+          id: r.id,
+          startsAt: r.startsAt.toISOString(),
+          endsAt: r.endsAt.toISOString(),
+          status: hold.heldByMe ? "held_by_me" : "holding",
+          expiresAt: hold.expiresAt,
+          secondsRemaining: hold.secondsRemaining,
+        };
+      }
+      return { id: r.id, startsAt: r.startsAt.toISOString(), endsAt: r.endsAt.toISOString(), status: "open" };
+    }),
     page: { limit: query.limit, nextCursor: hasMore ? (items[items.length - 1]?.id ?? null) : null },
   };
+}
+
+export async function holdHospitalSlot(
+  db: Db,
+  auth: AuthContext,
+  hospitalId: string,
+  slotId: string,
+): Promise<{ held: boolean; expiresAt: string; secondsRemaining: number }> {
+  const patientId = await ownPatientId(db, auth);
+  const slot = await db.availabilitySlot.findFirst({
+    where: { id: slotId, hospitalId },
+    select: { id: true, startsAt: true, appointments: { where: { status: "confirmed" }, select: { id: true } } },
+  });
+  if (!slot) throw new AppError("NOT_FOUND", "Slot not found");
+  if (slot.appointments.length > 0) throw new AppError("CONFLICT", "This slot has already been booked");
+  if (slot.startsAt.getTime() <= Date.now()) throw new AppError("CONFLICT", "This slot has already passed");
+
+  return acquireSlotHold(slotId, hospitalId, patientId, auth.userId);
+}
+
+export async function releaseHospitalSlot(
+  db: Db,
+  auth: AuthContext,
+  hospitalId: string,
+  slotId: string,
+): Promise<{ released: boolean }> {
+  const patientId = await ownPatientId(db, auth);
+  const released = releaseSlotHold(slotId, patientId);
+  return { released };
 }
 
 /** Admin-only schedule management: creates availability slots for a hospital. */
@@ -224,11 +332,12 @@ export interface ReviewDto {
 export async function listHospitalReviews(
   db: Db,
   hospitalId: string,
-): Promise<{ ratingAverage: number; reviewCount: number; reviews: ReviewDto[] }> {
+  callerUserId?: string,
+): Promise<{ ratingAverage: number; reviewCount: number; userReview?: ReviewDto | null; reviews: ReviewDto[] }> {
   const reviews = await db.hospitalReview.findMany({
     where: { hospitalId },
     include: {
-      patient: { select: { fullName: true } },
+      patient: { select: { id: true, userId: true, fullName: true } },
     },
     orderBy: { createdAt: "desc" },
     take: 50,
@@ -239,9 +348,25 @@ export async function listHospitalReviews(
     ? Number((reviews.reduce((acc, r) => acc + r.rating, 0) / reviewCount).toFixed(1))
     : 0;
 
+  let userReview: ReviewDto | null = null;
+  if (callerUserId) {
+    const userRev = reviews.find((r) => r.patient.userId === callerUserId);
+    if (userRev) {
+      userReview = {
+        id: userRev.id,
+        rating: userRev.rating,
+        reviewText: userRev.reviewText,
+        isVerifiedPatient: userRev.isVerifiedPatient,
+        createdAt: userRev.createdAt.toISOString(),
+        patientName: userRev.patient.fullName ? `${userRev.patient.fullName.charAt(0)}***` : "Patient",
+      };
+    }
+  }
+
   return {
     ratingAverage,
     reviewCount,
+    userReview,
     reviews: reviews.map((r) => ({
       id: r.id,
       rating: r.rating,
@@ -278,18 +403,37 @@ export async function createHospitalReview(
     select: { id: true },
   });
 
-  const created = await db.hospitalReview.create({
-    data: {
-      hospitalId,
-      patientId: patient.id,
-      rating: Math.max(1, Math.min(5, Math.round(input.rating))),
-      reviewText: input.reviewText?.slice(0, 500) ?? null,
-      isVerifiedPatient: Boolean(hasVisited),
-    },
+  const existing = await db.hospitalReview.findFirst({
+    where: { hospitalId, patientId: patient.id },
   });
 
+  const rating = Math.max(1, Math.min(5, Math.round(input.rating)));
+  const reviewText = input.reviewText?.trim().slice(0, 500) || null;
+
+  let created;
+  if (existing) {
+    created = await db.hospitalReview.update({
+      where: { id: existing.id },
+      data: {
+        rating,
+        reviewText,
+        isVerifiedPatient: Boolean(hasVisited),
+      },
+    });
+  } else {
+    created = await db.hospitalReview.create({
+      data: {
+        hospitalId,
+        patientId: patient.id,
+        rating,
+        reviewText,
+        isVerifiedPatient: Boolean(hasVisited),
+      },
+    });
+  }
+
   await recordAudit(db, {
-    action: "hospital.review_created",
+    action: existing ? "hospital.review_updated" : "hospital.review_created",
     outcome: "success",
     actorUserId: auth.userId,
     patientId: patient.id,

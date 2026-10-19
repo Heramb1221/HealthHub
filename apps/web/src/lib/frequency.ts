@@ -19,10 +19,13 @@ export function suggestTimes(frequency: string | null | undefined): string[] | n
 /** "5 days" or "2 weeks" give a length in days. Anything else gives null. */
 export function durationDays(duration: string | null | undefined): number | null {
   if (!duration) return null;
-  const match = /^\s*(\d{1,3})\s*(day|days|week|weeks)\s*$/i.exec(duration);
+  const match = /^\s*(\d{1,3})\s*(day|days|week|weeks|month|months)\s*$/i.exec(duration);
   if (!match) return null;
   const n = Number(match[1]);
-  return match[2].toLowerCase().startsWith("week") ? n * 7 : n;
+  const unit = match[2].toLowerCase();
+  if (unit.startsWith("week")) return n * 7;
+  if (unit.startsWith("month")) return n * 30;
+  return n;
 }
 
 /** Inclusive: starting on `startIso` for N days ends on day N. */

@@ -11,9 +11,11 @@ import {
   createHospitalReview,
   deactivateHospital,
   getHospital,
+  holdHospitalSlot,
   listAvailability,
   listHospitalReviews,
   listHospitals,
+  releaseHospitalSlot,
   updateHospital,
 } from "./service.js";
 
@@ -43,13 +45,40 @@ export function createHospitalRouter(db: Db, env: Env): Router {
     res.json(await listAvailability(db, requireAuth(req), uuidParam(req.params.hospitalId), parse(availabilityQuerySchema, req.query)));
   });
   router.get("/:hospitalId/reviews", async (req, res) => {
-    res.json({ data: await listHospitalReviews(db, uuidParam(req.params.hospitalId)) });
+    const auth = req.auth;
+    res.json({ data: await listHospitalReviews(db, uuidParam(req.params.hospitalId), auth?.userId) });
   });
   router.post("/:hospitalId/reviews", requireRole("patient"), async (req, res) => {
     const input = parse(reviewSchema, req.body);
-    const review = await createHospitalReview(db, requireAuth(req), uuidParam(req.params.hospitalId), input, { requestId: req.requestId });
+    const review = await createHospitalReview(
+      db,
+      requireAuth(req),
+      uuidParam(req.params.hospitalId),
+      input,
+      { requestId: req.requestId }
+    );
     res.status(201).json({ data: review });
   });
+  router.post("/:hospitalId/slots/:slotId/hold", requireRole("patient"), async (req, res) => {
+    const result = await holdHospitalSlot(
+      db,
+      requireAuth(req),
+      uuidParam(req.params.hospitalId),
+      uuidParam(req.params.slotId),
+    );
+    res.json({ data: result });
+  });
+
+  router.post("/:hospitalId/slots/:slotId/release", requireRole("patient"), async (req, res) => {
+    const result = await releaseHospitalSlot(
+      db,
+      requireAuth(req),
+      uuidParam(req.params.hospitalId),
+      uuidParam(req.params.slotId),
+    );
+    res.json({ data: result });
+  });
+
   return router;
 }
 

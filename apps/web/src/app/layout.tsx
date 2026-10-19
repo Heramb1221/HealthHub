@@ -4,6 +4,8 @@ import "./globals.css";
 
 import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "@/components/ui/sonner";
+import { LanguageProvider } from "@/lib/i18n/language-context";
+
 
 export const metadata: Metadata = {
   title: { default: "Sehat Med - Bharat ka apna Sathi", template: "%s · Sehat Med" },
@@ -25,15 +27,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en-IN">
       <body className="min-h-dvh">
         <ClerkProvider>
-          <a
-            href="#main"
-            className="bg-primary text-primary-foreground sr-only z-50 rounded-md px-4 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
-          >
-            Skip to main content
-          </a>
-          {children}
-          <Toaster />
+          <LanguageProvider>
+            <a
+              href="#main"
+              className="bg-primary text-primary-foreground sr-only z-50 rounded-md px-4 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+            >
+              Skip to main content
+            </a>
+            {children}
+            <Toaster />
+          </LanguageProvider>
         </ClerkProvider>
+
       </body>
     </html>
   );

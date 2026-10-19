@@ -167,9 +167,9 @@ describe("buildPrescriptionPdf", () => {
     const text = visibleText(buildPrescriptionPdf(input()));
     expect(text).not.toMatch(/\btake\b/i);
     expect(text).not.toMatch(/\byou should\b/i);
-    expect(text).toContain("Dose: 1 tablet");
+    expect(text).toContain("1 tablet");
     expect(visibleText(buildPrescriptionPdf(input({ medications: [] })))).toContain("No medications recorded.");
-    expect(visibleText(buildPrescriptionPdf(input({ medications: [med({ dose: null })] })))).toContain("Dose: not recorded");
+    expect(visibleText(buildPrescriptionPdf(input({ medications: [med({ dose: null })] })))).toContain("not recorded");
   });
 
   it("puts nothing but the reference in the QR payload", () => {

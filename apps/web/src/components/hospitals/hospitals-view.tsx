@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Hospital as HospitalIcon, Search } from "lucide-react";
+import { Hospital as HospitalIcon, Search, Star } from "lucide-react";
 
 import { EmptyState, ErrorState, LoadingState } from "@/components/feedback/states";
 import { PageHeader } from "@/components/layout/page-header";
@@ -72,6 +72,13 @@ export function HospitalsView() {
                         {h.name}
                       </Link>
                       {h.isDemo ? <DemoTag /> : null}
+                      {h.ratingAverage ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                          <Star className="size-3 fill-amber-400 text-amber-500" />
+                          <span>{h.ratingAverage.toFixed(1)}</span>
+                          <span className="text-muted-foreground font-normal">({h.reviewCount})</span>
+                        </span>
+                      ) : null}
                     </p>
                     <p className="text-muted-foreground text-sm">{[h.city, h.address].filter(Boolean).join(" · ") || "Address not provided"}</p>
                     <div className="text-muted-foreground flex flex-wrap items-center gap-3 text-xs">

@@ -40,6 +40,7 @@ const schema = z
   // and "gemini" uses Google Gemini multimodal vision.
   EXTRACTION_PROVIDER: z.enum(["disabled", "mock", "gemini"]).default("disabled"),
   GEMINI_API_KEY: z.string().default(""),
+  GEMINI_MODEL: z.string().default("gemini-3.5-flash"),
   PROCESS_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(10),
   // Base for QR payloads, e.g. "healthhub://" or "https://app.example.com/". Payloads are
   // this base plus a random id; they never contain medical data.
@@ -55,7 +56,18 @@ const schema = z
   RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(120),
   RESEND_API_KEY: z.string().default(""),
   RESEND_FROM_EMAIL: z.string().default("onboarding@resend.dev"),
+  RAZORPAY_KEY_ID: z.string().default(""),
+  RAZORPAY_KEY_SECRET: z.string().default(""),
+  RAZORPAY_WEBHOOK_SECRET: z.string().default(""),
+  GOOGLE_CLIENT_ID: z.string().default(""),
+  GOOGLE_CLIENT_SECRET: z.string().default(""),
+  GOOGLE_REDIRECT_URI: z.string().default("http://localhost:3000/api/v1/calendar/google/callback"),
+  TELEGRAM_BOT_TOKEN: z.string().default(""),
+  TELEGRAM_CHAT_ID: z.string().default(""),
+  BHASHINI_API_KEY: z.string().default(""),
+  BHASHINI_USER_ID: z.string().default(""),
   })
+
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === "production" && env.DEV_AUTH_ENABLED) {
       ctx.addIssue({

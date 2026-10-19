@@ -24,5 +24,20 @@ export function proxy(request: NextRequest) {
 
 /** Protected areas only. Public pages (/, /sign-in, /sign-up, /hospitals preview if made public) are excluded. */
 export const config = {
-  matcher: ["/dashboard/:path*", "/profile/:path*", "/prescriptions/:path*", "/medications/:path*", "/history/:path*", "/vaccinations/:path*", "/family/:path*", "/health-card/:path*", "/appointments/:path*", "/admin/:path*"],
+  matcher: [
+    "/dashboard/:path*",
+    "/profile/:path*",
+    "/prescriptions/:path*",
+    "/medications/:path*",
+    "/history/:path*",
+    "/vaccinations/:path*",
+    "/family/:path*",
+    "/health-card/:path*",
+    "/appointments/:path*",
+    "/insurance/:path*",
+    "/payments/:path*",
+    "/symptoms/:path*",
+    "/admin/:path*",
+  ],
+
 };

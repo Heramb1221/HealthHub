@@ -193,8 +193,11 @@ async function analyzeWithGemini(
   apiKey: string,
   medications: MedicationInput[],
   patientConditions: string[],
+  modelName: string = "gemini-3.5-flash",
 ): Promise<{ alerts: ContraindicationAlert[]; summary: string } | null> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`;
+  const candidateModels = [modelName, "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"].filter(
+    (m, idx, arr) => arr.indexOf(m) === idx,
+  );
 
   const inputPayload = {
     medications: medications.map((m) => ({
@@ -206,52 +209,64 @@ async function analyzeWithGemini(
     knownConditions: patientConditions,
   };
 
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: GEMINI_ANALYSIS_PROMPT },
-              { text: `Medications and patient data to analyze:\n${JSON.stringify(inputPayload, null, 2)}` },
-            ],
+  for (const model of candidateModels) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: GEMINI_ANALYSIS_PROMPT },
+                { text: `Medications and patient data to analyze:\n${JSON.stringify(inputPayload, null, 2)}` },
+              ],
+            },
+          ],
+          generationConfig: {
+            responseMimeType: "application/json",
+            temperature: 0.1,
           },
-        ],
-        generationConfig: {
-          responseMimeType: "application/json",
-          temperature: 0.1,
-        },
-      }),
-      signal: AbortSignal.timeout(25000),
-    });
+        }),
+        signal: AbortSignal.timeout(25000),
+      });
 
-    if (!res.ok) return null;
-    const json = (await res.json()) as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-    };
-    const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) return null;
+      if (!res.ok) {
+        if (res.status === 429 || res.status === 404 || res.status === 503) {
+          log("warn", "Gemini contraindication model unavailable or rate limited, trying fallback", { model, status: res.status });
+          continue;
+        }
+        return null;
+      }
 
-    const parsed = JSON.parse(text) as {
-      alerts?: ContraindicationAlert[];
-      summary?: string;
-    };
-
-    if (Array.isArray(parsed.alerts)) {
-      return {
-        alerts: parsed.alerts,
-        summary: parsed.summary ?? "Interaction analysis completed.",
+      const json = (await res.json()) as {
+        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
       };
+      const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) continue;
+
+      const parsed = JSON.parse(text) as {
+        alerts?: ContraindicationAlert[];
+        summary?: string;
+      };
+
+      if (Array.isArray(parsed.alerts)) {
+        return {
+          alerts: parsed.alerts,
+          summary: parsed.summary ?? "Interaction analysis completed.",
+        };
+      }
+    } catch (err) {
+      log("warn", "Gemini contraindication request failed for model", {
+        model,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
-    return null;
-  } catch (err) {
-    log("warn", "Gemini contraindication analysis failed; falling back to clinical rules", {
-      error: err instanceof Error ? err.message : String(err),
-    });
-    return null;
   }
+
+  return null;
 }
 
 /**
@@ -316,7 +331,7 @@ export async function checkPrescriptionContraindications(
   let summary = "";
 
   if (env.EXTRACTION_PROVIDER === "gemini" && env.GEMINI_API_KEY) {
-    const aiResult = await analyzeWithGemini(env.GEMINI_API_KEY, medications, patientConditions);
+    const aiResult = await analyzeWithGemini(env.GEMINI_API_KEY, medications, patientConditions, env.GEMINI_MODEL);
     if (aiResult && aiResult.alerts.length > 0) {
       alerts = aiResult.alerts;
       summary = aiResult.summary;

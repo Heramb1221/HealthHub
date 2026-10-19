@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Pencil } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Pencil, UserRound } from "lucide-react";
+import { toast } from "sonner";
 
 import { EmptyState, ErrorState, LoadingState } from "@/components/feedback/states";
 import { PageHeader } from "@/components/layout/page-header";
@@ -16,7 +18,6 @@ import type { Patient } from "@/lib/api/types";
 import { formatDate, orBlank } from "@/lib/format";
 import { GENDER_OPTIONS } from "@/lib/validation/profile";
 import { useResource } from "@/lib/use-resource";
-import { UserRound } from "lucide-react";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -56,8 +57,14 @@ function genderLabel(value: Patient["gender"]) {
 }
 
 export function ProfileView() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const patient = useResource(() => patientsApi.getMe(), "patient");
   const [editing, setEditing] = React.useState(false);
+
+  const p = patient.status === "ready" ? patient.data : null;
+  const isOnboarding = searchParams?.get("onboarding") === "true" || (p !== null && !p.fullName);
+  const isEditing = editing || isOnboarding;
 
   if (patient.status === "loading") {
     return (
@@ -85,18 +92,30 @@ export function ProfileView() {
     );
   }
 
-  const p = patient.data;
+  if (!p) return null;
 
-  if (editing) {
+  if (isEditing) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Edit profile" description="Changes are saved to your Sehat Med profile when you select Save changes." />
+        <PageHeader
+          title={isOnboarding ? "Complete your profile" : "Edit profile"}
+          description={
+            isOnboarding
+              ? "Fill in your basic information to complete account registration."
+              : "Changes are saved to your HealthHub medical profile when you select Save changes."
+          }
+        />
         <ProfileForm
           patient={p}
+          isOnboarding={isOnboarding}
           onCancel={() => setEditing(false)}
           onSaved={(updated) => {
             patient.setData(updated);
             setEditing(false);
+            if (isOnboarding) {
+              toast.success("Profile setup complete! Welcome to HealthHub.");
+              router.push("/dashboard");
+            }
           }}
         />
       </div>

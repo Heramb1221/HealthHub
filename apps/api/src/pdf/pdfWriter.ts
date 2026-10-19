@@ -158,6 +158,32 @@ export class PdfBuilder {
     );
   }
 
+  addPage(): void {
+    this.pages.push("");
+    this.y = PAGE_HEIGHT - MARGIN;
+  }
+
+  /** Draws a line between two points */
+  lineAt(x1: number, y1: number, x2: number, y2: number, options: { stroke?: Rgb; strokeWidth?: number } = {}): void {
+    const stroke = options.stroke ?? [0.7, 0.7, 0.7];
+    const width = options.strokeWidth ?? 0.5;
+    this.emit(`${num(width)} w\n${stroke.map(num).join(" ")} RG\n${num(x1)} ${num(y1)} m ${num(x2)} ${num(y2)} l S\n`);
+  }
+
+  /** Draws a QR matrix at specific x, y with custom module size */
+  qrAt(matrix: boolean[][], x: number, y: number, moduleSize: number): void {
+    const quiet = 2;
+    const size = (matrix.length + 2 * quiet) * moduleSize;
+    const top = y + size - quiet * moduleSize;
+    let ops = `1 g ${num(x)} ${num(y)} ${num(size)} ${num(size)} re f\n0 g\n`;
+    matrix.forEach((row, r) => {
+      row.forEach((dark, c) => {
+        if (dark) ops += `${num(x + (quiet + c) * moduleSize)} ${num(top - (r + 1) * moduleSize)} ${num(moduleSize)} ${num(moduleSize)} re\n`;
+      });
+    });
+    this.emit(`${ops}f`);
+  }
+
   /** Draws a QR matrix (true = dark) with a 4-module quiet zone, kept on one page. */
   qr(matrix: boolean[][], moduleSize: number): void {
     const quiet = 4;
@@ -174,6 +200,7 @@ export class PdfBuilder {
     this.emit(`${ops}f`);
     this.y -= size + 4;
   }
+
 
   build(): Buffer {
     // Object layout: 1 Catalog, 2 Pages, 3 Helvetica, 4 Helvetica-Bold, 5 Info, then (Page, Contents) pairs.

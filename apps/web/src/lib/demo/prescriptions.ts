@@ -338,4 +338,18 @@ export const demoPrescriptionsApi: PrescriptionsApi = {
       analyzedAt: new Date().toISOString(),
     };
   },
+
+  async delete(id) {
+    const ctx = await context();
+    const createdIdx = ctx.state.created.findIndex((p) => p.id === id);
+    if (createdIdx >= 0) {
+      ctx.state.created.splice(createdIdx, 1);
+    }
+    delete ctx.state.overrides[id];
+    delete ctx.state.extraVersions[id];
+    delete ctx.state.jobs[id];
+    save(ctx.user.id, ctx.state);
+    return { deleted: true };
+  },
 };
+

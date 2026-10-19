@@ -25,4 +25,7 @@ export type RootStackParamList = {
   Sharing: undefined;
   Hospital: { id: string };
   AddSchedule: { prescriptionId?: string; medicationPosition?: number } | undefined;
+  SymptomChecker: undefined;
+  Insurance: undefined;
+  Payments: undefined;
 };

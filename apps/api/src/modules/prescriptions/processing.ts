@@ -155,8 +155,9 @@ export async function processPrescription(
     raw = await withTimeout(provider.extract({ bytes, mimeType: record.originalMimeType }), EXTRACTION_TIMEOUT_MS);
   } catch (err) {
     if (err instanceof ExtractionUnrecognizedError) return fail("unrecognized_input");
-    // Log only the error type; provider errors can echo document content.
-    log("error", "extraction provider error", { requestId: ctx.requestId, errorName: err instanceof Error ? err.name : "unknown" });
+    // Log sanitized error info; provider errors can echo document content if uncurated.
+    const message = err instanceof Error ? err.message.replace(/([a-zA-Z0-9_-]{20,})/g, "[redacted]") : "unknown";
+    log("error", "extraction provider error", { requestId: ctx.requestId, errorName: err instanceof Error ? err.name : "unknown", errorDetails: message.slice(0, 300) });
     return fail("provider_error");
   }
 
