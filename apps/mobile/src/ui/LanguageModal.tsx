@@ -4,7 +4,7 @@ import { Feather } from "@expo/vector-icons";
 import { useLanguage } from "../i18n/LanguageContext";
 import { SUPPORTED_LANGUAGES, type SupportedLanguage } from "../i18n/languages";
 import { AppText, Row, Stack } from "./components";
-import { colors, space } from "./theme";
+import { colors, radius, space } from "./theme";
 
 export function LanguageModal({
   visible,

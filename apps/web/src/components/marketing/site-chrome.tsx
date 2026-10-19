@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Brand } from "@/components/layout/brand";
+import { LanguageSelector } from "@/components/layout/language-selector";
 import { Button } from "@/components/ui/button";
 
 export function SiteHeader() {
@@ -9,6 +10,7 @@ export function SiteHeader() {
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
         <Brand />
         <nav aria-label="Account" className="flex items-center gap-2">
+          <LanguageSelector />
           <Button asChild variant="ghost" size="sm">
             <Link href="/sign-in">Sign in</Link>
           </Button>

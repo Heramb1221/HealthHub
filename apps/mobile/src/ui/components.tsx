@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
+import { Fragment, useState } from "react";
 import type { ComponentProps, ReactNode } from "react";
-import { useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -21,6 +21,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { IS_DEMO } from "../config";
 
 import { colors, MIN_TOUCH, radius, space, toneStyles, type, type Tone } from "./theme";
+import { useLanguage } from "../i18n/LanguageContext";
+import { lookupTranslation } from "../i18n/languages";
 
 export type IconName = ComponentProps<typeof Feather>["name"];
 
@@ -82,8 +84,24 @@ interface AppTextProps extends TextProps {
   style?: StyleProp<TextStyle>;
 }
 
-export function AppText({ variant = "body", muted, color, style, ...rest }: AppTextProps) {
-  return <Text {...rest} style={[type[variant], { color: color ?? (muted ? colors.textMuted : colors.text) }, style]} />;
+export function AppText({ variant = "body", muted, color, style, children, ...rest }: AppTextProps) {
+  const { language } = useLanguage();
+
+  function translateChild(child: ReactNode): ReactNode {
+    if (typeof child === "string") {
+      return lookupTranslation(language, child) || child;
+    }
+    if (Array.isArray(child)) {
+      return child.map((c, i) => <Fragment key={i}>{translateChild(c)}</Fragment>);
+    }
+    return child;
+  }
+
+  return (
+    <Text {...rest} style={[type[variant], { color: color ?? (muted ? colors.textMuted : colors.text) }, style]}>
+      {translateChild(children)}
+    </Text>
+  );
 }
 
 export function Heading({ children, level = 2 }: { children: ReactNode; level?: 1 | 2 }) {
@@ -109,14 +127,17 @@ interface ButtonProps {
 }
 
 export function Button({ label, onPress, variant = "primary", icon, leading, loading, disabled, accessibilityHint, style }: ButtonProps) {
+  const { language } = useLanguage();
   const inactive = Boolean(disabled || loading);
   const palette = buttonPalette[variant];
+  const translatedLabel = lookupTranslation(language, label) || label;
+
   return (
     <Pressable
       onPress={onPress}
       disabled={inactive}
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={translatedLabel}
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled: inactive, busy: Boolean(loading) }}
       style={({ pressed }) => [
@@ -126,7 +147,7 @@ export function Button({ label, onPress, variant = "primary", icon, leading, loa
       ]}
     >
       {loading ? <ActivityIndicator color={palette.fg} /> : leading ? leading : icon ? <Feather name={icon} size={18} color={palette.fg} /> : null}
-      <Text style={[type.label, { color: palette.fg, fontSize: 16 }]}>{label}</Text>
+      <Text style={[type.label, { color: palette.fg, fontSize: 16 }]}>{translatedLabel}</Text>
     </Pressable>
   );
 }
@@ -152,13 +173,17 @@ export function ListRow({
   right?: ReactNode;
   accessibilityLabel?: string;
 }) {
+  const { language } = useLanguage();
+  const translatedTitle = lookupTranslation(language, title) || title;
+  const translatedSubtitle = subtitle ? (lookupTranslation(language, subtitle) || subtitle) : undefined;
+
   const content = (
     <View style={styles.listRow}>
       <View style={styles.flex}>
-        <AppText variant="label">{title}</AppText>
-        {subtitle ? (
+        <AppText variant="label">{translatedTitle}</AppText>
+        {translatedSubtitle ? (
           <AppText variant="small" muted>
-            {subtitle}
+            {translatedSubtitle}
           </AppText>
         ) : null}
       </View>
@@ -168,7 +193,7 @@ export function ListRow({
   );
   if (!onPress) return content;
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={accessibilityLabel ?? title} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={accessibilityLabel ?? translatedTitle} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
       {content}
     </Pressable>
   );
@@ -182,14 +207,20 @@ interface TextFieldProps extends Omit<TextInputProps, "style"> {
 }
 
 export function TextField({ label, error, hint, ...input }: TextFieldProps) {
+  const { language } = useLanguage();
   const [focused, setFocused] = useState(false);
+  const translatedLabel = lookupTranslation(language, label) || label;
+  const translatedHint = hint ? (lookupTranslation(language, hint) || hint) : undefined;
+  const translatedError = error ? (lookupTranslation(language, error) || error) : undefined;
+
   return (
     <View style={styles.field}>
-      <AppText variant="label">{label}</AppText>
+      <AppText variant="label">{translatedLabel}</AppText>
       <TextInput
         {...input}
-        accessibilityLabel={label}
-        accessibilityHint={hint}
+        accessibilityLabel={translatedLabel}
+        accessibilityHint={translatedHint}
+        placeholder={input.placeholder ? (lookupTranslation(language, input.placeholder) || input.placeholder) : undefined}
         placeholderTextColor={colors.textMuted}
         onFocus={(e) => {
           setFocused(true);
@@ -205,13 +236,13 @@ export function TextField({ label, error, hint, ...input }: TextFieldProps) {
           { borderColor: error ? colors.danger : focused ? colors.focus : colors.inputBorder, borderWidth: focused ? 2 : 1 },
         ]}
       />
-      {error ? (
+      {translatedError ? (
         <AppText variant="small" color={colors.danger} accessibilityLiveRegion="polite">
-          {error}
+          {translatedError}
         </AppText>
-      ) : hint ? (
+      ) : translatedHint ? (
         <AppText variant="small" muted>
-          {hint}
+          {translatedHint}
         </AppText>
       ) : null}
     </View>
@@ -231,25 +262,30 @@ export function Chip({ label, selected, onPress }: { label: string; selected: bo
   );
 }
 
-// ---------- Status ----------
 export function Badge({ label, tone, icon }: { label: string; tone: Tone; icon?: IconName }) {
+  const { language } = useLanguage();
   const t = toneStyles[tone];
+  const translatedLabel = lookupTranslation(language, label) || label;
+
   return (
-    <View style={[styles.badge, { backgroundColor: t.bg }]} accessible accessibilityLabel={label}>
+    <View style={[styles.badge, { backgroundColor: t.bg }]} accessible accessibilityLabel={translatedLabel}>
       {icon ? <Feather name={icon} size={14} color={t.fg} /> : null}
-      <Text style={[type.caption, { color: t.fg, fontWeight: "600" }]}>{label}</Text>
+      <Text style={[type.caption, { color: t.fg, fontWeight: "600" }]}>{translatedLabel}</Text>
     </View>
   );
 }
 
 export function Banner({ tone, title, children, icon }: { tone: Tone; title: string; children?: ReactNode; icon?: IconName }) {
+  const { language } = useLanguage();
   const t = toneStyles[tone];
+  const translatedTitle = lookupTranslation(language, title) || title;
+
   return (
     <View style={[styles.banner, { backgroundColor: t.bg, borderColor: t.fg }]} accessible accessibilityRole="alert">
       <Feather name={icon ?? "info"} size={20} color={t.fg} style={{ marginTop: 2 }} />
       <View style={styles.flex}>
         <AppText variant="label" color={t.fg}>
-          {title}
+          {translatedTitle}
         </AppText>
         {children ? (
           <AppText variant="small" color={t.fg}>
@@ -263,12 +299,16 @@ export function Banner({ tone, title, children, icon }: { tone: Tone; title: str
 
 /** Labelled value used on detail screens. Absent values read "Not provided", never invented. */
 export function Field({ label, value }: { label: string; value: string }) {
+  const { language } = useLanguage();
+  const translatedLabel = lookupTranslation(language, label) || label;
+  const translatedValue = lookupTranslation(language, value) || value;
+
   return (
-    <View accessible accessibilityLabel={`${label}: ${value}`} style={{ gap: 2 }}>
+    <View accessible accessibilityLabel={`${translatedLabel}: ${translatedValue}`} style={{ gap: 2 }}>
       <AppText variant="caption" muted>
-        {label}
+        {translatedLabel}
       </AppText>
-      <AppText>{value}</AppText>
+      <AppText>{translatedValue}</AppText>
     </View>
   );
 }

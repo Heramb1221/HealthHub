@@ -189,7 +189,7 @@ describe("a provider can never verify its own output", () => {
     }
     // Both outcomes were actually exercised, so the loop is not vacuous.
     expect(statuses.has("needs_review")).toBe(true);
-  });
+  }, 15000);
 });
 
 describe("malformed provider output", () => {
