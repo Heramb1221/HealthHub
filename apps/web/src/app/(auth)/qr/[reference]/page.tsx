@@ -29,7 +29,7 @@ interface EmergencyData {
 }
 
 async function fetchEmergencyProfile(healthId: string): Promise<EmergencyData | null> {
-  const apiOrigin = process.env.API_ORIGIN ?? "http://localhost:4000";
+  const apiOrigin = (process.env.API_ORIGIN ?? "http://localhost:4000").replace(/\/+$/, "");
   try {
     const res = await fetch(`${apiOrigin}/api/v1/qr/emergency/${encodeURIComponent(healthId)}`, {
       cache: "no-store",
