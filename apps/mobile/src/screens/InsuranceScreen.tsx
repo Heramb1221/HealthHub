@@ -18,7 +18,6 @@ export function InsuranceScreen() {
   const policiesRes = useResource((signal) => insuranceApi.policies(signal));
   const providersRes = useResource((signal) => insuranceApi.providers(signal));
 
-  // Form states
   const [providerName, setProviderName] = useState("");
   const [policyNumber, setPolicyNumber] = useState("");
   const [policyHolderName, setPolicyHolderName] = useState("");
@@ -104,7 +103,7 @@ export function InsuranceScreen() {
   return (
     <Screen refreshing={policiesRes.refreshing || providersRes.refreshing} onRefresh={() => { policiesRes.refresh(); providersRes.refresh(); }}>
       <Stack gap={space.lg}>
-        {/* Tab switcher */}
+
         <Row style={{ gap: space.sm }}>
           <Chip
             label={`My Policies (${policies.length})`}
@@ -135,7 +134,7 @@ export function InsuranceScreen() {
                 onPress={() => setShowAddForm(true)}
               />
             ) : (
-              /* Add Policy Card */
+
               <Card>
                 <Row style={{ justifyContent: "space-between", alignItems: "center" }}>
                   <Heading level={2}>Add Insurance Policy</Heading>
@@ -212,7 +211,6 @@ export function InsuranceScreen() {
               </Card>
             )}
 
-            {/* List Policies */}
             {policiesRes.loading ? (
               <LoadingState label="Loading insurance policies…" />
             ) : policiesRes.error && !policiesRes.data ? (
@@ -303,7 +301,7 @@ export function InsuranceScreen() {
             )}
           </>
         ) : (
-          /* Providers Directory */
+
           <>
             <TextField
               label="Search insurers or plans"

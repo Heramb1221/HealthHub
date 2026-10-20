@@ -31,7 +31,7 @@ export interface PrescriptionPdfInput {
     prescriberName: string | null;
     medications: PdfMedication[];
   };
-  /** Random reference only. Never medical data. */
+
   qrPayload: string;
   generatedAt: Date;
 }
@@ -60,9 +60,6 @@ function formatPdfDate(dateStr: string | null, fallbackDate: Date): string {
   return `${d.getUTCDate()} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
-/**
- * Builds the downloadable prescription PDF matching the Sehat Med clinical format.
- */
 export function buildPrescriptionPdf(input: PrescriptionPdfInput): Buffer {
   const { version } = input;
   const pdf = new PdfBuilder("Sehat Med - Clinical Prescription");
@@ -78,8 +75,6 @@ export function buildPrescriptionPdf(input: PrescriptionPdfInput): Buffer {
 
   let y = 802;
 
-  // 1. TOP HEADER
-  // Left: SEHAT MED
   pdf.textAt("SEHAT MED", MARGIN, y - 18, { size: 20, bold: true, color: PRIMARY_DARK });
   pdf.textAt("PATIENT CARE * CLINICAL DOCUMENT RECORD", MARGIN, y - 30, {
     size: 7.5,
@@ -87,17 +82,14 @@ export function buildPrescriptionPdf(input: PrescriptionPdfInput): Buffer {
     color: [0.45, 0.50, 0.55],
   });
 
-  // Right: PRESCRIPTION & Date
   const dateFormatted = formatPdfDate(version.prescriptionDate, input.generatedAt);
   pdf.textAt("PRESCRIPTION", 445, y - 14, { size: 11, bold: true, color: [0.10, 0.15, 0.22] });
   pdf.textAt(`Date: ${dateFormatted}`, 445, y - 26, { size: 8.5, color: [0.25, 0.30, 0.35] });
 
-  // Teal divider rule
   y -= 38;
   pdf.lineAt(MARGIN, y, MARGIN + CONTENT_WIDTH, y, { stroke: HEADER_TEAL, strokeWidth: 2 });
   y -= 14;
 
-  // 2. PATIENT INFORMATION SECTION
   pdf.textAt("PATIENT INFORMATION", MARGIN, y, { size: 9, bold: true, color: PRIMARY_DARK });
   y -= 6;
 
@@ -136,19 +128,16 @@ export function buildPrescriptionPdf(input: PrescriptionPdfInput): Buffer {
 
   for (const [lbl1, val1, lbl2, val2] of patientRows) {
     const rowY = y - pRowH;
-    // Col 1 label
+
     pdf.box(MARGIN, rowY, pCol1W, pRowH, { fill: LABEL_BG, stroke: BORDER_COLOR, strokeWidth: 0.5 });
     pdf.textAt(lbl1, MARGIN + 6, rowY + 5, { size: 8, bold: true, color: [0.20, 0.25, 0.30] });
 
-    // Col 2 value
     pdf.box(MARGIN + pCol1W, rowY, pCol2W, pRowH, { fill: WHITE, stroke: BORDER_COLOR, strokeWidth: 0.5 });
     pdf.textAt(val1, MARGIN + pCol1W + 6, rowY + 5, { size: 8, color: [0.10, 0.15, 0.20] });
 
-    // Col 3 label
     pdf.box(MARGIN + pCol1W + pCol2W, rowY, pCol3W, pRowH, { fill: LABEL_BG, stroke: BORDER_COLOR, strokeWidth: 0.5 });
     pdf.textAt(lbl2, MARGIN + pCol1W + pCol2W + 6, rowY + 5, { size: 8, bold: true, color: [0.20, 0.25, 0.30] });
 
-    // Col 4 value
     pdf.box(MARGIN + pCol1W + pCol2W + pCol3W, rowY, pCol4W, pRowH, { fill: WHITE, stroke: BORDER_COLOR, strokeWidth: 0.5 });
     pdf.textAt(val2, MARGIN + pCol1W + pCol2W + pCol3W + 6, rowY + 5, { size: 8, bold: true, color: [0.10, 0.15, 0.20] });
 
@@ -157,7 +146,6 @@ export function buildPrescriptionPdf(input: PrescriptionPdfInput): Buffer {
 
   y -= 12;
 
-  // 3. PRESCRIBER & FACILITY SECTION
   pdf.textAt("PRESCRIBER & FACILITY", MARGIN, y, { size: 9, bold: true, color: PRIMARY_DARK });
   y -= 6;
 
@@ -194,13 +182,10 @@ export function buildPrescriptionPdf(input: PrescriptionPdfInput): Buffer {
 
   y -= 14;
 
-  // 4. PRESCRIBED MEDICATIONS SECTION
-  // Teal square icon + Header
   pdf.box(MARGIN, y - 2, 7, 7, { fill: HEADER_TEAL });
   pdf.textAt("PRESCRIBED MEDICATIONS", MARGIN + 12, y - 2, { size: 9.5, bold: true, color: PRIMARY_DARK });
   y -= 10;
 
-  // Table Columns
   const mColW = {
     num: 24,
     med: 125,
@@ -211,7 +196,6 @@ export function buildPrescriptionPdf(input: PrescriptionPdfInput): Buffer {
     instr: 151,
   };
 
-  // Header Row
   const mHeadH = 17;
   pdf.box(MARGIN, y - mHeadH, CONTENT_WIDTH, mHeadH, { fill: [0.06, 0.20, 0.35] });
   let curX = MARGIN;
@@ -230,7 +214,6 @@ export function buildPrescriptionPdf(input: PrescriptionPdfInput): Buffer {
   drawHeadCell("INSTRUCTIONS", mColW.instr);
   y -= mHeadH;
 
-  // Medication rows
   const mRowH = 18;
   const meds = version.medications;
 
@@ -240,7 +223,7 @@ export function buildPrescriptionPdf(input: PrescriptionPdfInput): Buffer {
     y -= mRowH;
   } else {
     meds.forEach((m, idx) => {
-      // Check page break if reaching near bottom
+
       if (y - mRowH < 180) {
         pdf.addPage();
         y = 802;
@@ -271,7 +254,6 @@ export function buildPrescriptionPdf(input: PrescriptionPdfInput): Buffer {
       const uncertain = (m.confidence < CHECK_THRESHOLD || incomplete) && version.kind === "extraction";
       const instrStr = `${m.instructions ?? "Not recorded"}${uncertain ? " [NEEDS CHECKING]" : ""}`;
 
-      // Draw row box
       pdf.box(MARGIN, rowY, CONTENT_WIDTH, mRowH, { fill: rowBg, stroke: BORDER_COLOR, strokeWidth: 0.5 });
 
       curX = MARGIN;
@@ -298,7 +280,6 @@ export function buildPrescriptionPdf(input: PrescriptionPdfInput): Buffer {
 
   y -= 14;
 
-  // 5. CLINICAL NOTES & FOLLOW-UP SECTION
   pdf.textAt("CLINICAL NOTES & FOLLOW-UP", MARGIN, y, { size: 9, bold: true, color: PRIMARY_DARK });
   y -= 6;
 
@@ -322,7 +303,6 @@ export function buildPrescriptionPdf(input: PrescriptionPdfInput): Buffer {
     y -= pRowH;
   }
 
-  // Prescriber signature row
   const sigRowH = 22;
   const sigY = y - sigRowH;
   pdf.box(MARGIN, sigY, notesLabelW, sigRowH, { fill: LABEL_BG, stroke: BORDER_COLOR, strokeWidth: 0.5 });
@@ -349,16 +329,13 @@ export function buildPrescriptionPdf(input: PrescriptionPdfInput): Buffer {
 
   y -= sigRowH + 16;
 
-  // 6. BOTTOM VERIFICATION & QR CODE (Yellow mock box is REMOVED as requested)
   const qrBoxY = Math.max(50, y - 56);
   const qrX = MARGIN + CONTENT_WIDTH - 64;
 
-  // Left Verification Text
   pdf.textAt("SCAN TO OPEN HEALTH RECORD", MARGIN + 190, qrBoxY + 44, { size: 8.5, bold: true, color: [0.15, 0.20, 0.28] });
   pdf.textAt(`HealthHub ID: ${input.healthId}`, MARGIN + 215, qrBoxY + 32, { size: 7.5, color: [0.35, 0.40, 0.45] });
   pdf.textAt("QR links to this prescription record.", MARGIN + 200, qrBoxY + 20, { size: 7, color: [0.50, 0.55, 0.60] });
 
-  // Verification disclaimer text for compliance and test assertions
   const verificationStatusText =
     version.verificationStatus === "verified_by_authorized_clinician"
       ? "VERIFIED by an authorized clinician."
@@ -392,13 +369,10 @@ export function buildPrescriptionPdf(input: PrescriptionPdfInput): Buffer {
     { size: 6.5, color: [0.65, 0.68, 0.72] },
   );
 
-  // Hidden/compact QR reference for parser checks
   pdf.textAt(input.qrPayload, MARGIN, qrBoxY, { size: 6, color: [0.70, 0.72, 0.75] });
 
-  // Right: QR Matrix
   pdf.qrAt(qrMatrix(input.qrPayload), qrX, qrBoxY - 2, 1.85);
 
-  // 7. FOOTER BAR
   pdf.lineAt(MARGIN, 34, MARGIN + CONTENT_WIDTH, 34, { stroke: [0.85, 0.88, 0.90], strokeWidth: 0.5 });
   pdf.textAt("SEHAT MED * Clinical prescription document", MARGIN, 24, { size: 7.5, color: [0.45, 0.50, 0.55] });
   pdf.textAt("Page 1", MARGIN + CONTENT_WIDTH - 30, 24, { size: 7.5, color: [0.45, 0.50, 0.55] });

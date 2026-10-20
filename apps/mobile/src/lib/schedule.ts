@@ -7,11 +7,6 @@ export interface NextReminder {
   medicationName: string;
 }
 
-/**
- * Next reminder time among schedules the server marks `remindersActive` (active, enabled, source unchanged, within dates), using the reminder times
- * the server stored. Display only: the app invents no times and decides nothing clinical.
- * Times are interpreted in the device's local time zone.
- */
 export function nextReminder(schedules: MedicationSchedule[], now: Date = new Date()): NextReminder | null {
   let best: NextReminder | null = null;
   for (const s of schedules) {
@@ -28,7 +23,6 @@ export function nextReminder(schedules: MedicationSchedule[], now: Date = new Da
   return best;
 }
 
-/** Distinct, sorted reminder times across schedules with reminders enabled. */
 export function enabledReminderTimes(schedules: MedicationSchedule[]): string[] {
   const set = new Set<string>();
   for (const s of schedules) {

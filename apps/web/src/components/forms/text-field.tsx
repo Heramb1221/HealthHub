@@ -11,12 +11,11 @@ import { cn } from "@/lib/utils";
 interface TextFieldProps extends Omit<React.ComponentProps<"input">, "id" | "name"> {
   name: string;
   label: string;
-  /** Helpful example or rule shown under the label, e.g. "Use at least 8 characters." */
+
   hint?: string;
   error?: string;
 }
 
-/** Labelled input with hint and error wired up via aria-describedby. Every form field in the app uses this. */
 export function TextField({ name, label, hint, error, className, ...props }: TextFieldProps) {
   const id = React.useId();
   const hintId = hint ? `${id}-hint` : undefined;
@@ -41,7 +40,6 @@ export function TextField({ name, label, hint, error, className, ...props }: Tex
   );
 }
 
-/** Password input with an accessible show/hide toggle. */
 export function PasswordField({ name, label, hint, error, className, ...props }: TextFieldProps) {
   const id = React.useId();
   const [visible, setVisible] = React.useState(false);

@@ -39,7 +39,6 @@ interface NavItem {
   icon: LucideIcon;
 }
 
-/** Only routes that exist are listed. Each build slice adds its own entries. */
 const PATIENT_NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", key: "dashboard", icon: LayoutDashboard },
   { href: "/symptoms", label: "Symptom Checker", key: "symptoms", icon: Activity },
@@ -56,7 +55,6 @@ const PATIENT_NAV: NavItem[] = [
   { href: "/profile", label: "Profile", key: "profile", icon: UserRound },
 ];
 
-/** Administrators manage the hospital directory only. They have no patient records, so no patient screens are listed. */
 const ADMIN_NAV: NavItem[] = [{ href: "/admin/hospitals", label: "Hospitals", key: "hospitals", icon: Hospital }];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -66,7 +64,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isAdmin = user.role === "admin";
   const navItems = isAdmin ? ADMIN_NAV : PATIENT_NAV;
 
-  // On narrow screens the tab bar scrolls sideways; keep the current tab visible.
   React.useEffect(() => {
     document.querySelector<HTMLElement>('nav[aria-label="Main"] [aria-current="page"]')?.scrollIntoView({ inline: "center", block: "nearest" });
   }, [pathname]);

@@ -88,7 +88,7 @@ describe.skipIf(!TEST_DATABASE_URL)("hospital directory and availability", () =>
       expect(second.body.page.nextCursor).toBeNull();
       expect(a.id).toBeDefined();
       for (const q of ["limit=0", "limit=101", "cursor=x", "foo=1", "q=", `q=${"x".repeat(81)}`, "includeInactive=yes"]) expect((await get(patient.token, `/hospitals?${q}`)).status, q).toBe(400);
-      // search text is data, never query syntax
+
       expect((await get(patient.token, `/hospitals?q=${encodeURIComponent("%'; DROP TABLE \"Hospital\";--")}`)).status).toBe(200);
     });
 
@@ -155,7 +155,7 @@ describe.skipIf(!TEST_DATABASE_URL)("hospital directory and availability", () =>
       expect((await get(patient.token, `/hospitals/${hospital.id}`)).status).toBe(404);
       expect((await get(patient.token, `/hospitals/${hospital.id}/availability`)).status).toBe(404);
       expect((await get(admin, `/hospitals/${hospital.id}/availability`)).status).toBe(200);
-      // The existing appointment is untouched, and nobody can book the hospital any more.
+
       expect((await h.db.appointment.findUniqueOrThrow({ where: { id: booked.body.data.id } })).status).toBe("confirmed");
       const other = await registerPatient(app, h.db);
       const slot2 = await addSlot(hospital.id, 72);
@@ -182,7 +182,7 @@ describe.skipIf(!TEST_DATABASE_URL)("hospital directory and availability", () =>
       const hospital = await addHospital();
       const open = await addSlot(hospital.id, 3);
       const taken = await addSlot(hospital.id, 4);
-      await addSlot(hospital.id, -5); // already passed
+      await addSlot(hospital.id, -5);
       await post(patient.token, "/appointments", { slotId: taken.id });
       const res = await get(patient.token, `/hospitals/${hospital.id}/availability`);
       expect(res.status).toBe(200);
@@ -214,7 +214,7 @@ describe.skipIf(!TEST_DATABASE_URL)("hospital directory and availability", () =>
       const page1 = await get(patient.token, `/hospitals/${hospital.id}/availability?limit=1`);
       const page2 = await get(patient.token, `/hospitals/${hospital.id}/availability?limit=1&cursor=${page1.body.page.nextCursor}`);
       expect([page1.body.data[0].id, page2.body.data[0].id]).toEqual([s1.id, s2.id]);
-      // A "from" in the past never reveals past slots.
+
       const past = await get(patient.token, `/hospitals/${hospital.id}/availability?from=${encodeURIComponent(new Date(Date.now() - 2 * 86_400_000).toISOString())}&to=${encodeURIComponent(new Date(Date.now() + 5 * 86_400_000).toISOString())}`);
       expect(past.status).toBe(200);
       expect(past.body.data.every((s: { startsAt: string }) => new Date(s.startsAt).getTime() > Date.now())).toBe(true);

@@ -86,7 +86,6 @@ function buildInitialConfigs(prescription: Prescription, existingSchedules: Medi
       ? existing.times
       : suggestTimes(med.frequency) || ["08:00"];
 
-    // Reminders run in the present and future; never start on a past prescription date
     const rawStart = existing?.startDate || todayStr;
     const defaultStart = rawStart < todayStr ? todayStr : rawStart;
 
@@ -142,7 +141,6 @@ export function MedicationSetupWizard({
   const [syncingCalendar, setSyncingCalendar] = React.useState(false);
   const [calendarSyncedCount, setCalendarSyncedCount] = React.useState<number | null>(null);
 
-  // Load calendar integration status
   React.useEffect(() => {
     if (!open) return;
     calendarApi
@@ -155,7 +153,7 @@ export function MedicationSetupWizard({
 
   if (!open || medications.length === 0) return null;
 
-  const totalSteps = medications.length + 1; // 0..N-1: Medicines, N: Calendar
+  const totalSteps = medications.length + 1;
   const isCalendarStep = currentStep === medications.length;
   const currentConfig = configs[currentStep] as MedicationConfig | undefined;
 
@@ -235,8 +233,7 @@ export function MedicationSetupWizard({
         });
         updateCurrentConfig({ existingScheduleId: scheduleId, saved: true });
       } else {
-        // If prescription has not been verified/confirmed yet, confirm it first so the
-        // clinical safety gate allows schedule creation (must be patient_corrected).
+
         if (!verified) {
           try {
             await prescriptionsApi.correct(prescription.id, {
@@ -254,7 +251,7 @@ export function MedicationSetupWizard({
             });
             setVerified(true);
           } catch {
-            // Proceed to schedule creation if already confirmed
+
           }
         }
 
@@ -265,7 +262,7 @@ export function MedicationSetupWizard({
             currentVersion = Math.max(...vs.map((v) => v.versionNumber));
           }
         } catch {
-          // Fallback to 1
+
         }
 
         const created = await medicationSchedulesApi.create({
@@ -354,7 +351,7 @@ export function MedicationSetupWizard({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
     >
       <div className="bg-card flex max-h-[92vh] w-full max-w-2xl flex-col rounded-xl border shadow-2xl">
-        {/* Wizard Header */}
+
         <div className="flex items-center justify-between border-b px-6 py-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
@@ -377,7 +374,6 @@ export function MedicationSetupWizard({
           </Button>
         </div>
 
-        {/* Progress Bar */}
         <div className="bg-muted h-1 w-full overflow-hidden">
           <div
             className="bg-primary h-full transition-all duration-300"
@@ -385,11 +381,10 @@ export function MedicationSetupWizard({
           />
         </div>
 
-        {/* Wizard Content Body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {!isCalendarStep && currentConfig ? (
             <div className="space-y-6">
-              {/* Medicine Card Overview */}
+
               <div className="bg-muted/40 rounded-lg border p-4 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
@@ -424,14 +419,12 @@ export function MedicationSetupWizard({
                 </div>
               </div>
 
-              {/* Time Configuration Section */}
               <div className="space-y-3">
                 <Label className="text-sm font-semibold">Reminder Times</Label>
                 <p className="text-muted-foreground text-xs">
                   Choose the times of day you want to take this medicine. We pre-selected slots based on your prescription frequency.
                 </p>
 
-                {/* Quick Presets */}
                 <div className="flex flex-wrap gap-2 pt-1">
                   {COMMON_TIME_PRESETS.map((p) => {
                     const active = currentConfig.times.includes(p.time);
@@ -453,7 +446,6 @@ export function MedicationSetupWizard({
                   })}
                 </div>
 
-                {/* Active Times List */}
                 <div className="space-y-2 pt-2">
                   {currentConfig.times.map((t, idx) => (
                     <div key={idx} className="flex items-center gap-3">
@@ -491,7 +483,6 @@ export function MedicationSetupWizard({
                 </div>
               </div>
 
-              {/* Date Range Section */}
               <div className="grid gap-4 sm:grid-cols-2 pt-2 border-t">
                 <div className="space-y-1.5">
                   <Label htmlFor="med-start-date" className="text-xs font-medium">
@@ -524,7 +515,7 @@ export function MedicationSetupWizard({
               </div>
             </div>
           ) : (
-            /* Google Calendar Step */
+
             <div className="space-y-6">
               <div className="space-y-1">
                 <h3 className="text-base font-semibold text-foreground">
@@ -535,14 +526,13 @@ export function MedicationSetupWizard({
                 </p>
               </div>
 
-              {/* Medication Schedules Summary */}
               <div className="space-y-3">
                 <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   Configured Medicines ({configs.length})
                 </span>
                 <div className="divide-y rounded-lg border bg-card">
                   {configs.map((cfg) => {
-                    // Create direct Google Calendar web link for the first time slot
+
                     const firstTime = cfg.times[0] || "08:00";
                     const directUrl = createGoogleCalendarWebUrl({
                       medicationName: cfg.name,
@@ -584,7 +574,6 @@ export function MedicationSetupWizard({
                 </div>
               </div>
 
-              {/* Google Calendar OAuth Integration Box */}
               <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-1">
@@ -666,7 +655,6 @@ export function MedicationSetupWizard({
                   </div>
                 )}
 
-                {/* .ics file download option */}
                 <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3 text-xs">
                   <span className="text-muted-foreground">
                     Prefer Apple Calendar, Outlook, or mobile calendar app?
@@ -686,7 +674,6 @@ export function MedicationSetupWizard({
           )}
         </div>
 
-        {/* Wizard Footer Navigation */}
         <div className="flex items-center justify-between border-t bg-card px-6 py-4">
           <Button
             type="button"

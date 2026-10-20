@@ -73,7 +73,6 @@ export function FamilyTreeScreen() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<FamilyMember | null>(null);
 
-  // Form states
   const [formName, setFormName] = useState("");
   const [formRel, setFormRel] = useState<FamilyRelationship>("father");
   const [formVital, setFormVital] = useState<VitalStatus>("alive");
@@ -228,7 +227,6 @@ export function FamilyTreeScreen() {
           Recording family health patterns helps clinicians spot potential genetic predispositions. It does not provide access to your account for any relative.
         </Banner>
 
-        {/* Hereditary risk aggregates */}
         {hereditaryRisks.length > 0 ? (
           <Card style={styles.riskCard}>
             <Row style={styles.riskHeader}>
@@ -262,7 +260,6 @@ export function FamilyTreeScreen() {
           </Card>
         ) : null}
 
-        {/* Generations or Empty State */}
         {totalCount === 0 ? (
           <EmptyState
             icon="users"
@@ -379,7 +376,6 @@ export function FamilyTreeScreen() {
         )}
       </Stack>
 
-      {/* Add / Edit Family Member Modal */}
       <Modal visible={modalOpen} animationType="slide" transparent onRequestClose={() => setModalOpen(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
@@ -492,7 +488,6 @@ export function FamilyTreeScreen() {
                     />
                   </Row>
 
-                  {/* Common condition suggestions */}
                   <Row style={{ flexWrap: "wrap", gap: space.xs, marginBottom: space.xs }}>
                     {COMMON_CONDITIONS.filter(
                       (c) => !formConditions.some((fc) => fc.toLowerCase() === c.toLowerCase())
@@ -506,7 +501,6 @@ export function FamilyTreeScreen() {
                     ))}
                   </Row>
 
-                  {/* Selected conditions list */}
                   {formConditions.length > 0 ? (
                     <View style={styles.conditionsSelectedBox}>
                       <Row style={{ flexWrap: "wrap", gap: space.xs }}>

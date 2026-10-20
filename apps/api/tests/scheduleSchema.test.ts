@@ -62,7 +62,7 @@ describe("createScheduleSchema", () => {
   });
 
   it("requires a real time zone and returns it in canonical form", () => {
-    // Ambiguous abbreviations and legacy fixed-offset names are refused, as are unknown places and path-like text.
+
     for (const bad of ["IST", "EST", "PST8PDT", "CET", "GMT", "Mars/Phobos", "", "../etc", "/Asia/Kolkata", "Asia//Kolkata", "UTC+5", "x".repeat(65), 5]) {
       expect(ok(createScheduleSchema, valid({ timezone: bad })), String(bad)).toBe(false);
     }
@@ -97,7 +97,7 @@ describe("updateScheduleSchema", () => {
       { instructions: "x" }, { startDate: day(0) }, { sourceMedicationId: RX }, { prescriptionId: RX }, { patientId: RX }, { sourceStatus: "current" }, { remindersActive: true },
     ]) {
       expect(ok(updateScheduleSchema, bad), JSON.stringify(bad)).toBe(false);
-      // Mixed with a legitimate field it must still be an error, not silently dropped.
+
       expect(ok(updateScheduleSchema, { isActive: false, ...bad }), `mixed ${JSON.stringify(bad)}`).toBe(false);
     }
   });

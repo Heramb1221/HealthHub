@@ -35,13 +35,12 @@ export function buildApp(
   return createApp(env, register, { db, ...(store ? { store } : {}), ...(extraction !== undefined ? { extraction } : {}) });
 }
 
-/** Inserts a user directly (any role) with a known password and returns its credentials. */
 export async function seedUser(db: Db, role: "patient" | "admin" | "provider", extra: { isActive?: boolean } = {}) {
   const email = `${uniq(role)}@example.test`;
   const user = await db.user.create({
     data: { email, passwordHash: await hashPassword(PASSWORD), role, isActive: extra.isActive ?? true },
   });
-  // Mirrors registration: every patient user has exactly one patient row.
+
   let patientId: string | undefined;
   if (role === "patient") {
     const patient = await db.patient.create({ data: { userId: user.id, healthId: uniq("HID") } });
@@ -56,7 +55,6 @@ export async function loginToken(app: Express, email: string): Promise<string> {
   return res.body.data.accessToken as string;
 }
 
-/** Registers a patient through the real endpoint. Returns token, ids and the patient row id. */
 export async function registerPatient(app: Express, db: Db) {
   const email = `${uniq("pat")}@example.test`;
   const res = await request(app).post("/api/v1/auth/register").send({ email, password: PASSWORD });

@@ -12,7 +12,6 @@ import { login, logout, refresh, register } from "./service.js";
 export function createAuthRouter(db: Db, env: Env): Router {
   const router = Router();
 
-  // Tighter than the global limit: these are the brute-force targets.
   const credentialLimiter = rateLimit({
     windowMs: env.RATE_LIMIT_WINDOW_MS,
     limit: env.AUTH_RATE_LIMIT_MAX,
@@ -33,7 +32,6 @@ export function createAuthRouter(db: Db, env: Env): Router {
     res.json({ data: result });
   });
 
-  // No body: the bearer token is the only input. Strict, so junk is rejected rather than ignored.
   router.post("/refresh", credentialLimiter, authenticate(db, env), async (req, res) => {
     parse(z.strictObject({}), req.body ?? {});
     const auth = requireAuth(req);

@@ -40,14 +40,12 @@ export function createSymptomRouter(db: Db, env: Env): Router {
     handler: (_req, _res, next) => next(new AppError("RATE_LIMITED")),
   });
 
-  // Get dynamic rule-based questions tailored to the patient's symptoms
   router.post("/questions", limiter, async (req, res) => {
     const input = parse(questionsSchema, req.body);
     const questions = getRuleBasedQuestions(input.symptoms);
     res.json({ data: { questions } });
   });
 
-  // Triage & differential assessment based on symptoms and questionnaire answers
   router.post("/assess", limiter, async (req, res) => {
     const input = parse(assessSymptomSchema, req.body);
     const result = await assessSymptoms(env, input);

@@ -28,7 +28,6 @@ const MEDICATION_TEXT = ["name", "strength", "dose", "route", "frequency", "dura
 
 const dateOnly = (date: Date): string => date.toISOString().slice(0, 10);
 
-/** The calendar date of an instant in a time zone, as YYYY-MM-DD. */
 function localDate(instant: Date, timeZone: string): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(instant);
 }
@@ -87,14 +86,14 @@ export interface ScheduleDto {
   id: string;
   prescriptionId: string;
   sourceVersionNumber: number;
-  /** Whether the prescription still says what this schedule was made from. */
+
   sourceStatus: SourceStatus;
   medication: Record<(typeof MEDICATION_TEXT)[number], string | null>;
   startDate: string;
   endDate: string | null;
   reminderTimes: string[];
   remindersEnabled: boolean;
-  /** The one flag clients should use to decide whether to remind. */
+
   remindersActive: boolean;
   timezone: string;
   isActive: boolean;
@@ -110,7 +109,6 @@ interface LatestVersion {
   medications: Array<Record<(typeof MEDICATION_TEXT)[number], string | null> & { position: number }>;
 }
 
-/** The newest version of each given prescription, with its medication rows. */
 async function latestVersions(reader: Reader, prescriptionIds: string[]): Promise<Map<string, LatestVersion>> {
   if (prescriptionIds.length === 0) return new Map();
   const rows = await reader.prescriptionVersion.findMany({
@@ -175,11 +173,9 @@ async function toDtos(reader: Reader, rows: ScheduleRow[], now: Date): Promise<S
 
 const since = (now: Date): Date => new Date(now.getTime() - RECENT_DOSE_DAYS * DAY_MS);
 
-/** Serialises schedule changes for one patient, so limits and duplicate checks cannot be raced. */
 const lockPatient = (tx: Prisma.TransactionClient, patientId: string) =>
   tx.$queryRaw`SELECT "id" FROM "Patient" WHERE "id" = ${patientId}::uuid FOR UPDATE`;
 
-/** Another ACTIVE schedule for the same medication of the same prescription. */
 async function duplicateActive(tx: Prisma.TransactionClient, patientId: string, prescriptionId: string, position: number, exceptId?: string) {
   return tx.medicationSchedule.findFirst({
     where: {
@@ -196,7 +192,7 @@ export async function createSchedule(db: Db, auth: AuthContext, input: CreateSch
   const patientId = await ownPatientId(db, auth);
   const record = await db.prescriptionRecord.findUnique({ where: { id: input.prescriptionId }, select: { patientId: true } });
   if (!record) throw new AppError("NOT_FOUND");
-  // Patients pass only for their own prescription; anything else is refused and audited.
+
   await authorizePatientData(db, auth, record.patientId, "prescriptions:read", {
     requestId: ctx.requestId,
     resourceType: "prescription",
@@ -230,7 +226,7 @@ export async function createSchedule(db: Db, auth: AuthContext, input: CreateSch
     },
   });
   if (!latest) return refuse("no_version", "The prescription has not been processed or entered yet");
-  // The patient must have acted on what they saw: never schedule a different row than the one on their screen.
+
   if (latest.versionNumber !== input.versionNumber) return refuse("version_changed", "The prescription changed since you loaded it");
 
   const medication = latest.medications.find((m) => m.position === input.medicationPosition);
@@ -238,7 +234,7 @@ export async function createSchedule(db: Db, auth: AuthContext, input: CreateSch
 
   const eligibility = checkScheduleEligibility({ verificationStatus: latest.verificationStatus, medication });
   if (!eligibility.ok) return refuse(eligibility.reason, REFUSAL_MESSAGE[eligibility.reason]);
-  // Eligibility guarantees these are present.
+
   const { name, strength, dose, frequency } = medication;
   if (!name) throw new AppError("INTERNAL_ERROR");
 
@@ -279,7 +275,7 @@ export async function createSchedule(db: Db, auth: AuthContext, input: CreateSch
       resourceType: "medication_schedule",
       resourceId: created.id,
       requestId: ctx.requestId,
-      // Ids and positions only; never the medication text.
+
       metadata: { prescriptionId: input.prescriptionId, versionNumber: latest.versionNumber, medicationPosition: input.medicationPosition },
     });
     return created;
@@ -315,7 +311,7 @@ export async function updateSchedule(db: Db, auth: AuthContext, scheduleId: stri
 
   const row = await db.$transaction(async (tx) => {
     await lockPatient(tx, patientId);
-    // Someone else's schedule looks exactly like one that does not exist.
+
     const current = await tx.medicationSchedule.findFirst({ where: { id: scheduleId, patientId }, select: scheduleSelect(since(now)) });
     if (!current) throw new AppError("NOT_FOUND");
 
@@ -354,7 +350,7 @@ export async function updateSchedule(db: Db, auth: AuthContext, scheduleId: stri
     if (next.timezone !== current.timezone) changedFields.push("timezone");
     if ((next.endDate ? dateOnly(next.endDate) : null) !== (current.endDate ? dateOnly(current.endDate) : null)) changedFields.push("endDate");
     if (next.isActive !== current.isActive) changedFields.push("isActive");
-    if (changedFields.length === 0) return current; // nothing changed: no write, no audit noise
+    if (changedFields.length === 0) return current;
 
     const updated = await tx.medicationSchedule.update({ where: { id: current.id }, data: next, select: scheduleSelect(since(now)) });
     await recordAudit(tx, {
@@ -378,15 +374,10 @@ export interface DoseEventDto {
   scheduledFor: string;
   status: string;
   recordedAt: string;
-  /** Always true: the API only ever stores what the patient reports. */
+
   selfReported: true;
 }
 
-/**
- * Records that the patient says they took or skipped a dose. It is a
- * self-report and is stored and labelled as one; nothing in the system treats
- * it as verified. Events are append-only and unique per schedule and time.
- */
 export async function recordDoseEvent(
   db: Db,
   auth: AuthContext,

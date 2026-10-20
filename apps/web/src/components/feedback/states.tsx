@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { describeError } from "@/lib/api/errors";
 
-/** Loading placeholder. `label` is announced to screen readers; the skeleton rows themselves are hidden. */
 export function LoadingState({ label = "Loading", rows = 3 }: { label?: string; rows?: number }) {
   return (
     <div role="status" aria-live="polite" className="space-y-3">
@@ -17,7 +16,6 @@ export function LoadingState({ label = "Loading", rows = 3 }: { label?: string; 
   );
 }
 
-/** Empty state: says what's missing and offers the next action. */
 export function EmptyState({
   icon: Icon = Inbox,
   title,
@@ -41,7 +39,6 @@ export function EmptyState({
   );
 }
 
-/** Error state with retry. Shows the server request ID when present so support can trace it. */
 export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   const { title, detail, requestId } = describeError(error);
   return (

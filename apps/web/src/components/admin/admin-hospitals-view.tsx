@@ -17,7 +17,6 @@ import { hospitalsApi } from "@/lib/api/hospitals";
 import type { Hospital } from "@/lib/api/types";
 import { useResource } from "@/lib/use-resource";
 
-/** "" means every status (the select's first option). */
 type StatusFilter = "" | "active" | "deactivated";
 
 function StatusBadge({ active }: { active: boolean }) {

@@ -55,7 +55,6 @@ export async function listVaccinations(
     orderBy: { createdAt: "asc" },
   });
 
-  // Map of lowercase name -> stored row
   const rowMap = new Map<string, (typeof storedRows)[number]>();
   for (const row of storedRows) {
     rowMap.set(row.vaccineName.toLowerCase().trim(), row);
@@ -67,7 +66,6 @@ export async function listVaccinations(
   const items: PatientVaccinationDto[] = [];
   const processedRowIds = new Set<string>();
 
-  // 1. Process catalog items
   for (const cat of VACCINE_CATALOG) {
     const matched = rowMap.get(cat.name.toLowerCase().trim()) ?? rowMap.get(cat.id.toLowerCase().trim());
     if (matched) processedRowIds.add(matched.id);
@@ -87,7 +85,6 @@ export async function listVaccinations(
     });
   }
 
-  // 2. Process custom items not in directory
   for (const row of storedRows) {
     if (!processedRowIds.has(row.id)) {
       items.push({
@@ -106,7 +103,6 @@ export async function listVaccinations(
     }
   }
 
-  // Summary counts across all items
   const summary = {
     total: items.length,
     taken: items.filter((i) => i.status === "taken").length,
@@ -114,7 +110,6 @@ export async function listVaccinations(
     unrecorded: items.filter((i) => i.status === null).length,
   };
 
-  // Optional category / status filters
   let filtered = items;
   if (query.category) {
     filtered = filtered.filter((i) => i.category === query.category);
@@ -137,7 +132,6 @@ export async function recordVaccination(
 ): Promise<PatientVaccinationDto> {
   const patientId = await ownPatientId(db, auth);
 
-  // Check if name matches catalog
   const catalogMatch = VACCINE_CATALOG.find(
     (c) =>
       c.name.toLowerCase().trim() === input.vaccineName.toLowerCase().trim() ||
@@ -215,7 +209,6 @@ export async function deleteVaccination(
 ): Promise<{ success: boolean; clearedVaccine: string }> {
   const patientId = await ownPatientId(db, auth);
 
-  // Search case-insensitively or exact match
   const existing = await db.patientVaccination.findFirst({
     where: {
       patientId,

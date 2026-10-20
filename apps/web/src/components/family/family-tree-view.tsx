@@ -40,22 +40,22 @@ import type {
 import { useResource } from "@/lib/use-resource";
 
 const RELATIONSHIPS: { value: FamilyRelationship; label: string; generation: Generation }[] = [
-  // Grandparents
+
   { value: "paternal_grandfather", label: "Paternal Grandfather (Dad's Father)", generation: "grandparents" },
   { value: "paternal_grandmother", label: "Paternal Grandmother (Dad's Mother)", generation: "grandparents" },
   { value: "maternal_grandfather", label: "Maternal Grandfather (Mom's Father)", generation: "grandparents" },
   { value: "maternal_grandmother", label: "Maternal Grandmother (Mom's Mother)", generation: "grandparents" },
-  // Parents
+
   { value: "father", label: "Father", generation: "parents" },
   { value: "mother", label: "Mother", generation: "parents" },
-  // Current Generation
+
   { value: "spouse", label: "Spouse", generation: "current" },
   { value: "brother", label: "Brother", generation: "current" },
   { value: "sister", label: "Sister", generation: "current" },
-  // Children
+
   { value: "son", label: "Son", generation: "children" },
   { value: "daughter", label: "Daughter", generation: "children" },
-  // Other
+
   { value: "other", label: "Other Relative", generation: "other" },
 ];
 
@@ -159,7 +159,7 @@ export function FamilyTreeView() {
           description="Record multi-generational family health history to identify hereditary risk patterns. Family members have no account access."
         />
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-          {/* View mode toggle */}
+
           <div className="inline-flex rounded-lg border bg-muted p-0.5 text-xs font-medium">
             <button
               type="button"
@@ -203,7 +203,6 @@ export function FamilyTreeView() {
         </AlertDescription>
       </Alert>
 
-      {/* Hereditary Risk Insights Panel */}
       {data.hereditaryRisks.length > 0 && (
         <section aria-labelledby="hereditary-risks-title" className="bg-card rounded-lg border p-4 shadow-xs">
           <div className="flex items-center gap-2 mb-3">
@@ -243,7 +242,6 @@ export function FamilyTreeView() {
         </section>
       )}
 
-      {/* Main Family Tree: Diagram or List View */}
       {totalCount === 0 && !patient ? (
         <EmptyState
           icon={Users}
@@ -273,7 +271,6 @@ export function FamilyTreeView() {
         />
       )}
 
-      {/* Member Form Modal */}
       {modalState.isOpen && (
         <FamilyMemberModal
           mode={modalState.mode}
@@ -289,10 +286,6 @@ export function FamilyTreeView() {
     </div>
   );
 }
-
-/* -------------------------------------------------------------------------- */
-/* Visual Family Tree Diagram Component                                       */
-/* -------------------------------------------------------------------------- */
 
 interface FamilyTreeDiagramProps {
   members: FamilyMember[];
@@ -311,7 +304,7 @@ function FamilyTreeDiagram({
   onDelete,
   deletePendingId,
 }: FamilyTreeDiagramProps) {
-  // Categorize family members according to their specific biological/kinship roles
+
   const patGrandfather = members.find((m) => m.relationship === "paternal_grandfather");
   const patGrandmother = members.find((m) => m.relationship === "paternal_grandmother");
 
@@ -330,7 +323,6 @@ function FamilyTreeDiagram({
     <div className="rounded-xl border bg-card/60 p-4 sm:p-6 shadow-xs overflow-x-auto">
       <div className="min-w-[780px] max-w-5xl mx-auto flex flex-col items-center space-y-10 py-4">
 
-        {/* ---------------- LEVEL 1: GRANDPARENTS ---------------- */}
         <section aria-labelledby="generation-grandparents" className="w-full flex flex-col items-center">
           <div className="flex items-center gap-2 mb-4">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted px-2.5 py-0.5 rounded-full border">
@@ -339,7 +331,7 @@ function FamilyTreeDiagram({
           </div>
 
           <div className="w-full grid grid-cols-2 gap-8 lg:gap-16">
-            {/* Paternal Lineage (Dad's side) */}
+
             <div className="flex flex-col items-center">
               <span className="text-xs font-medium text-muted-foreground mb-3">Paternal Lineage (Father&apos;s Parents)</span>
               <div className="flex items-center gap-3">
@@ -354,7 +346,6 @@ function FamilyTreeDiagram({
                   <EmptySlotNode label="Paternal Grandfather" onClick={() => onAdd("paternal_grandfather")} />
                 )}
 
-                {/* Horizontal marriage/partnership bridge */}
                 <div className="flex flex-col items-center">
                   <div className="h-0.5 w-6 bg-border" />
                   <Heart className="size-3 text-muted-foreground/60 my-0.5" aria-hidden="true" />
@@ -373,11 +364,9 @@ function FamilyTreeDiagram({
                 )}
               </div>
 
-              {/* Vertical connector down to Father */}
               <div className="w-0.5 h-8 bg-border mt-3" />
             </div>
 
-            {/* Maternal Lineage (Mom's side) */}
             <div className="flex flex-col items-center">
               <span className="text-xs font-medium text-muted-foreground mb-3">Maternal Lineage (Mother&apos;s Parents)</span>
               <div className="flex items-center gap-3">
@@ -392,7 +381,6 @@ function FamilyTreeDiagram({
                   <EmptySlotNode label="Maternal Grandfather" onClick={() => onAdd("maternal_grandfather")} />
                 )}
 
-                {/* Horizontal marriage/partnership bridge */}
                 <div className="flex flex-col items-center">
                   <div className="h-0.5 w-6 bg-border" />
                   <Heart className="size-3 text-muted-foreground/60 my-0.5" aria-hidden="true" />
@@ -411,13 +399,11 @@ function FamilyTreeDiagram({
                 )}
               </div>
 
-              {/* Vertical connector down to Mother */}
               <div className="w-0.5 h-8 bg-border mt-3" />
             </div>
           </div>
         </section>
 
-        {/* ---------------- LEVEL 2: PARENTS ---------------- */}
         <section aria-labelledby="generation-parents" className="w-full flex flex-col items-center -mt-4">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted px-2.5 py-0.5 rounded-full border">
@@ -426,7 +412,7 @@ function FamilyTreeDiagram({
           </div>
 
           <div className="flex items-center justify-center gap-6 sm:gap-12 relative">
-            {/* Father Node */}
+
             <div className="flex flex-col items-center">
               {father ? (
                 <TreeMemberCard
@@ -440,7 +426,6 @@ function FamilyTreeDiagram({
               )}
             </div>
 
-            {/* Marriage bridge between Parents */}
             <div className="flex items-center gap-2 relative">
               <div className="h-0.5 w-8 sm:w-16 bg-primary/40" />
               <div className="flex flex-col items-center px-1.5 py-1 bg-muted rounded-full border text-[10px] text-muted-foreground font-semibold">
@@ -448,11 +433,9 @@ function FamilyTreeDiagram({
               </div>
               <div className="h-0.5 w-8 sm:w-16 bg-primary/40" />
 
-              {/* Stem dropping down from the exact center of parents union */}
               <div className="absolute left-1/2 -bottom-10 -translate-x-1/2 w-0.5 h-10 bg-primary/40" />
             </div>
 
-            {/* Mother Node */}
             <div className="flex flex-col items-center">
               {mother ? (
                 <TreeMemberCard
@@ -468,7 +451,6 @@ function FamilyTreeDiagram({
           </div>
         </section>
 
-        {/* ---------------- LEVEL 3: CURRENT GENERATION (PATIENT, SIBLINGS, SPOUSE) ---------------- */}
         <section aria-labelledby="generation-current" className="w-full flex flex-col items-center pt-4">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted px-2.5 py-0.5 rounded-full border">
@@ -476,14 +458,12 @@ function FamilyTreeDiagram({
             </span>
           </div>
 
-          {/* Sibling & Patient branching line */}
           <div className="w-full flex flex-col items-center">
-            {/* Horizontal distribution bar across offspring */}
+
             <div className="relative flex flex-wrap items-center justify-center gap-4 sm:gap-6 pt-6">
-              {/* Top horizontal distribution rail */}
+
               <div className="absolute top-0 left-12 right-12 h-0.5 bg-primary/30" />
 
-              {/* Siblings */}
               {siblings.map((sib) => (
                 <div key={sib.id} className="flex flex-col items-center relative">
                   <div className="w-0.5 h-6 bg-primary/30 absolute -top-6" />
@@ -496,7 +476,6 @@ function FamilyTreeDiagram({
                 </div>
               ))}
 
-              {/* Add Sibling quick action */}
               <div className="flex flex-col items-center relative">
                 <div className="w-0.5 h-6 bg-primary/30 absolute -top-6" />
                 <button
@@ -509,16 +488,14 @@ function FamilyTreeDiagram({
                 </button>
               </div>
 
-              {/* YOU (Patient) & SPOUSE group */}
               <div className="flex flex-col items-center relative">
-                {/* Vertical stem connecting patient to parental line */}
+
                 <div className="w-0.5 h-6 bg-primary absolute -top-6" />
 
                 <div className="flex items-center gap-4 sm:gap-6 relative">
-                  {/* Patient Node */}
+
                   <PatientTreeNode patient={patient} />
 
-                  {/* Partnership bridge between Patient and Spouse */}
                   <div className="flex items-center gap-1.5 relative">
                     <div className="h-0.5 w-6 sm:w-10 bg-primary/40" />
                     <div className="flex items-center gap-1 px-1.5 py-0.5 bg-muted rounded-full border text-[10px] text-muted-foreground font-semibold">
@@ -527,11 +504,9 @@ function FamilyTreeDiagram({
                     </div>
                     <div className="h-0.5 w-6 sm:w-10 bg-primary/40" />
 
-                    {/* Stem dropping down to children */}
                     <div className="absolute left-1/2 -bottom-10 -translate-x-1/2 w-0.5 h-10 bg-primary/40" />
                   </div>
 
-                  {/* Spouse Node */}
                   {spouse ? (
                     <TreeMemberCard
                       member={spouse}
@@ -548,7 +523,6 @@ function FamilyTreeDiagram({
           </div>
         </section>
 
-        {/* ---------------- LEVEL 4: CHILDREN ---------------- */}
         <section aria-labelledby="generation-children" className="w-full flex flex-col items-center pt-2">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted px-2.5 py-0.5 rounded-full border">
@@ -589,7 +563,6 @@ function FamilyTreeDiagram({
           </div>
         </section>
 
-        {/* ---------------- LEVEL 5: EXTENDED RELATIVES (IF ANY) ---------------- */}
         {extended.length > 0 && (
           <section aria-labelledby="generation-extended" className="w-full flex flex-col items-center pt-6 border-t">
             <div className="flex items-center gap-2 mb-3">
@@ -614,10 +587,6 @@ function FamilyTreeDiagram({
     </div>
   );
 }
-
-/* -------------------------------------------------------------------------- */
-/* Tree Member Card Component                                                 */
-/* -------------------------------------------------------------------------- */
 
 function TreeMemberCard({
   member,
@@ -714,10 +683,6 @@ function TreeMemberCard({
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/* Patient Tree Node (You)                                                    */
-/* -------------------------------------------------------------------------- */
-
 function PatientTreeNode({ patient }: { patient: Patient | null }) {
   const conditions = patient?.conditions ?? [];
 
@@ -775,10 +740,6 @@ function PatientTreeNode({ patient }: { patient: Patient | null }) {
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/* Empty Slot Node                                                            */
-/* -------------------------------------------------------------------------- */
-
 function EmptySlotNode({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <button
@@ -798,10 +759,6 @@ function EmptySlotNode({ label, onClick }: { label: string; onClick: () => void 
     </button>
   );
 }
-
-/* -------------------------------------------------------------------------- */
-/* List View Mode Component                                                   */
-/* -------------------------------------------------------------------------- */
 
 function FamilyListView({
   data,
@@ -940,10 +897,6 @@ function FamilyListView({
     </div>
   );
 }
-
-/* -------------------------------------------------------------------------- */
-/* Family Member Modal Component                                              */
-/* -------------------------------------------------------------------------- */
 
 function FamilyMemberModal({
   mode,
@@ -1168,7 +1121,6 @@ function FamilyMemberModal({
               </Button>
             </div>
 
-            {/* Quick Suggestions */}
             <div className="flex flex-wrap gap-1 mb-2">
               {COMMON_CONDITIONS.filter((c) => !conditions.some((existing) => existing.toLowerCase() === c.toLowerCase())).slice(0, 5).map((quick) => (
                 <button

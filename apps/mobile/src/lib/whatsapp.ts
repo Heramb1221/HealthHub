@@ -10,10 +10,6 @@ export interface MobileWhatsAppReminderOptions {
   phone?: string;
 }
 
-/**
- * Builds a WhatsApp deep-link and opens WhatsApp on the user's phone directly.
- * 100% free with zero configuration or API keys required.
- */
 export async function sendWhatsAppReminder(options: MobileWhatsAppReminderOptions): Promise<void> {
   const cleanPhone = options.phone ? options.phone.replace(/[^0-9]/g, "") : "";
   const lines = [
@@ -41,7 +37,7 @@ export async function sendWhatsAppReminder(options: MobileWhatsAppReminderOption
       Alert.alert("WhatsApp not found", "Could not open WhatsApp on this device.");
     }
   } catch {
-    // Fallback: try opening URL directly
+
     await Linking.openURL(url).catch(() => {
       Alert.alert("Unable to open WhatsApp", "Please make sure WhatsApp is installed.");
     });

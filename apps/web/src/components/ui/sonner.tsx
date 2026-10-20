@@ -2,7 +2,6 @@
 
 import { Toaster as Sonner, type ToasterProps } from "sonner";
 
-/** Toasts report only persisted outcomes. Never toast success before the API call resolves. */
 function Toaster(props: ToasterProps) {
   return (
     <Sonner

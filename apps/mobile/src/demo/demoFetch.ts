@@ -10,18 +10,6 @@ import type {
   VitalStatus,
 } from "../api/types.ts";
 
-/**
- * DEMO MODE: an in-memory stand-in for the HealthHub API, used only when the app runs without a server.
- *
- * - It is clearly labelled in the UI (persistent "Demo mode" banner) and never persists anything.
- * - All data is synthetic and fictional. Uploaded files are NOT read or sent anywhere: processing returns a
- *   fixed synthetic fixture chosen by file name ("illegible" fails, "ambiguous" needs review, anything else is a
- *   clear fixture). This mirrors the backend mock provider's refusal to invent medicines for real documents.
- * - It follows the backend's implemented rules (CONTRACT_DECISIONS.md F-I) and proposed shapes (B1-B5) so the same
- *   client code paths run in demo and live mode. Where the backend has not decided a shape, it uses the mobile
- *   assumptions in docs/MOBILE_CONTRACT_ASSUMPTIONS.md.
- * - No React Native imports, so it is unit-tested in Node.
- */
 export const DEMO_BASE_URL = "https://demo.healthhub.invalid/api/v1";
 
 type Json = Record<string, unknown>;
@@ -68,7 +56,7 @@ interface Schedule {
   prescriptionId: string;
   position: number;
   sourceVersionNumber: number;
-  /** Copy of the prescription row at creation (backend K1): never edited afterwards. */
+
   med: Omit<Med, "confidence">;
   startDate: string;
   endDate: string | null;
@@ -183,7 +171,6 @@ interface State {
 
 let state: State = freshState();
 
-/** Test helper and "start over" on sign-out. */
 export function resetDemo(): void {
   counter = 0;
   state = freshState();
@@ -374,7 +361,6 @@ function freshState(): State {
   rx2.versions.push(version(rx2.id, 1, "extraction", c.status, c.date, c.prescriber, c.meds, []));
   s.rxs.push(rx1, rx2);
 
-  // Slots: 3 days x 4 times for each hospital, starting tomorrow (local time).
   const base = new Date();
   base.setHours(0, 0, 0, 0);
   for (const h of HOSPITALS) {
@@ -391,7 +377,6 @@ function freshState(): State {
   return s;
 }
 
-// ---------- helpers ----------
 const delay = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 function respond(status: number, body?: unknown): Response {
@@ -497,7 +482,6 @@ function changedFieldNames(prev: Version | undefined, date: string | null, presc
   return out;
 }
 
-/** Same safety gate as the web/mobile clients and backend note I3 (0.85, four required fields). */
 function medicationIsSafe(m: Med): boolean {
   const filled = (v: string | null) => typeof v === "string" && v.trim() !== "";
   return m.confidence >= 0.85 && filled(m.name) && filled(m.strength) && filled(m.dose) && filled(m.frequency);
@@ -602,7 +586,6 @@ function validMeds(input: unknown): Med[] | null {
   return out;
 }
 
-// ---------- the fetch-compatible entry point ----------
 export async function demoFetch(input: string | URL | Request, init?: RequestInit): Promise<Response> {
   await delay(120);
   const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
@@ -618,7 +601,6 @@ export async function demoFetch(input: string | URL | Request, init?: RequestIni
     }
   }
 
-  // ----- auth -----
   if (path === "/auth/register" || path === "/auth/login") {
     if (method !== "POST" || !isRecord(body)) return invalid();
     const keys = Object.keys(body);
@@ -646,7 +628,6 @@ export async function demoFetch(input: string | URL | Request, init?: RequestIni
     return ok({ revoked: true });
   }
 
-  // ----- patient -----
   if (path === "/patients/me") {
     if (method === "GET") return ok(state.patient);
     if (method === "PATCH") return patchPatient(body);
@@ -665,7 +646,6 @@ export async function demoFetch(input: string | URL | Request, init?: RequestIni
   }
   if (path === "/patients/me/access-history" && method === "GET") return list(state.access);
 
-  // ----- prescriptions -----
   if (path === "/prescriptions") {
     if (method === "GET") return list([...state.rxs].reverse().map(rxView));
     if (method === "POST") {
@@ -702,7 +682,7 @@ export async function demoFetch(input: string | URL | Request, init?: RequestIni
       return ok(rxView(rx));
     }
     if (sub === "extracted-fields" && method === "PATCH") {
-      // BACKEND J1: owner only, based on the version the patient saw, a NEW version is the result.
+
       if (rx.status === "processing") return fail(409, "CONFLICT", "The prescription is being processed");
       if (!isRecord(body) || Object.keys(body).some((k) => !["baseVersionNumber", "prescriptionDate", "prescriberName", "medications"].includes(k))) return invalid();
       const base = body.baseVersionNumber;
@@ -733,7 +713,7 @@ export async function demoFetch(input: string | URL | Request, init?: RequestIni
           const unchanged = before !== undefined && MED_KEYS.every((k) => before[k] === row[k]);
           const confirmed = input[i]?.confirmed === true;
           if (confirmed) confirmedRows.push(i);
-          // BACKEND J1/K3: unchanged keeps its confidence unless confirmed; edited or added rows are "stated by a person" (1).
+
           return { ...row, confidence: unchanged ? (confirmed ? 1 : (before?.confidence ?? 1)) : 1 };
         });
       }
@@ -746,7 +726,6 @@ export async function demoFetch(input: string | URL | Request, init?: RequestIni
     if (sub === "pdf") return fail(404, "NOT_FOUND", "PDF is not available in demo mode");
   }
 
-  // ----- consents (backend F3: patient sees consents they granted; revoke is idempotent) -----
   if (path === "/consents" && method === "GET") return list(state.consents);
   const consentMatch = /^\/consents\/([^/]+)$/.exec(path);
   if (consentMatch && method === "DELETE") {
@@ -759,7 +738,6 @@ export async function demoFetch(input: string | URL | Request, init?: RequestIni
     return ok(c);
   }
 
-  // ----- medication schedules (BACKEND K) -----
   if (path === "/medication-schedules") {
     if (method === "GET") return list([...state.schedules].reverse().map(scheduleView));
     if (method === "POST") {
@@ -841,7 +819,6 @@ export async function demoFetch(input: string | URL | Request, init?: RequestIni
     }
   }
 
-  // ----- history (BACKEND L5) -----
   if (path === "/health-history" && method === "GET") return list(state.history);
   if (path === "/health-history/conditions" && method === "POST") {
     if (!isRecord(body) || Object.keys(body).some((k) => !["title", "notes", "diagnosedOn"].includes(k))) return invalid();
@@ -857,7 +834,6 @@ export async function demoFetch(input: string | URL | Request, init?: RequestIni
     return ok(entry, 201);
   }
 
-  // ----- QR (BACKEND J3: random reference, 15 min, owner-only, revocable) -----
   if (path === "/qr/access-sessions" && method === "POST") {
     if (!isRecord(body) || Object.keys(body).some((k) => k !== "prescriptionId") || typeof body.prescriptionId !== "string") return invalid();
     if (!state.rxs.some((r) => r.id === body.prescriptionId)) return notFound();
@@ -886,7 +862,6 @@ export async function demoFetch(input: string | URL | Request, init?: RequestIni
     }
   }
 
-  // ----- hospitals and appointments -----
   if (path === "/hospitals" && method === "GET") return list(HOSPITALS.map((h) => ({ ...h, isActive: true, isDemo: true })));
   const hMatch = /^\/hospitals\/([^/]+)(?:\/(availability))?$/.exec(path);
   if (hMatch && method === "GET") {
@@ -927,7 +902,6 @@ export async function demoFetch(input: string | URL | Request, init?: RequestIni
     return ok(apptView(a));
   }
 
-  // ----- vaccinations -----
   if (path === "/vaccinations") {
     if (method === "GET") {
       const items: PatientVaccination[] = VACCINE_CATALOG.map((cat) => {
@@ -947,7 +921,6 @@ export async function demoFetch(input: string | URL | Request, init?: RequestIni
         };
       });
 
-      // Include custom items
       for (const [k, v] of state.vaccinations.entries()) {
         const inCat = VACCINE_CATALOG.some((c) => c.name.toLowerCase() === k || c.id.toLowerCase() === k);
         if (!inCat) {
@@ -1019,7 +992,6 @@ export async function demoFetch(input: string | URL | Request, init?: RequestIni
     return ok({ success: true, clearedVaccine: vName });
   }
 
-  // ----- family members -----
   const RELATIONSHIP_LABELS: Record<FamilyRelationship, string> = {
     father: "Father",
     mother: "Mother",

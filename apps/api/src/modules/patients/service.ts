@@ -77,7 +77,6 @@ export interface ProfileDto {
   updatedAt: string;
 }
 
-/** Explicit field-by-field mapping: nothing is exposed unless it is listed here. */
 function toProfile(row: ProfileRow): ProfileDto {
   return {
     id: row.id,
@@ -111,7 +110,6 @@ export async function getProfile(db: Db, auth: AuthContext): Promise<ProfileDto>
 export async function updateProfile(db: Db, auth: AuthContext, input: UpdateProfileInput, ctx: Ctx): Promise<ProfileDto> {
   const id = await ownPatientId(db, auth);
 
-  // Only keys the client actually sent are written. Names are public API names.
   const data: Record<string, unknown> = {};
   const touched: string[] = [];
   const set = (apiName: string, column: string, value: unknown) => {
@@ -146,7 +144,7 @@ export async function updateProfile(db: Db, auth: AuthContext, input: UpdateProf
       const column = Object.keys(data)[index] as string;
       return JSON.stringify(beforeRecord[column] ?? null) !== JSON.stringify(data[column] ?? null);
     });
-    if (changedFields.length === 0) return before; // nothing changed: no write, no audit noise
+    if (changedFields.length === 0) return before;
 
     const after = await tx.patient.update({ where: { id }, data, select: PROFILE_SELECT });
     await recordAudit(tx, {
@@ -157,7 +155,7 @@ export async function updateProfile(db: Db, auth: AuthContext, input: UpdateProf
       resourceType: "patient_profile",
       resourceId: id,
       requestId: ctx.requestId,
-      // Field NAMES only, never the values.
+
       metadata: { changedFields },
     });
     return after;
@@ -184,9 +182,6 @@ export interface HealthCardDto {
   };
 }
 
-/**
- * Identity & emergency fields for digital/printable health card.
- */
 export async function getHealthCard(db: Db, auth: AuthContext): Promise<HealthCardDto> {
   const id = await ownPatientId(db, auth);
   const row = await db.patient.findUniqueOrThrow({
@@ -224,7 +219,6 @@ export async function getHealthCard(db: Db, auth: AuthContext): Promise<HealthCa
   };
 }
 
-/** Events a patient may see about their own record. Login and registration events are excluded. */
 const ACCESS_HISTORY_ACTIONS = [
   "access.granted",
   "access.denied",
@@ -236,7 +230,6 @@ const ACCESS_HISTORY_ACTIONS = [
   "qr.session_revoked",
 ];
 
-// Only these metadata keys are shown to the patient.
 const SHOWN_METADATA = ["resourceScope", "reason", "changedFields", "consentId", "granteeUserId", "versionNumber"];
 
 export interface AccessEventDto {
@@ -244,7 +237,7 @@ export interface AccessEventDto {
   occurredAt: string;
   action: string;
   outcome: string;
-  /** `userId` is included only for providers, whom the patient may have granted access. Never for other users. */
+
   actor: { type: "self" | "provider" | "other"; userId?: string };
   resourceType: string | null;
   resourceId: string | null;
@@ -308,7 +301,6 @@ export async function listAccessHistory(
   return { data, page: { limit: query.limit, nextCursor: hasMore ? (items[items.length - 1]?.id ?? null) : null } };
 }
 
-/** Consolidates all patient data into an authorized export payload adhering to privacy/export regulations. */
 export async function exportPatientData(db: Db, auth: AuthContext, ctx: Ctx) {
   const patientId = await ownPatientId(db, auth);
 
@@ -458,7 +450,6 @@ export async function exportPatientData(db: Db, auth: AuthContext, ctx: Ctx) {
   };
 }
 
-/** Account deactivation: revokes all active sessions and marks the user inactive while preserving legal audit records. */
 export async function deactivateAccount(db: Db, auth: AuthContext, ctx: Ctx) {
   const patientId = await ownPatientId(db, auth);
 

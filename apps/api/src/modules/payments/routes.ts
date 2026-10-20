@@ -26,7 +26,6 @@ const verifyPaymentSchema = z.strictObject({
 export function createPaymentRouter(db: Db, env: Env): Router {
   const router = Router();
 
-  // Public config for frontend checkout integration
   router.get("/config", (_req, res) => {
     res.json({
       data: {

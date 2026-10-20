@@ -2,7 +2,6 @@ import { z } from "zod";
 
 const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Choose a time.");
 
-/** Reminder preferences. The medicine, dose and strength always come from the prescription, never from this form. */
 export const reminderSchema = z
   .object({
     times: z

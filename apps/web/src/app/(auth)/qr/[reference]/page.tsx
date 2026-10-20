@@ -46,11 +46,10 @@ export default async function QrLandingPage(props: Props) {
   const { reference } = await props.params;
   const emergencyData = await fetchEmergencyProfile(reference);
 
-  // If this QR represents a patient's Emergency Health Card
   if (emergencyData) {
     return (
       <div className="mx-auto max-w-md space-y-6 py-4">
-        {/* Emergency Header */}
+
         <div className="border-destructive/40 bg-destructive/10 rounded-lg border-2 p-5 text-center">
           <HeartPulse className="text-destructive mx-auto size-10" />
           <h1 className="text-destructive mt-2 text-xl font-bold tracking-tight">
@@ -61,7 +60,6 @@ export default async function QrLandingPage(props: Props) {
           </p>
         </div>
 
-        {/* Patient Identity */}
         <div className="bg-card border-border space-y-3 rounded-lg border p-5 shadow-xs">
           <div className="flex items-start justify-between">
             <div>
@@ -81,7 +79,6 @@ export default async function QrLandingPage(props: Props) {
           </div>
         </div>
 
-        {/* Critical Allergies */}
         <div className="bg-card border-border space-y-2 rounded-lg border p-5 shadow-xs">
           <div className="flex items-center gap-2">
             <AlertTriangle className="size-4 text-amber-500" />
@@ -100,7 +97,6 @@ export default async function QrLandingPage(props: Props) {
           )}
         </div>
 
-        {/* Emergency Contact */}
         {emergencyData.emergencyContact?.phone ? (
           <div className="bg-card border-border space-y-3 rounded-lg border p-5 shadow-xs">
             <div className="flex items-center gap-2">
@@ -123,7 +119,6 @@ export default async function QrLandingPage(props: Props) {
           </div>
         ) : null}
 
-        {/* Privacy & Clinical Guard Notice */}
         <Alert tone="neutral">
           <AlertTitle className="text-xs font-semibold">Privacy & Clinical Access Notice</AlertTitle>
           <AlertDescription className="text-[11px] leading-relaxed">
@@ -140,7 +135,6 @@ export default async function QrLandingPage(props: Props) {
     );
   }
 
-  // Standard Scoped / Protected QR Landing Page
   return (
     <div className="mx-auto max-w-md space-y-6 py-6">
       <ShieldCheck aria-hidden="true" className="text-accent-foreground size-10" />

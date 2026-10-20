@@ -47,6 +47,4 @@ function main(): void {
   process.on("SIGINT", shutdown);
 }
 
-// Server entrypoint with Google Calendar OAuth & Resend integration
 main();
-

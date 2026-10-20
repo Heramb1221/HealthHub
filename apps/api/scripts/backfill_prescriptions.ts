@@ -62,7 +62,6 @@ async function main() {
       }
     }
 
-    // Check if HistoryEntry exists
     const doctorTitle = latest.prescriberName
       ? `Prescription: Dr. ${latest.prescriberName.replace(/^Dr\.?\s*/i, "")}`
       : "Prescription Consultation";

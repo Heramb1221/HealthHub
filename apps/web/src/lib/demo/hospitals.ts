@@ -6,15 +6,6 @@ import type { Appointment, AuthUser, AvailabilitySlot, Hospital, HospitalInput, 
 
 import { currentUser, isSeeded, requirePatient } from "./records";
 
-/**
- * DEMO ONLY. Typed stand-ins for /hospitals, /hospitals/:id/availability and /appointments.
- *
- * Every hospital here is synthetic and labelled as demo data. Slots are generated from fixed times relative to now.
- * Appointment state lives in ONE localStorage entry shared by every demo account in this browser, like a server would
- * share it, so a slot booked by one account (or in another tab) is genuinely gone for everyone else.
- * Booking and cancelling are each a single read-check-write step. The real guarantee against double booking is a
- * database transaction or unique constraint on the server; this only imitates its observable behaviour (409 on a lost race).
- */
 const SEED_HOSPITALS: Hospital[] = [
   {
     id: "demo-hospital-vanita",
@@ -90,7 +81,7 @@ const SLOT_TIMES: Record<string, string[]> = {
   "demo-hospital-rl": ["09:30", "11:00", "14:00", "16:00", "17:30"],
   "demo-hospital-ganpati": ["10:00", "11:30", "15:00", "16:00", "18:30"],
 };
-/** Hospitals an administrator adds in demo mode get this sample schedule so booking can be tried end to end. */
+
 const DEFAULT_TIMES = ["10:00", "11:00", "14:00"];
 const SLOT_MINUTES = 30;
 const DAYS_AHEAD = 14;
@@ -109,10 +100,6 @@ interface Store {
 
 const KEY = "healthhub-demo-appointments:v1";
 
-/**
- * Hospitals added or changed by the demo administrator, shared by every demo account in this browser (so a hospital
- * the admin adds is really what the patient sees). Seeded hospitals can be patched, never removed.
- */
 const HOSPITALS_KEY = "healthhub-demo-hospitals:v1";
 interface HospitalStore {
   created: Hospital[];
@@ -124,7 +111,7 @@ function loadHospitals(): HospitalStore {
     const raw = window.localStorage.getItem(HOSPITALS_KEY);
     if (raw) return JSON.parse(raw) as HospitalStore;
   } catch {
-    /* use empty store */
+
   }
   return { created: [], patches: {} };
 }
@@ -148,7 +135,7 @@ function load(): Store {
     const raw = window.localStorage.getItem(KEY);
     if (raw) return JSON.parse(raw) as Store;
   } catch {
-    /* use empty store */
+
   }
   return { appointments: [], seededCancelled: false };
 }
@@ -180,7 +167,6 @@ function toSlot(hospitalId: string, day: Date, time: string): AvailabilitySlot {
   };
 }
 
-/** Every slot the schedule defines for a hospital, taken or not, that starts far enough ahead. */
 function generatedSlots(hospitalId: string, now: Date): AvailabilitySlot[] {
   const out: AvailabilitySlot[] = [];
   for (let offset = 0; offset <= DAYS_AHEAD; offset++) {
@@ -193,7 +179,6 @@ function generatedSlots(hospitalId: string, now: Date): AvailabilitySlot[] {
   return out;
 }
 
-/** Some slots are deterministically "already taken by other patients" so the schedule looks lived-in and stays stable. */
 function takenByOthers(slotId: string): boolean {
   let h = 0;
   for (const c of slotId) h = (h * 31 + c.charCodeAt(0)) >>> 0;
@@ -224,7 +209,6 @@ function isTaken(slotId: string, store: Store, now: Date): boolean {
   return takenByOthers(slotId) || everyAppointment(store, now).some((a) => a.slotId === slotId && a.status === "booked");
 }
 
-/** What the API returns: the appointment without the demo store's internal bookkeeping fields. The hospital name is always the current one. */
 function publicView(a: StoredAppointment): Appointment {
   const name = allHospitals().find((h) => h.id === a.hospitalId)?.name ?? a.hospitalName;
   return { id: a.id, hospitalId: a.hospitalId, hospitalName: name, startsAt: a.startsAt, endsAt: a.endsAt, status: a.status, isDemo: a.isDemo };
@@ -235,7 +219,6 @@ function mine(user: AuthUser, store: Store, now: Date): StoredAppointment[] {
   return [...(isSeeded(user) ? [seededAppointment(store, now)] : []), ...own].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
 }
 
-/** The server checks the role on every admin call. The demo does the same, so a patient session is refused. */
 function requireAdmin(user: AuthUser) {
   if (user.role !== "admin") throw new ApiError({ code: "FORBIDDEN", message: "Only administrators can do this.", status: 403 });
 }
@@ -362,7 +345,7 @@ export const demoHospitalsApi: HospitalsApi = {
     try {
       if (typeof window !== "undefined") localStorage.setItem(key, JSON.stringify(stored));
     } catch {
-      // Ignore
+
     }
 
     return review;
@@ -421,7 +404,6 @@ export const demoAppointmentsApi: AppointmentsApi = {
     const hospital = allHospitals().find((h) => h.id === hospitalId) ?? notFound("This hospital doesn’t exist or isn’t available.");
     if (!hospital.active) conflict("This hospital isn’t accepting appointments.");
 
-    // Read, check and write with no await in between, so the check and the claim can't be separated.
     const store = load();
     const slot = generatedSlots(hospitalId, now).find((s) => s.id === slotId);
     if (!slot) throw new ApiError({ code: "VALIDATION_ERROR", message: "That time isn’t available. Choose another.", status: 422 });

@@ -1,6 +1,5 @@
 import { cn } from "@/lib/utils";
 
-/** Consistent page title block: h1, optional one-line description, optional actions aligned right on wide screens. */
 export function PageHeader({
   title,
   description,

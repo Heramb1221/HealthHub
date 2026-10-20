@@ -11,7 +11,6 @@ const specialties = z
     return items.filter((item) => (seen.has(item.toLowerCase()) ? false : (seen.add(item.toLowerCase()), true)));
   });
 
-/** isDemo is deliberately not accepted: only the seed can create demo-labelled rows. */
 export const createHospitalSchema = z.strictObject({
   name: text(120),
   address: text(300).nullable().optional(),

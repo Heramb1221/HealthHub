@@ -18,7 +18,7 @@ export const VACCINE_CATEGORIES: { id: VaccineCategory | "all"; label: string }[
 ];
 
 export const VACCINE_CATALOG: VaccineCatalogItem[] = [
-  // 1. Universal Immunization Programme (UIP) — Government Routine Vaccines
+
   {
     id: "bcg",
     name: "Bacillus Calmette–Guérin (BCG)",
@@ -97,7 +97,6 @@ export const VACCINE_CATALOG: VaccineCatalogItem[] = [
     description: "Adolescent and adult booster vaccine given at ages 10 and 16, and routinely for pregnant women.",
   },
 
-  // 2. Indian Academy of Pediatrics (IAP) & Private Healthcare Recommendations
   {
     id: "mmr",
     name: "MMR (Measles, Mumps, Rubella)",
@@ -141,7 +140,6 @@ export const VACCINE_CATALOG: VaccineCatalogItem[] = [
     description: "Gardasil/Cervarix types protecting pre-teens and young adults against cervical, anal, and throat cancers linked to HPV.",
   },
 
-  // 3. COVID-19 Vaccines Approved in India
   {
     id: "covishield",
     name: "Covishield",
@@ -199,7 +197,6 @@ export const VACCINE_CATALOG: VaccineCatalogItem[] = [
     description: "Indigenously developed Omicron-adapted mRNA booster.",
   },
 
-  // 4. Travel, Outbreak, and High-Risk Special Vaccines
   {
     id: "yellow_fever",
     name: "Yellow Fever Vaccine",

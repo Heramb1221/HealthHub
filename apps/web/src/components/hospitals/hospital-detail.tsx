@@ -36,7 +36,6 @@ export function HospitalDetail({ id }: { id: string }) {
   const [notice, setNotice] = React.useState<{ tone: "warning" | "danger"; title: string; body: string } | null>(null);
   const noticeRef = React.useRef<HTMLDivElement>(null);
 
-  // Real-time polling every 4 seconds to reflect live slot holds / bookings
   React.useEffect(() => {
     if (!active) return;
     const interval = setInterval(() => {
@@ -77,7 +76,7 @@ export function HospitalDetail({ id }: { id: string }) {
     try {
       await hospitalsApi.releaseSlot(id, currentId);
     } catch {
-      // Ignore
+
     } finally {
       await availability.reload();
     }
@@ -113,7 +112,7 @@ export function HospitalDetail({ id }: { id: string }) {
     setPending(true);
     setNotice(null);
     try {
-      // Only when the server has confirmed does the person see a booking at all.
+
       const appointment = await appointmentsApi.book({ hospitalId: id, slotId: chosen.id });
       router.push(`/appointments?booked=${encodeURIComponent(appointment.id)}`);
     } catch (error) {
@@ -252,7 +251,6 @@ export function HospitalDetail({ id }: { id: string }) {
               onReleaseSlot={handleReleaseSlot}
             />
 
-            {/* BookMyShow Style Sticky Bottom Checkout Bar */}
             <div className="bg-card/95 supports-[backdrop-filter]:bg-card/85 sticky bottom-4 z-20 rounded-xl border p-4 shadow-lg backdrop-blur-md" aria-live="polite">
               {chosen ? (
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

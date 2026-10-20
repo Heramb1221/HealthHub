@@ -2,10 +2,6 @@ import * as SecureStore from "expo-secure-store";
 
 import type { AuthUser } from "../api/types";
 
-/**
- * Only the access token, its expiry, and the account identity are persisted, in the platform keychain/keystore
- * (expo-secure-store). Medical records are never written to device storage: screens hold API data in memory only.
- */
 const KEY = "healthhub.session.v1";
 
 export interface StoredSession {
@@ -34,6 +30,6 @@ export async function clearSession(): Promise<void> {
   try {
     await SecureStore.deleteItemAsync(KEY);
   } catch {
-    // Nothing useful to do; the in-memory session is cleared regardless.
+
   }
 }

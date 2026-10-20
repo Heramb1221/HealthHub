@@ -1,5 +1,4 @@
-// Writes the synthetic demo PDFs to fixtures/synthetic/. Output is deterministic.
-// Run with: npm run fixtures:generate
+
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { FIXTURES } from "../src/extraction/fixtures.js";

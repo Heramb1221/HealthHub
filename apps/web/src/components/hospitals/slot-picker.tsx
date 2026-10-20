@@ -22,7 +22,7 @@ function localDayKey(iso: string) {
 }
 
 function getSessionPeriod(date: Date): "morning" | "afternoon" | "evening" {
-  // Use local hours
+
   const hours = date.getHours();
   if (hours < 13) return "morning";
   if (hours < 17) return "afternoon";
@@ -36,7 +36,7 @@ export function SlotPicker({
   onSelectSlot,
   onReleaseSlot,
 }: SlotPickerProps) {
-  // Group slots by local day
+
   const daysMap = React.useMemo(() => {
     const map = new Map<string, { date: Date; slots: AvailabilitySlot[] }>();
     for (const slot of slots) {
@@ -53,19 +53,16 @@ export function SlotPicker({
 
   const daysList = React.useMemo(() => Array.from(daysMap.entries()), [daysMap]);
 
-  // Active selected day: maintain chosen key, fall back to first day if unset/invalid
   const [chosenDayKey, setChosenDayKey] = React.useState<string>("");
   const activeDayKey = React.useMemo(() => {
     if (chosenDayKey && daysMap.has(chosenDayKey)) return chosenDayKey;
     return daysList[0]?.[0] ?? "";
   }, [chosenDayKey, daysMap, daysList]);
 
-  // Active day's slots
   const currentDaySlots = React.useMemo(() => {
     return daysMap.get(activeDayKey)?.slots ?? [];
   }, [daysMap, activeDayKey]);
 
-  // Divide into Morning, Afternoon, Evening
   const { morning, afternoon, evening } = React.useMemo(() => {
     const m: AvailabilitySlot[] = [];
     const a: AvailabilitySlot[] = [];
@@ -79,7 +76,6 @@ export function SlotPicker({
     return { morning: m, afternoon: a, evening: e };
   }, [currentDaySlots]);
 
-  // Hold Countdown Timer
   const [secondsRemaining, setSecondsRemaining] = React.useState<number | null>(null);
 
   React.useEffect(() => {
@@ -119,7 +115,7 @@ export function SlotPicker({
 
   return (
     <div className="space-y-6">
-      {/* Real-time Status Legend (Movie Ticket Matrix Style) */}
+
       <div className="bg-card flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4 text-xs shadow-sm">
         <div className="text-muted-foreground flex items-center gap-2 font-medium">
           <Clock className="text-primary size-4" />
@@ -145,7 +141,6 @@ export function SlotPicker({
         </div>
       </div>
 
-      {/* Date Carousel Navigation (BookMyShow style) */}
       <div className="relative">
         <div className="scrollbar-none flex gap-2.5 overflow-x-auto pb-2 pt-1">
           {daysList.map(([key, data]) => {
@@ -195,7 +190,6 @@ export function SlotPicker({
         </div>
       </div>
 
-      {/* Held by Current User Live Alert Banner */}
       {selectedSlotId && activeHoldSeconds !== null ? (
         <div className="border-amber-500/30 bg-amber-500/10 flex items-center justify-between rounded-lg border p-3 text-sm">
           <div className="flex items-center gap-2">
@@ -217,7 +211,6 @@ export function SlotPicker({
         </div>
       ) : null}
 
-      {/* OPD Cabin Screen Bar (Movie Theater Screen equivalent) */}
       <div className="relative py-2 text-center">
         <div className="border-primary/20 bg-gradient-to-b from-primary/10 to-transparent mx-auto h-2 w-3/4 rounded-t-full border-t-2" />
         <p className="text-muted-foreground -mt-1 text-[11px] font-semibold uppercase tracking-widest">
@@ -225,9 +218,8 @@ export function SlotPicker({
         </p>
       </div>
 
-      {/* Slots Sections (Morning / Afternoon / Evening) */}
       <div className="space-y-6">
-        {/* Morning Session */}
+
         {morning.length > 0 ? (
           <SessionBlock
             title="Morning OPD Session"
@@ -238,7 +230,6 @@ export function SlotPicker({
           />
         ) : null}
 
-        {/* Afternoon Session */}
         {afternoon.length > 0 ? (
           <SessionBlock
             title="Afternoon OPD Session"
@@ -249,7 +240,6 @@ export function SlotPicker({
           />
         ) : null}
 
-        {/* Evening Session */}
         {evening.length > 0 ? (
           <SessionBlock
             title="Evening Clinic Session"
@@ -303,7 +293,6 @@ function SessionBlock({ title, timeRange, slots, selectedSlotId, onSelectSlot }:
         </div>
       </div>
 
-      {/* Grid of 15-minute slot seats */}
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
         {slots.map((slot) => {
           const start = new Date(slot.startsAt);
@@ -367,7 +356,6 @@ function SessionBlock({ title, timeRange, slots, selectedSlotId, onSelectSlot }:
             );
           }
 
-          // Open Slot
           return (
             <button
               key={slot.id}

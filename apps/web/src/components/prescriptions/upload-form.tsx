@@ -31,7 +31,6 @@ export function UploadForm() {
     const form = event.currentTarget;
     setFormError(null);
 
-    // Snapshot everything the person entered before any await, so a later edit can't change what is submitted.
     const values = formValues(form);
     const chosen = file;
     const next: FieldErrors = {};

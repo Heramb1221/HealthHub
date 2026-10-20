@@ -14,10 +14,6 @@ export interface SendEmailResult {
   error?: string;
 }
 
-/**
- * Dispatches an email via Resend REST API using Node.js built-in fetch.
- * Does not depend on heavy third-party SDKs and respects API keys safely.
- */
 export async function sendResendEmail(env: Env, payload: SendEmailPayload): Promise<SendEmailResult> {
   const apiKey = env.RESEND_API_KEY;
   if (!apiKey) {

@@ -8,7 +8,7 @@ export interface AuthApi {
   register(input: RegisterInput): Promise<AuthUser>;
   loginWithProvider(provider: "google" | "apple"): Promise<AuthUser>;
   logout(): Promise<void>;
-  /** Resolves to null when nobody is signed in. Throws for any other failure. */
+
   getSession(): Promise<AuthUser | null>;
 }
 

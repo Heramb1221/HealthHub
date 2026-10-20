@@ -36,7 +36,6 @@ export function PaymentsView() {
   const [verifying, setVerifying] = React.useState(false);
   const [verificationResult, setVerificationResult] = React.useState<PaymentVerificationResult | null>(null);
 
-  // Load Razorpay Standard Checkout SDK on client mount
   React.useEffect(() => {
     if (typeof window !== "undefined" && !document.getElementById("razorpay-checkout-js")) {
       const script = document.createElement("script");
@@ -52,13 +51,13 @@ export function PaymentsView() {
     try {
       const order = await paymentsApi.createOrder({
         appointmentId,
-        amountPaise: 50000, // ₹500
+        amountPaise: 50000,
         currency: "INR",
       });
       setActiveCheckoutOrder(order);
       setVerificationResult(null);
       toast.success("Razorpay payment order generated.");
-      // If Razorpay SDK is loaded and order has Razorpay ID, automatically trigger popup
+
       if (order.orderRef.startsWith("order_") && !order.orderRef.startsWith("order_demo_")) {
         openRazorpayCheckout(order);
       }
@@ -158,7 +157,6 @@ export function PaymentsView() {
   const appointments: Appointment[] = appointmentsResource.status === "ready" ? appointmentsResource.data : [];
   const history: PaymentHistoryItem[] = historyResource.status === "ready" ? historyResource.data : [];
 
-  // Booked appointments that have not yet been marked completed in history
   const paidAppointmentTimes = new Set(
     history.filter((h: PaymentHistoryItem) => h.status === "completed").map((h: PaymentHistoryItem) => h.appointmentTime)
   );
@@ -174,7 +172,6 @@ export function PaymentsView() {
         description="Pay hospital consultation fees securely via Razorpay (UPI, NetBanking, Cards) and download digital receipts."
       />
 
-      {/* Razorpay Gateway Notice */}
       <Alert tone="neutral">
         <ShieldCheck className="size-4 text-primary" />
         <AlertTitle>Razorpay Payment Gateway Connected</AlertTitle>
@@ -184,7 +181,6 @@ export function PaymentsView() {
         </AlertDescription>
       </Alert>
 
-      {/* Active Checkout Drawer/Card */}
       {activeCheckoutOrder && (
         <div className="bg-card border-primary/40 space-y-4 rounded-lg border-2 p-6 shadow-md">
           <div className="flex items-start justify-between border-b pb-3">
@@ -294,7 +290,6 @@ export function PaymentsView() {
         </div>
       )}
 
-      {/* Booked Appointments Requiring Payment */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold">Unpaid Consultation Appointments ({pendingPaymentAppointments.length})</h2>
@@ -348,7 +343,6 @@ export function PaymentsView() {
         )}
       </div>
 
-      {/* Payment History & Invoices */}
       <div className="space-y-4 pt-4">
         <h2 className="text-base font-semibold">Payment History & Receipts</h2>
 

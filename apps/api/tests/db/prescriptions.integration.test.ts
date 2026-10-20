@@ -69,7 +69,6 @@ describe.skipIf(!TEST_DATABASE_URL)("prescription upload and reads", () => {
       expect(await store.read(row.originalStorageKey)).toEqual(bytes);
       expect(row.originalStorageKey).toMatch(new RegExp(`^prescriptions/${p.patientId}/[0-9a-f-]{36}$`));
 
-      // Nothing about where or what the file is leaks into the response.
       const text = JSON.stringify(res.body);
       for (const hidden of [row.originalStorageKey, "prescriptions/", "My Rx", row.originalSha256, "url", "http"]) {
         expect(text).not.toContain(hidden);
@@ -133,12 +132,12 @@ describe.skipIf(!TEST_DATABASE_URL)("prescription upload and reads", () => {
     it("rejects oversized files and stores nothing", async () => {
       const p = await registerPatient(app, h.db);
       const before = await storedCount();
-      const oneByteOver = await upload(p.token, png(2049 - 8)); // limit is 2048
+      const oneByteOver = await upload(p.token, png(2049 - 8));
       expect(oneByteOver.status).toBe(413);
       const slightlyOver = await upload(p.token, png(3000));
       expect(slightlyOver.status).toBe(413);
       expect(slightlyOver.body.error.code).toBe("PAYLOAD_TOO_LARGE");
-      const wayOver = await upload(p.token, png(300_000)); // rejected from Content-Length alone
+      const wayOver = await upload(p.token, png(300_000));
       expect(wayOver.status).toBe(413);
       expect(await storedCount()).toBe(before);
       expect(await h.db.prescriptionRecord.count({ where: { patientId: p.patientId } })).toBe(0);
@@ -310,10 +309,10 @@ describe.skipIf(!TEST_DATABASE_URL)("prescription upload and reads", () => {
       const provider = await seedUser(h.db, "provider");
       const token = await loginToken(app, provider.email);
 
-      expect((await getRx(token, rxA)).status).toBe(403); // no consent yet
+      expect((await getRx(token, rxA)).status).toBe(403);
 
       await h.db.consent.create({ data: { patientId: a.patientId, granteeUserId: provider.id, resourceScope: "profile:read", purpose: "p" } });
-      expect((await getRx(token, rxA)).status).toBe(403); // wrong scope
+      expect((await getRx(token, rxA)).status).toBe(403);
 
       const created = await request(app).post("/api/v1/consents").set(bearer(a.token)).send({ granteeUserId: provider.id, resourceScope: "prescriptions:read", purpose: "visit" });
       const allowed = await getRx(token, rxA);
@@ -322,7 +321,7 @@ describe.skipIf(!TEST_DATABASE_URL)("prescription upload and reads", () => {
       expect(await h.db.auditEvent.count({ where: { action: "access.granted", actorUserId: provider.id, resourceId: rxA } })).toBe(1);
 
       await request(app).delete(`/api/v1/consents/${created.body.data.id}`).set(bearer(a.token));
-      expect((await getRx(token, rxA)).status).toBe(403); // revoked
+      expect((await getRx(token, rxA)).status).toBe(403);
     });
 
     it("does not let a consent on one patient open another patient's prescription", async () => {

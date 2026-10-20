@@ -30,7 +30,7 @@ export function HealthCardView() {
 
   return (
     <div className="space-y-8">
-      {/* Page Header (hidden in print) */}
+
       <div className="print:hidden">
         <PageHeader
           title="Sehat Med Digital Card"
@@ -64,9 +64,9 @@ export function HealthCardView() {
         )
       ) : (
         <>
-          {/* SCREEN CONTROLS & DISPLAY (HIDDEN WHEN PRINTING) */}
+
           <div className="space-y-6 print:hidden">
-            {/* View switcher tabs */}
+
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
               <div className="flex items-center gap-1 rounded-lg bg-muted p-1">
                 <button
@@ -107,14 +107,12 @@ export function HealthCardView() {
                 </button>
               </div>
 
-              {/* Dimension tag */}
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <span className="size-2 rounded-full bg-emerald-500" />
                 <span>CR80 Wallet Standard (85.6mm × 54.0mm)</span>
               </div>
             </div>
 
-            {/* Selected View Mode Content */}
             {viewMode === "interactive" && (
               <div className="flex flex-col items-center justify-center py-4">
                 <InteractiveFlipCard card={card.data} />
@@ -142,7 +140,6 @@ export function HealthCardView() {
               <PrintableCardSheet card={card.data} />
             )}
 
-            {/* QR Code details accordion */}
             <details className="max-w-2xl rounded-md border border-border bg-card p-4 text-sm">
               <summary className="cursor-pointer font-medium text-foreground hover:text-primary flex items-center gap-2">
                 <Info className="size-4 text-info" />
@@ -159,12 +156,10 @@ export function HealthCardView() {
             </details>
           </div>
 
-          {/* DEDICATED PRINT CONTAINER (SHOWN ONLY DURING BROWSER PRINT) */}
           <div className="hidden print:block print:w-full">
             <PrintableCardSheet card={card.data} />
           </div>
 
-          {/* Explainer guide (hidden when printing) */}
           <AccessExplainer />
         </>
       )}

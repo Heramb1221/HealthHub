@@ -61,7 +61,7 @@ export function ProfileForm({
     setPending(true);
     try {
       const updated = await patientsApi.updateMe(toUpdateInput(result.data));
-      // Confirm only after the API has accepted the change.
+
       toast.success("Profile saved");
       onSaved(updated);
     } catch (error) {

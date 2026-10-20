@@ -6,11 +6,11 @@ import type { CreateScheduleInput, DoseEvent, DoseEventInput, MedicationSchedule
 export interface MedicationSchedulesApi {
   list(): Promise<MedicationSchedule[]>;
   get(id: string): Promise<MedicationSchedule>;
-  /** The server re-checks that the medicine is complete and reviewed before creating the schedule. */
+
   create(input: CreateScheduleInput): Promise<MedicationSchedule>;
-  /** Reminder preferences only (times, end date, on/paused). Medicine and dose can't be edited here. */
+
   update(id: string, input: UpdateScheduleInput): Promise<MedicationSchedule>;
-  /** Self-reported "taken" or "skipped" for one reminder slot. */
+
   recordDose(scheduleId: string, input: DoseEventInput): Promise<DoseEvent>;
 }
 
@@ -72,7 +72,7 @@ const liveSchedulesApi: MedicationSchedulesApi = {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       return (require("@/lib/demo/schedules") as typeof import("@/lib/demo/schedules")).demoSchedulesApi.get(id);
     }
-    // The contract has no single-schedule GET; read it from the list.
+
     const found = (await liveSchedulesApi.list()).find((s) => s.id === id);
     if (!found) {
       throw new ApiError({ code: "NOT_FOUND", message: "This reminder doesn’t exist or isn’t available to you.", status: 404 });
@@ -117,6 +117,6 @@ const liveSchedulesApi: MedicationSchedulesApi = {
 export const medicationSchedulesApi: MedicationSchedulesApi =
   process.env.NEXT_PUBLIC_API_MODE === "live"
     ? liveSchedulesApi
-    : // Required only in demo builds, so demo accounts and sample data never ship in a live bundle (see README).
+    :
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       (require("@/lib/demo/schedules") as typeof import("@/lib/demo/schedules")).demoSchedulesApi;

@@ -28,7 +28,6 @@ function ChangeLine({ change }: { change: Change }) {
   );
 }
 
-/** Every reading and correction is kept. Earlier values stay visible here and are never overwritten. */
 export function VersionHistory({ versions }: { versions: PrescriptionVersion[] }) {
   return (
     <ol className="space-y-6">

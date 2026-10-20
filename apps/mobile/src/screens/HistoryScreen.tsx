@@ -49,7 +49,7 @@ export function HistoryScreen() {
       setDiagnosed("");
       setAdding(false);
       setSuccess(true);
-      await res.reload(); // show what the server actually stored
+      await res.reload();
     } catch (e) {
       const info = describeError(e);
       setError(`${info.title}. ${info.detail}`);

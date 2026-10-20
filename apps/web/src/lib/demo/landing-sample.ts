@@ -1,10 +1,5 @@
 import type { PrescriptionMedication } from "@/lib/api/types";
 
-/**
- * ILLUSTRATION ONLY. Two invented rows used on the public landing page to show how HealthHub marks
- * what it could and could not read. Not a real prescription, patient or dosing recommendation.
- * Review status on the page is computed by lib/prescription-safety.ts, the same rule the app uses.
- */
 export const LANDING_SAMPLE_MEDICATIONS: PrescriptionMedication[] = [
   {
     name: "Paracetamol",

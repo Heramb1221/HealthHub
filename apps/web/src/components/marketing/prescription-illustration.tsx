@@ -5,7 +5,6 @@ import { ProcessingBadge, VerificationBadge } from "@/components/status/verifica
 import { LANDING_SAMPLE_MEDICATIONS } from "@/lib/demo/landing-sample";
 import { isInstructionSafe, medicationReviewReasons, REVIEW_REASON_LABEL } from "@/lib/prescription-safety";
 
-/** Hero visual: how an uploaded prescription is presented, with unclear details flagged instead of guessed. */
 export function PrescriptionIllustration() {
   return (
     <figure className="bg-card rounded-lg border shadow-xs">

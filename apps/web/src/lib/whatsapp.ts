@@ -8,10 +8,6 @@ export interface WhatsAppReminderOptions {
   phone?: string;
 }
 
-/**
- * Builds a direct, pre-filled WhatsApp click-to-chat URL (wa.me)
- * 100% free with no third-party API keys or setup required.
- */
 export function buildWhatsAppReminderUrl(options: WhatsAppReminderOptions): string {
   const cleanPhone = options.phone ? options.phone.replace(/[^0-9]/g, "") : "";
   const lines = [
@@ -32,9 +28,6 @@ export function buildWhatsAppReminderUrl(options: WhatsAppReminderOptions): stri
   return cleanPhone ? `https://wa.me/${cleanPhone}?text=${text}` : `https://wa.me/?text=${text}`;
 }
 
-/**
- * Builds a direct WhatsApp message link for appointment alerts.
- */
 export function buildWhatsAppAppointmentUrl(options: {
   hospitalName: string;
   dateStr: string;

@@ -110,7 +110,7 @@ function ScheduleCard({ schedule, onUpdated }: { schedule: MedicationSchedule; o
     setDoseError(null);
     try {
       const event = await medicationApi.reportDose(schedule.id, { scheduledFor, status });
-      setReported((r) => ({ ...r, [time]: event?.status ?? status })); // only after the server accepted it
+      setReported((r) => ({ ...r, [time]: event?.status ?? status }));
     } catch (error) {
       const info = describeError(error);
       setDoseError(`${info.title}. ${info.detail}`);
@@ -230,7 +230,6 @@ function ScheduleCard({ schedule, onUpdated }: { schedule: MedicationSchedule; o
   );
 }
 
-/** Prototype: local on-device reminders. Clearly separate from server-delivered push (not built). */
 function LocalReminders({ schedules }: { schedules: MedicationSchedule[] }) {
   const [permission, setPermission] = useState<ReminderPermission | null>(null);
   const [count, setCount] = useState(0);

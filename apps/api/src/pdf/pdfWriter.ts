@@ -1,11 +1,4 @@
-/**
- * Minimal, dependency-free PDF writer: A4 pages, wrapped text in Helvetica,
- * tinted banners, a rule, and a QR code drawn as vector squares. Output is
- * fully deterministic (no dates, no random ids) and uncompressed.
- *
- * Limitation: only the standard Helvetica fonts are used, so characters
- * outside Latin-1 (for example Devanagari) are printed as "?".
- */
+
 const PAGE_WIDTH = 595;
 const PAGE_HEIGHT = 842;
 const MARGIN = 50;
@@ -14,7 +7,6 @@ const CONTENT_WIDTH = PAGE_WIDTH - 2 * MARGIN;
 
 type Rgb = [number, number, number];
 
-/** Maps text to WinAnsi bytes and escapes PDF string syntax. Unsupported characters become "?". */
 export function toPdfText(text: string): string {
   let out = "";
   for (const char of text) {
@@ -27,7 +19,6 @@ export function toPdfText(text: string): string {
   return out;
 }
 
-/** Conservative wrapping: assumes a wide average glyph so lines never overflow the page. */
 export function wrapText(text: string, size: number, bold: boolean, width: number): string[] {
   const maxChars = Math.max(8, Math.floor(width / (size * (bold ? 0.62 : 0.58))));
   const lines: string[] = [];
@@ -82,7 +73,6 @@ export class PdfBuilder {
     this.y -= points;
   }
 
-  /** Wrapped text at the cursor. Starts a new page when needed. */
   text(text: string, options: { size?: number; bold?: boolean; indent?: number; color?: Rgb } = {}): void {
     const size = options.size ?? 10;
     const bold = options.bold ?? false;
@@ -98,7 +88,6 @@ export class PdfBuilder {
     }
   }
 
-  /** A tinted box with bold text inside, kept on one page. */
   banner(text: string, fill: Rgb): void {
     const size = 10.5;
     const lineHeight = size * 1.35;
@@ -131,7 +120,6 @@ export class PdfBuilder {
     this.y = newY;
   }
 
-  /** Draws a vector rectangle at specified coordinates */
   box(x: number, y: number, w: number, h: number, options: { fill?: Rgb; stroke?: Rgb; strokeWidth?: number } = {}): void {
     const { fill, stroke, strokeWidth } = options;
     let ops = "";
@@ -148,7 +136,6 @@ export class PdfBuilder {
     this.emit(ops);
   }
 
-  /** Direct text placement at exact x, y coordinate */
   textAt(text: string, x: number, y: number, options: { size?: number; bold?: boolean; color?: Rgb } = {}): void {
     const size = options.size ?? 10;
     const bold = options.bold ?? false;
@@ -163,14 +150,12 @@ export class PdfBuilder {
     this.y = PAGE_HEIGHT - MARGIN;
   }
 
-  /** Draws a line between two points */
   lineAt(x1: number, y1: number, x2: number, y2: number, options: { stroke?: Rgb; strokeWidth?: number } = {}): void {
     const stroke = options.stroke ?? [0.7, 0.7, 0.7];
     const width = options.strokeWidth ?? 0.5;
     this.emit(`${num(width)} w\n${stroke.map(num).join(" ")} RG\n${num(x1)} ${num(y1)} m ${num(x2)} ${num(y2)} l S\n`);
   }
 
-  /** Draws a QR matrix at specific x, y with custom module size */
   qrAt(matrix: boolean[][], x: number, y: number, moduleSize: number): void {
     const quiet = 2;
     const size = (matrix.length + 2 * quiet) * moduleSize;
@@ -184,7 +169,6 @@ export class PdfBuilder {
     this.emit(`${ops}f`);
   }
 
-  /** Draws a QR matrix (true = dark) with a 4-module quiet zone, kept on one page. */
   qr(matrix: boolean[][], moduleSize: number): void {
     const quiet = 4;
     const size = (matrix.length + 2 * quiet) * moduleSize;
@@ -201,9 +185,8 @@ export class PdfBuilder {
     this.y -= size + 4;
   }
 
-
   build(): Buffer {
-    // Object layout: 1 Catalog, 2 Pages, 3 Helvetica, 4 Helvetica-Bold, 5 Info, then (Page, Contents) pairs.
+
     const fonts = (name: string) => `<< /Type /Font /Subtype /Type1 /BaseFont /${name} /Encoding /WinAnsiEncoding >>`;
     const pageIds = this.pages.map((_p, i) => 6 + i * 2);
     const objects: string[] = [

@@ -17,7 +17,7 @@ import { correctionSchema } from "@/lib/validation/prescription";
 type RowFields = "name" | "strength" | "dose" | "route" | "frequency" | "duration" | "instructions";
 interface Row extends Record<RowFields, string> {
   key: string;
-  /** Reasons the original reading was unclear, shown to help the patient know where to look. */
+
   unclear: string[];
 }
 

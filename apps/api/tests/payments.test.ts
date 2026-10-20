@@ -13,7 +13,6 @@ describe("Razorpay HMAC-SHA256 signature verification", () => {
     expect(signature).toHaveLength(64);
     expect(/^[0-9a-f]{64}$/.test(signature)).toBe(true);
 
-    // Re-verify with matching input
     const verification = createHmac("sha256", secret).update(textToSign).digest("hex");
     expect(verification).toBe(signature);
   });

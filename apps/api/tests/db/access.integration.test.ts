@@ -13,7 +13,7 @@ describe.skipIf(!TEST_DATABASE_URL)("patient data access guard", () => {
   beforeAll(async () => {
     h = await openHarness(TEST_DATABASE_URL as string);
     const env = testEnv(TEST_DATABASE_URL as string);
-    // A stand-in protected resource: "the data of patient :patientId".
+
     app = buildApp(h.db, env, (router) => {
       router.get(
         "/test/patients/:patientId/data",

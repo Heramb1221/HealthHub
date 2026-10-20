@@ -28,11 +28,6 @@ function groupByDay(slots: AvailabilitySlot[]) {
   return days;
 }
 
-/**
- * Read-only view of the times patients can currently book. The API contract has no admin slot endpoints, so
- * nothing can be created or changed here. It deliberately shows open times only: which times are booked, and by
- * whom, is patient information that administrators don't get (docs/PRODUCT_SPEC.md).
- */
 export function AdminSlotsView({ id }: { id: string }) {
   const hospital = useResource(() => hospitalsApi.get(id), id);
   const slots = useResource(() => hospitalsApi.availability(id), `${id}:slots`);

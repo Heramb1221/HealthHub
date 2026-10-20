@@ -25,7 +25,6 @@ const callbackQuerySchema = z.object({
 export function calendarRouter(db: Db, env: Env): Router {
   const router = Router();
 
-  // Status check
   router.get("/status", authenticate(db, env), requireRole("patient"), async (req, res, next) => {
     try {
       const status = await getCalendarStatus(db, requireAuth(req), env);
@@ -35,7 +34,6 @@ export function calendarRouter(db: Db, env: Env): Router {
     }
   });
 
-  // Get OAuth Authorization URL
   router.get("/google/auth-url", authenticate(db, env), requireRole("patient"), async (req, res, next) => {
     try {
       const origin = (req.headers.origin as string) || (req.headers.referer as string);
@@ -46,7 +44,6 @@ export function calendarRouter(db: Db, env: Env): Router {
     }
   });
 
-  // OAuth redirect callback (public browser redirect from Google)
   router.get("/google/callback", async (req, res, next) => {
     try {
       const query = parse(callbackQuerySchema, req.query);
@@ -57,7 +54,6 @@ export function calendarRouter(db: Db, env: Env): Router {
     }
   });
 
-  // Disconnect Google Calendar
   router.post("/google/disconnect", authenticate(db, env), requireRole("patient"), async (req, res, next) => {
     try {
       await disconnectGoogleCalendar(db, requireAuth(req));
@@ -67,7 +63,6 @@ export function calendarRouter(db: Db, env: Env): Router {
     }
   });
 
-  // Sync medication schedules into Google Calendar
   router.post("/sync-schedules", authenticate(db, env), requireRole("patient"), async (req, res, next) => {
     try {
       const body = parse(syncSchema, req.body);

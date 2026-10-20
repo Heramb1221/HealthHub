@@ -77,7 +77,7 @@ describe("checkScheduleEligibility", () => {
       const real = (t: string | null) => t !== null && /[\p{L}\p{N}]/u.test(t);
       const expected =
         REVIEWED_STATUSES.includes(status) && [med.name, med.strength, med.dose, med.frequency].every(real) && Number.isFinite(med.confidence) && med.confidence >= 0.85 && med.confidence <= 2;
-      // Confidence above 1 is not valid data; the gate only checks the lower bound, which is the safety-relevant one.
+
       if (result.ok) {
         allowed += 1;
         expect(REVIEWED_STATUSES).toContain(status);
@@ -87,6 +87,6 @@ describe("checkScheduleEligibility", () => {
         expect(expected && med.confidence <= 1).toBe(false);
       }
     }
-    expect(allowed).toBeGreaterThan(0); // the loop really exercised the allow path
+    expect(allowed).toBeGreaterThan(0);
   });
 });

@@ -34,13 +34,11 @@ export function HospitalScreen({ route, navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [booked, setBooked] = useState<Appointment | null>(null);
 
-  // Rating & Review State
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [userRating, setUserRating] = useState<number>(5);
   const [userComment, setUserComment] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
 
-  // Auto-poll availability every 4 seconds for live concurrency updates
   const reloadSlots = slots.reload;
   useEffect(() => {
     const timer = setInterval(() => {
@@ -49,7 +47,6 @@ export function HospitalScreen({ route, navigation }: Props) {
     return () => clearInterval(timer);
   }, [reloadSlots]);
 
-  // Hold Countdown
   useEffect(() => {
     if (!holdExpiresAt || !selected) {
       return;
@@ -106,11 +103,11 @@ export function HospitalScreen({ route, navigation }: Props) {
     }
 
     if (selected === slot.id) {
-      // Deselect
+
       try {
         await hospitalApi.releaseSlot(id, slot.id);
       } catch {
-        // Ignore
+
       }
       setSelected(null);
       setHoldExpiresAt(null);
@@ -199,7 +196,6 @@ export function HospitalScreen({ route, navigation }: Props) {
         {booked ? <Button label="View my appointments" variant="secondary" onPress={() => navigation.navigate("Tabs", { screen: "Care" })} /> : null}
         {error ? <Banner tone="danger" title={error} icon="alert-circle" /> : null}
 
-        {/* Live Reservation Hold Banner */}
         {selected && activeHoldSeconds !== null ? (
           <Banner tone="warning" title={`Slot held for you: ${Math.floor(activeHoldSeconds / 60)}:${String(activeHoldSeconds % 60).padStart(2, "0")}`} icon="clock">
             Complete booking below to confirm your consultation.
@@ -294,7 +290,6 @@ export function HospitalScreen({ route, navigation }: Props) {
           })
         )}
 
-        {/* Bottom Floating Bar */}
         <Card style={{ marginTop: space.sm }}>
           <Row style={{ justifyContent: "space-between", alignItems: "center" }}>
             <View>
@@ -310,7 +305,6 @@ export function HospitalScreen({ route, navigation }: Props) {
           </Row>
         </Card>
 
-        {/* Patient Ratings and Reviews Card */}
         <Card style={{ marginTop: space.md }}>
           <Row style={{ justifyContent: "space-between", alignItems: "center" }}>
             <View>
@@ -397,7 +391,6 @@ export function HospitalScreen({ route, navigation }: Props) {
             </Stack>
           ) : null}
 
-          {/* List of reviews */}
           {reviews.data?.reviews && reviews.data.reviews.length > 0 ? (
             <Stack gap={space.md}>
               {reviews.data.reviews.map((r) => (

@@ -3,13 +3,6 @@ import { ExtractionUnrecognizedError, type ExtractionInput, type ExtractionProvi
 
 const MARKER = Buffer.from(FIXTURE_MARKER, "latin1");
 
-/**
- * Deterministic provider for development and tests. It does NOT read real
- * prescriptions. It only recognises synthetic fixture documents (files that
- * contain `HEALTHHUB-SYNTHETIC-FIXTURE:<id>`) and returns that fixture's fixed
- * output. Any other file is refused, so it can never invent medications for a
- * real document. Output depends only on the file's bytes.
- */
 export class MockExtractionProvider implements ExtractionProvider {
   readonly name = "mock-synthetic";
 
@@ -22,7 +15,6 @@ export class MockExtractionProvider implements ExtractionProvider {
     const fixture = id ? FIXTURES[id] : undefined;
     if (!fixture) throw new ExtractionUnrecognizedError();
 
-    // A deep copy, so callers can never mutate the shared fixture table.
     return structuredClone(fixture.raw);
   }
 }

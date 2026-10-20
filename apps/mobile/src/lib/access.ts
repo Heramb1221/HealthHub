@@ -12,7 +12,6 @@ export interface AccessDescription {
   tone: "neutral" | "warning" | "info";
 }
 
-/** Plain-language line for an access-history event (backend note G7). Unknown actions fall back to the action name. */
 export function describeAccessEvent(e: AccessEvent): AccessDescription {
   const scope = e.details?.resourceScope ? (SCOPE_LABEL[e.details.resourceScope] ?? e.details.resourceScope) : null;
   switch (e.action) {

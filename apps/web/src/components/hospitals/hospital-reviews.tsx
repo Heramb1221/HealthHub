@@ -73,7 +73,7 @@ export function HospitalReviews({ hospitalId, hospitalName }: { hospitalId: stri
 
   return (
     <div className="space-y-6">
-      {/* Top Header Card */}
+
       <div className="flex flex-col gap-4 rounded-xl border bg-card p-6 shadow-xs sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
@@ -87,7 +87,6 @@ export function HospitalReviews({ hospitalId, hospitalName }: { hospitalId: stri
           </p>
         </div>
 
-        {/* Rating Score Badge */}
         <div className="flex items-center gap-4">
           <div className="flex items-baseline gap-1.5">
             <span className="text-3xl font-bold tracking-tight text-foreground">
@@ -125,7 +124,6 @@ export function HospitalReviews({ hospitalId, hospitalName }: { hospitalId: stri
         </div>
       </div>
 
-      {/* Review Submission Form Drawer / Card */}
       {formOpen ? (
         <form
           onSubmit={handleSubmitReview}
@@ -140,7 +138,6 @@ export function HospitalReviews({ hospitalId, hospitalName }: { hospitalId: stri
             </span>
           </div>
 
-          {/* Interactive Star Picker */}
           <div className="flex items-center gap-2">
             {[1, 2, 3, 4, 5].map((star) => (
               <button
@@ -169,7 +166,6 @@ export function HospitalReviews({ hospitalId, hospitalName }: { hospitalId: stri
             </span>
           </div>
 
-          {/* Review Text Area */}
           <div className="space-y-1.5">
             <label htmlFor="hospital-review-text" className="text-xs font-medium text-foreground">
               Review details (optional)
@@ -214,7 +210,6 @@ export function HospitalReviews({ hospitalId, hospitalName }: { hospitalId: stri
         </form>
       ) : null}
 
-      {/* Reviews List */}
       {data.reviews.length === 0 ? (
         <div className="rounded-xl border border-dashed p-8 text-center bg-card/50">
           <ThumbsUp className="mx-auto size-8 text-muted-foreground/60" />

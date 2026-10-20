@@ -61,12 +61,10 @@ describe.skipIf(!TEST_DATABASE_URL)("QR access sessions", () => {
       expect(s.revokedAt).toBeNull();
       expect(s.qrPayload).toBe(`healthhub://qr/${s.id}`);
 
-      // expiresAt comes from the app clock and createdAt from the database clock, so allow a little skew.
       const ttl = new Date(s.expiresAt).getTime() - new Date(s.createdAt).getTime();
       expect(Math.abs(ttl - 15 * 60_000)).toBeLessThan(2_000);
       expect(new Date(s.expiresAt).getTime()).toBeGreaterThan(Date.now());
 
-      // The payload carries no medical or account data.
       for (const hidden of ["Examplecillin", "HH-", owner.email, owner.patientId, rx]) expect(s.qrPayload).not.toContain(hidden);
       const row = await h.db.qrAccessSession.findUniqueOrThrow({ where: { id: s.id } });
       expect(row.patientId).toBe(owner.patientId);
@@ -126,7 +124,7 @@ describe.skipIf(!TEST_DATABASE_URL)("QR access sessions", () => {
       const admin = await seedUser(h.db, "admin");
       expect((await create(await loginToken(app, admin.email), { prescriptionId: rx })).status).toBe(403);
       expect((await create(undefined, { prescriptionId: rx })).status).toBe(401);
-      expect(await h.db.qrAccessSession.count({ where: { patientId: owner.patientId } })).toBe(1); // only the one from scene()
+      expect(await h.db.qrAccessSession.count({ where: { patientId: owner.patientId } })).toBe(1);
     });
 
     it("rate-limits creation", async () => {
@@ -167,7 +165,7 @@ describe.skipIf(!TEST_DATABASE_URL)("QR access sessions", () => {
     it("gives a provider access only with a live prescriptions:read consent, checked on every read", async () => {
       const { owner, session, provider, rx } = await scene();
       await grant(owner.patientId, provider.id, "profile:read");
-      expect((await read(provider.token, session.id)).status).toBe(403); // wrong scope
+      expect((await read(provider.token, session.id)).status).toBe(403);
 
       const consent = await grant(owner.patientId, provider.id);
       const ok = await read(provider.token, session.id);
@@ -176,7 +174,7 @@ describe.skipIf(!TEST_DATABASE_URL)("QR access sessions", () => {
       expect(await h.db.auditEvent.count({ where: { action: "access.granted", actorUserId: provider.id, resourceId: session.id } })).toBe(1);
 
       await h.db.consent.update({ where: { id: consent.id }, data: { revokedAt: new Date() } });
-      expect((await read(provider.token, session.id)).status).toBe(403); // revoking consent ends access at once
+      expect((await read(provider.token, session.id)).status).toBe(403);
     });
 
     it("never gives admins or other patients access", async () => {

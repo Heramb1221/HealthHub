@@ -3,12 +3,9 @@ import { asList, request } from "./http";
 import type { Appointment, BookAppointmentInput } from "./types";
 
 export interface AppointmentsApi {
-  /** Soonest first. */
+
   list(): Promise<Appointment[]>;
-  /**
-   * Asks the server to book the slot. Resolves only when the server has confirmed it; rejects with 409 when the
-   * slot was taken first. The UI must never show a booking as made before this resolves.
-   */
+
   book(input: BookAppointmentInput): Promise<Appointment>;
   cancel(id: string): Promise<Appointment>;
 }
@@ -25,6 +22,6 @@ const liveAppointmentsApi: AppointmentsApi = {
 export const appointmentsApi: AppointmentsApi =
   process.env.NEXT_PUBLIC_API_MODE === "live"
     ? liveAppointmentsApi
-    : // Required only in demo builds, so demo accounts and sample data never ship in a live bundle (see README).
+    :
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       (require("@/lib/demo/hospitals") as typeof import("@/lib/demo/hospitals")).demoAppointmentsApi;

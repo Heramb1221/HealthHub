@@ -2,11 +2,6 @@ import { FIXTURES, FIXTURE_MARKER } from "./fixtures.js";
 
 const escapePdfText = (text: string): string => text.replace(/[\\()]/g, (c) => `\\${c}`).replace(/[^\x20-\x7e]/g, "?");
 
-/**
- * Builds a small, valid, fully deterministic PDF for a fixture id (no dates,
- * no random ids), so the same fixture always yields identical bytes. The PDF
- * is visibly labelled synthetic and carries the marker the mock provider looks for.
- */
 export function buildSyntheticPdf(fixtureId: string): Buffer {
   const fixture = FIXTURES[fixtureId];
   if (!fixture) throw new Error(`unknown synthetic fixture: ${fixtureId}`);

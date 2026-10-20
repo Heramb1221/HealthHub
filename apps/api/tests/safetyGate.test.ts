@@ -59,11 +59,11 @@ describe("fixtures through the gate", () => {
     expect(out.medications).toHaveLength(MAX_MEDICATIONS);
     expect(out.medications[0]?.name?.length).toBe(MAX_TEXT_LENGTH);
     expect(out.medications[0]?.instructions).toBe("line1 line2");
-    // 1.7 and "high" and -3 are invalid confidences: they count as 0, never as certain.
+
     expect(out.medications.slice(0, 3).map((m) => m.confidence)).toEqual([0, 0, 0]);
     for (const m of out.medications) expect(m.confidence).toBeGreaterThanOrEqual(0);
     for (const m of out.medications) expect(m.confidence).toBeLessThanOrEqual(1);
-    // The row with no readable content was dropped.
+
     expect(out.medications.some((m) => m.name === null && m.strength === null)).toBe(false);
   });
 });
@@ -98,7 +98,7 @@ describe("review triggers, one at a time", () => {
   it("handles dates", () => {
     expect(gate(rx([med()], { prescriptionDate: null })).verificationStatus).toBe("unverified");
     expect(gate(rx([med()], { prescriptionDate: undefined })).verificationStatus).toBe("unverified");
-    expect(gate(rx([med()], { prescriptionDate: "2026-10-10" })).verificationStatus).toBe("unverified"); // today
+    expect(gate(rx([med()], { prescriptionDate: "2026-10-10" })).verificationStatus).toBe("unverified");
     for (const bad of ["2026-10-11", "2999-01-01", "1899-12-31", "2026-02-30", "01/09/2026", "2026-09-01T10:00:00Z", 20260901, {}, "tomorrow"]) {
       const out = gate(rx([med()], { prescriptionDate: bad }));
       expect(out.prescriptionDate, String(bad)).toBeNull();
@@ -179,7 +179,7 @@ describe("a provider can never verify its own output", () => {
           expect(text.length).toBeLessThanOrEqual(MAX_TEXT_LENGTH);
           expect([...text].every((c) => (c.codePointAt(0) ?? 0) >= 32 && c.codePointAt(0) !== 127)).toBe(true);
         }
-        // A row that is allowed to stay "unverified" must be complete and confident.
+
         if (v.verificationStatus === "unverified") {
           expect(m.confidence).toBeGreaterThanOrEqual(CONFIDENCE_REVIEW_THRESHOLD);
           for (const field of [m.name, m.strength, m.dose, m.frequency]) expect(field).not.toBeNull();
@@ -187,7 +187,7 @@ describe("a provider can never verify its own output", () => {
       }
       if (v.verificationStatus === "unverified") expect(v.overallConfidence).toBeGreaterThanOrEqual(CONFIDENCE_REVIEW_THRESHOLD);
     }
-    // Both outcomes were actually exercised, so the loop is not vacuous.
+
     expect(statuses.has("needs_review")).toBe(true);
   }, 15000);
 });

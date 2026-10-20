@@ -34,7 +34,6 @@ export async function getCalendarStatus(
 ): Promise<CalendarStatusDto> {
   const isConfigured = Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
 
-  // 1. Check local GoogleOAuthToken table
   const token = await db.googleOAuthToken.findUnique({
     where: { userId: auth.userId },
   });
@@ -48,7 +47,6 @@ export async function getCalendarStatus(
     };
   }
 
-  // 2. Check Clerk OAuth tokens if user is linked to Clerk
   if (env.CLERK_SECRET_KEY) {
     try {
       const user = await db.user.findUnique({
@@ -69,7 +67,7 @@ export async function getCalendarStatus(
         }
       }
     } catch {
-      // Clerk OAuth token fetch failed or not authorized with Google scope
+
     }
   }
 
@@ -156,7 +154,7 @@ export async function handleGoogleOAuthCallback(
       email = info.email ?? null;
     }
   } catch {
-    // optional userinfo
+
   }
 
   const expiryDate = tokenData.expires_in
@@ -186,7 +184,7 @@ export async function handleGoogleOAuthCallback(
   try {
     targetOrigin = new URL(redirectUri).origin;
   } catch {
-    // fallback
+
   }
 
   return { redirectUrl: `${targetOrigin}/medications?calendarConnected=true` };
@@ -203,7 +201,7 @@ async function getValidAccessToken(
   auth: AuthContext,
   env: Env,
 ): Promise<string> {
-  // Check local database
+
   const tokenRecord = await db.googleOAuthToken.findUnique({
     where: { userId: auth.userId },
   });
@@ -249,7 +247,6 @@ async function getValidAccessToken(
     return tokenRecord.accessToken;
   }
 
-  // Check Clerk Google OAuth token
   if (env.CLERK_SECRET_KEY) {
     const user = await db.user.findUnique({
       where: { id: auth.userId },
@@ -300,12 +297,11 @@ export async function syncMedicationSchedules(
     for (const time of times) {
       const [hourStr, minStr] = time.split(":");
       const startDateTime = `${startIsoDate}T${(hourStr || "08").padStart(2, "0")}:${(minStr || "00").padStart(2, "0")}:00`;
-      
+
       const startD = new Date(`${startIsoDate}T${time}:00`);
       const endD = new Date(startD.getTime() + 15 * 60_000);
       const endDateTime = `${startIsoDate}T${String(endD.getHours()).padStart(2, "0")}:${String(endD.getMinutes()).padStart(2, "0")}:00`;
 
-      // Recurrence rule
       const recurrenceRules: string[] = [];
       if (schedule.endDate) {
         const untilStr = schedule.endDate.toISOString().slice(0, 10).replace(/-/g, "");

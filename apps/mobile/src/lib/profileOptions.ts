@@ -1,6 +1,5 @@
 import type { BloodGroup, Gender } from "../api/types.ts";
 
-/** Allowed values from backend note G3. The server validates; the app offers only these. */
 export const GENDER_OPTIONS: { value: Gender; label: string }[] = [
   { value: "female", label: "Female" },
   { value: "male", label: "Male" },

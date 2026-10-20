@@ -48,7 +48,7 @@ before(async () => {
       res.writeHead(502, { "Content-Type": "text/html" });
       return res.end("<html>bad gateway with secrets</html>");
     }
-    if (url === "/api/v1/slow") return; // never responds: exercises the timeout
+    if (url === "/api/v1/slow") return;
     if (url === "/api/v1/empty") return send(204);
     send(404, { error: { code: "NOT_FOUND", message: "nope", requestId: "r4" } });
   });

@@ -87,7 +87,6 @@ describe("EXTRACTION_PROVIDER setting", () => {
     expect(loadEnv({ ...base, EXTRACTION_PROVIDER: "mock" }).EXTRACTION_PROVIDER).toBe("mock");
     expect(loadEnv({ ...base, EXTRACTION_PROVIDER: "gemini", GEMINI_API_KEY: "dummy_key" }).EXTRACTION_PROVIDER).toBe("gemini");
 
-    // gemini without GEMINI_API_KEY is rejected
     try {
       loadEnv({ ...base, EXTRACTION_PROVIDER: "gemini" });
       expect.unreachable("gemini without GEMINI_API_KEY");

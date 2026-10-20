@@ -1,7 +1,3 @@
-/**
- * Browser-native Notification helper.
- * Free, offline-friendly, and runs directly on the user's laptop or mobile browser.
- */
 
 export async function requestBrowserNotificationPermission(): Promise<boolean> {
   if (typeof window === "undefined" || !("Notification" in window)) {
@@ -43,6 +39,6 @@ export function triggerBrowserMedicationAlarm(options: {
       requireInteraction: true,
     });
   } catch {
-    // Fallback if Notification constructor fails
+
   }
 }

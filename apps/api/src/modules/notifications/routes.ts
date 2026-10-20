@@ -81,4 +81,3 @@ export function createNotificationRouter(db: Db, env: Env): Router {
 
   return router;
 }
-

@@ -62,7 +62,7 @@ describe.skipIf(!TEST_DATABASE_URL)("appointments", () => {
       const second = await book(b.token, { slotId: s.id });
       expect(second.status).toBe(409);
       expect(second.body.error.code).toBe("CONFLICT");
-      expect((await book(a.token, { slotId: s.id })).status).toBe(409); // the same patient again
+      expect((await book(a.token, { slotId: s.id })).status).toBe(409);
       expect(await confirmedFor(s.id)).toBe(1);
     });
 
@@ -76,7 +76,7 @@ describe.skipIf(!TEST_DATABASE_URL)("appointments", () => {
     });
 
     it("turns the database's refusal into a clean conflict even when nothing checked first", async () => {
-      // Another booking exists that the application never saw: only the constraint can stop this one.
+
       const a = await registerPatient(app, h.db);
       const b = await registerPatient(app, h.db);
       const s = await slot((await hospital()).id, 9);
@@ -122,7 +122,7 @@ describe.skipIf(!TEST_DATABASE_URL)("appointments", () => {
       expect((await book(p.token, { slotId: a.id })).status).toBe(201);
       const overlapping = await slot((await hospital()).id, 20.5, 60);
       expect((await book(p.token, { slotId: overlapping.id })).status).toBe(409);
-      const backToBack = await slot((await hospital()).id, 21, 30); // starts exactly when the first ends
+      const backToBack = await slot((await hospital()).id, 21, 30);
       expect((await book(p.token, { slotId: backToBack.id })).status).toBe(201);
     });
 
@@ -173,8 +173,8 @@ describe.skipIf(!TEST_DATABASE_URL)("appointments", () => {
       expect(again.status).toBe(200);
       expect(again.body.data.cancelledAt).toBe(res.body.data.cancelledAt);
       expect(await h.db.auditEvent.count({ where: { action: "appointment.cancelled", resourceId: appt.id } })).toBe(1);
-      expect((await book(b.token, { slotId: s.id })).status).toBe(201); // freed
-      expect((await book(a.token, { slotId: s.id })).status).toBe(409); // and now taken again
+      expect((await book(b.token, { slotId: s.id })).status).toBe(201);
+      expect((await book(a.token, { slotId: s.id })).status).toBe(409);
     });
 
     it("hides other patients' appointments and refuses past ones", async () => {

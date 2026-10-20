@@ -30,19 +30,12 @@ const medication = z
     frequency: text.nullable().optional(),
     duration: text.nullable().optional(),
     instructions: text.nullable().optional(),
-    // "I checked this row against the original prescription." Raises an unchanged row to
-    // confidence 1 so it can be used for a schedule; an edited or added row is already 1.
+
     confirmed: z.boolean().optional(),
   })
-  // An entirely empty row is not a medication.
+
   .refine((row) => MEDICATION_FIELDS.some((field) => typeof row[field] === "string"));
 
-/**
- * `baseVersionNumber` is the version the client was looking at (0 when there is
- * none yet). It must still be the newest version, so one edit can never
- * silently overwrite a newer one. Omitted fields keep their current value;
- * `medications`, when sent, replaces the whole list.
- */
 export const correctionSchema = z
   .strictObject({
     baseVersionNumber: z.number().int().min(0).max(1_000_000),
@@ -56,7 +49,6 @@ export type CorrectionInput = z.infer<typeof correctionSchema>;
 
 const orNull = (value: string | null | undefined): string | null => value ?? null;
 
-/** Adds `medications.<row>.confirmed` names, keeping the list in row order. */
 function withConfirmed(changed: string[], confirmedRows: number[]): string[] {
   const out: string[] = [];
   const pending = [...confirmedRows].sort((a, b) => a - b);
@@ -72,20 +64,6 @@ function withConfirmed(changed: string[], confirmedRows: number[]): string[] {
   return out;
 }
 
-/**
- * Records a patient's review of a prescription as a NEW version. Earlier
- * versions and the original file are never changed. The new version is
- * `patient_corrected`: the patient's own entry or confirmation, which is not
- * verification by a clinician. A correction with no actual changes is still
- * recorded (with empty changedFields) because it documents the patient's review.
- *
- * Confidence is an extraction measure. A row whose text is unchanged keeps its
- * previous confidence, unless the patient marks it `confirmed`. A row the
- * patient edited, added, or confirmed gets 1, meaning "stated by a person", not
- * "read with certainty"; verificationStatus, not confidence, is what says how
- * far the data can be trusted. Confirming a row is recorded in changedFields as
- * `medications.<row>.confirmed`.
- */
 export async function correctPrescription(
   db: Db,
   auth: AuthContext,
@@ -98,7 +76,7 @@ export async function correctPrescription(
   let created;
   try {
     created = await db.$transaction(async (tx) => {
-      // Serialises corrections with each other and with processing for this record.
+
       await tx.$queryRaw`SELECT "id" FROM "PrescriptionRecord" WHERE "id" = ${prescriptionId}::uuid FOR UPDATE`;
 
       const record = await tx.prescriptionRecord.findUniqueOrThrow({
@@ -143,7 +121,6 @@ export async function correctPrescription(
         medications: nextMedications,
       });
 
-      // Rows unchanged in text whose confidence the patient raised by confirming them.
       const confirmedRows = nextMedications
         .map((row, position) => ({ row, position }))
         .filter(({ row, position }) => {
@@ -185,13 +162,13 @@ export async function correctPrescription(
         resourceType: "prescription",
         resourceId: prescriptionId,
         requestId: ctx.requestId,
-        // Version numbers and field NAMES only. Never the values.
+
         metadata: { versionNumber: version.versionNumber, baseVersionNumber: input.baseVersionNumber, changedFields },
       });
       return version;
     });
   } catch (err) {
-    // Two corrections racing for the same version number: the database refuses the second one.
+
     if (typeof err === "object" && err !== null && (err as { code?: unknown }).code === "P2002") {
       throw new AppError("CONFLICT", "The record changed since you loaded it");
     }

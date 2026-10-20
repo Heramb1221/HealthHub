@@ -8,7 +8,6 @@ export function appointmentHospitalName(a: Appointment): string {
   return a.hospital.name || "Hospital";
 }
 
-/** Earliest confirmed appointment that has not started yet, or null. */
 export function nextAppointment(list: Appointment[], now: Date = new Date()): Appointment | null {
   let best: { a: Appointment; t: number } | null = null;
   for (const a of list) {

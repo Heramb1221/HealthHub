@@ -20,11 +20,11 @@ describe("sniffMime", () => {
       Buffer.from("<svg xmlns='http://www.w3.org/2000/svg'/>"),
       Buffer.from("GIF89a"),
       Buffer.from("PK\x03\x04 zip"),
-      Buffer.from([0xff, 0xd8]), // truncated JPEG signature
-      Buffer.from([0x89, 0x50, 0x4e, 0x47]), // truncated PNG signature
-      Buffer.concat([Buffer.from("RIFF"), Buffer.alloc(4), Buffer.from("WAVEfmt ")]), // RIFF but not WebP
-      Buffer.from("%PDF"), // no dash
-      Buffer.from("  %PDF-1.4"), // leading whitespace
+      Buffer.from([0xff, 0xd8]),
+      Buffer.from([0x89, 0x50, 0x4e, 0x47]),
+      Buffer.concat([Buffer.from("RIFF"), Buffer.alloc(4), Buffer.from("WAVEfmt ")]),
+      Buffer.from("%PDF"),
+      Buffer.from("  %PDF-1.4"),
     ];
     for (const buffer of rejected) expect(sniffMime(buffer), JSON.stringify(buffer.subarray(0, 12).toString("latin1"))).toBeNull();
   });
@@ -56,7 +56,7 @@ describe("sanitizeFileName", () => {
   it("removes control characters and replaces unsafe ones", () => {
     expect(sanitizeFileName("a\nb\tc\u0000.png")).toBe("abc.png");
     expect(sanitizeFileName("<img src=x onerror=alert(1)>.png")).toBe("_img src_x onerror_alert_1__.png");
-    // A "/" starts a new path segment, so only the last one is kept.
+
     expect(sanitizeFileName("<script>alert(1)</script>.png")).toBe("script_.png");
     expect(sanitizeFileName("name\u202e.png")).toBe("name_.png");
     expect(sanitizeFileName("a;rm -rf *.png")).toBe("a_rm -rf _.png");

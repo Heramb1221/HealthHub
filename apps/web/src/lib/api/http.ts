@@ -6,9 +6,9 @@ type Query = Record<string, string | number | boolean | undefined | null>;
 export interface RequestOptions {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
   query?: Query;
-  /** JSON body. Mutually exclusive with `formData`. */
+
   json?: unknown;
-  /** Multipart body, e.g. prescription upload. Content-Type is set by the browser. */
+
   formData?: FormData;
   signal?: AbortSignal;
 }
@@ -42,7 +42,7 @@ export async function resolveAuthToken(): Promise<string | null> {
         return fresh;
       }
     } catch {
-      // fallback to cached token
+
     }
   }
   return getAuthToken();
@@ -70,10 +70,6 @@ function buildUrl(path: string, query?: Query) {
   return qs ? `${url}?${qs}` : url;
 }
 
-/**
- * The contract allows success responses to be either the bare resource, `{ data: resource }`,
- * or paginated list `{ data: [...], page: ... }`.
- */
 export function unwrapEnvelope<T>(body: unknown): T {
   if (typeof body === "object" && body !== null && !Array.isArray(body)) {
     if ("data" in body) {
@@ -96,7 +92,6 @@ async function parseBody(response: Response): Promise<unknown> {
   }
 }
 
-/** Typed JSON request. Sends credentials and Authorization: Bearer <token>. */
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = "GET", query, json, formData, signal } = options;
   const headers: Record<string, string> = { Accept: "application/json" };
@@ -133,7 +128,6 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   return unwrapEnvelope<T>(parsed);
 }
 
-/** Binary download (e.g. prescription PDF). Returns the blob and a suggested filename if provided. */
 export async function requestBlob(path: string, signal?: AbortSignal): Promise<{ blob: Blob; filename?: string }> {
   let response: Response;
   const headers: Record<string, string> = {};
@@ -155,7 +149,6 @@ export async function requestBlob(path: string, signal?: AbortSignal): Promise<{
   return { blob: await response.blob(), filename: match?.[1] };
 }
 
-/** List endpoints may return a bare array, `{ data: [...] }` or `{ items: [...] }`. */
 export function asList<T>(body: T[] | { items: T[] } | { data: T[] } | null | undefined): T[] {
   if (!body) return [];
   if (Array.isArray(body)) return body;

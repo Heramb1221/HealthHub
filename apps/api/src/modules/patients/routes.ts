@@ -20,7 +20,6 @@ const acceptTermsSchema = z.strictObject({
   version: z.string().min(1).max(50),
 });
 
-/** `/patients/me/*`: the patient is always the authenticated session's own patient. No patient id is ever read from the client. */
 export function createPatientRouter(db: Db, env: Env): Router {
   const router = Router();
   router.use(authenticate(db, env));

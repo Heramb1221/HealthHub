@@ -29,7 +29,6 @@ export function EmptyState({ icon = "inbox", title, body, action }: { icon?: Ico
   );
 }
 
-/** Network/server error with a retry action when retrying can help. */
 export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   const info = describeError(error);
   return (
@@ -51,7 +50,6 @@ export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () =>
   );
 }
 
-/** Shown when the user denied a device permission. Offers the OS settings, never a fake workaround. */
 export function PermissionDenied({ what, why }: { what: string; why: string }) {
   return (
     <Stack gap={space.md} style={{ padding: space.lg }}>

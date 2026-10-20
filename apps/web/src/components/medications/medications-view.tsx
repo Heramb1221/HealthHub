@@ -26,7 +26,6 @@ import { buildWhatsAppReminderUrl } from "@/lib/whatsapp";
 import { isBrowserNotificationGranted, requestBrowserNotificationPermission, triggerBrowserMedicationAlarm } from "@/lib/browser-notifications";
 import { useLanguage } from "@/lib/i18n/language-context";
 
-
 function AddButton() {
   return (
     <Button asChild>
@@ -52,7 +51,7 @@ function DoseRow({
   slot: DoseSlot;
   now: Date;
   concern: string | null;
-  /** Resolves true only when the API accepted the record. Shows its own error message when it fails. */
+
   onRecord: (slot: DoseSlot, status: "taken" | "skipped") => Promise<boolean>;
 }) {
   const [changing, setChanging] = React.useState(false);
@@ -62,11 +61,10 @@ function DoseRow({
   const justRecorded = React.useRef(false);
   const { schedule, at, event } = slot;
   const label = `${schedule.medicationName} at ${formatTime(at)}`;
-  // A dose can be marked from one hour before its time. Marking a dose that is hours away would be a guess, not a record.
+
   const canRecord = at.getTime() <= now.getTime() + HOUR;
   const showButtons = canRecord && (!event || changing);
 
-  // Keep keyboard focus on the row after the buttons are replaced by the recorded state.
   React.useEffect(() => {
     if (justRecorded.current && event && !changing) {
       changeRef.current?.focus();
@@ -76,8 +74,7 @@ function DoseRow({
 
   async function record(status: "taken" | "skipped") {
     setPending(true);
-    // Set before the request: the parent re-renders with the new event as soon as the API answers,
-    // and the focus effect must already know this change came from the person.
+
     justRecorded.current = true;
     const saved = await onRecord(slot, status);
     setPending(false);
@@ -169,10 +166,9 @@ function DoseRow({
   );
 }
 
-
 export function MedicationsView() {
   const [now, setNow] = React.useState(() => new Date());
-  // Keep "due" and "upcoming" current without a reload, and roll over at midnight.
+
   React.useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 60_000);
     return () => clearInterval(timer);
@@ -183,7 +179,7 @@ export function MedicationsView() {
   async function record(slot: DoseSlot, status: "taken" | "skipped"): Promise<boolean> {
     try {
       const event = await medicationSchedulesApi.recordDose(slot.schedule.id, { scheduledFor: slot.at.toISOString(), status });
-      // Update the screen only after the API has accepted the record.
+
       if (schedules.status === "ready") {
         schedules.setData(schedules.data.map((s) => (s.id === slot.schedule.id ? { ...s, doseEvents: [...(s.doseEvents ?? []), event] } : s)));
       }
@@ -313,7 +309,6 @@ export function MedicationsView() {
       <AddButton />
     </div>
   );
-
 
   return (
     <div className="space-y-10">

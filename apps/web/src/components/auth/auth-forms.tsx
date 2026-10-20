@@ -13,7 +13,6 @@ import { describeError, isApiError } from "@/lib/api/errors";
 import { formValues, safeNextPath, validate, type FieldErrors } from "@/lib/forms";
 import { signInSchema, signUpSchema } from "@/lib/validation/auth";
 
-/** For sign-in and sign-up the server's own message (wrong password, duplicate email) is the useful one. */
 function authErrorMessage(error: unknown): string {
   if (isApiError(error) && error.code !== "NETWORK_ERROR" && error.code !== "INVALID_RESPONSE") return error.message;
   const { title, detail } = describeError(error);

@@ -1,9 +1,5 @@
 import { z } from "zod";
 
-/**
- * Client-side validation for fast feedback only. The API validates again and is authoritative.
- * ASSUMPTION: 8-character minimum password; confirm the real policy with the backend owner.
- */
 export const signInSchema = z.object({
   email: z.string().trim().min(1, "Enter your email address.").pipe(z.email("Enter an email address like name@example.com.")),
   password: z.string().min(1, "Enter your password."),

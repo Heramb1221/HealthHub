@@ -18,7 +18,6 @@ interface Ctx {
   requestId: string;
 }
 
-/** Demo accounts only; the development-only login refuses every other address. */
 export const DEMO_EMAIL_DOMAIN = "@demo.healthhub.test";
 
 const MAX_HEALTH_ID_ATTEMPTS = 5;
@@ -27,7 +26,6 @@ function isUniqueViolation(err: unknown): boolean {
   return typeof err === "object" && err !== null && (err as { code?: unknown }).code === "P2002";
 }
 
-/** A token never outlives the absolute maximum session age, counted from the original login. */
 function sessionExpiry(env: Env, originAt: Date): Date {
   return new Date(Math.min(Date.now() + env.ACCESS_TOKEN_TTL_MINUTES * 60_000, originAt.getTime() + env.SESSION_MAX_HOURS * 3_600_000));
 }
@@ -40,7 +38,6 @@ async function issueSession(db: Db, env: Env, user: { id: string; email: string;
   return { user, accessToken, expiresAt: expiresAt.toISOString() };
 }
 
-/** Registration always creates a patient user plus its patient row. The role is never client-supplied. */
 export async function register(db: Db, env: Env, input: { email: string; password: string; fullName?: string }, ctx: Ctx): Promise<AuthResult> {
   const passwordHash = await hashPassword(input.password);
 
@@ -67,10 +64,10 @@ export async function register(db: Db, env: Env, input: { email: string; passwor
       return await issueSession(db, env, user);
     } catch (err) {
       if (!isUniqueViolation(err)) throw err;
-      // Either the email is taken or the generated health ID collided; tell them apart.
+
       const existing = await db.user.findUnique({ where: { email: input.email }, select: { id: true } });
       if (existing) throw new AppError("CONFLICT", "Unable to register with these details");
-      // Health ID collision: loop and generate another.
+
     }
   }
   throw new AppError("INTERNAL_ERROR");
@@ -82,7 +79,6 @@ export async function login(db: Db, env: Env, input: { email: string; password: 
     select: { id: true, email: true, role: true, isActive: true, passwordHash: true },
   });
 
-  // Always run a full password verification, even for unknown emails.
   const passwordOk = await verifyPassword(user?.passwordHash ?? null, input.password);
 
   if (!user || !passwordOk || !user.isActive) {
@@ -96,7 +92,7 @@ export async function login(db: Db, env: Env, input: { email: string; password: 
     } catch {
       log("error", "audit write failed", { requestId: ctx.requestId, action: "auth.login" });
     }
-    // Identical for wrong email, wrong password, and deactivated account.
+
     throw new AppError("UNAUTHENTICATED", "Invalid email or password");
   }
 
@@ -105,7 +101,6 @@ export async function login(db: Db, env: Env, input: { email: string; password: 
   return result;
 }
 
-/** DEVELOPMENT ONLY. Logs in a seeded demo account without a password. Route is mounted only when DEV_AUTH_ENABLED=true. */
 export async function devLogin(db: Db, env: Env, input: { email: string }, ctx: Ctx): Promise<AuthResult> {
   const user = input.email.endsWith(DEMO_EMAIL_DOMAIN)
     ? await db.user.findUnique({ where: { email: input.email }, select: { id: true, email: true, role: true, isActive: true } })
@@ -128,12 +123,6 @@ export async function logout(db: Db, auth: { userId: string; sessionId: string }
   await recordAudit(db, { action: "auth.logout", outcome: "success", actorUserId: auth.userId, requestId: ctx.requestId });
 }
 
-/**
- * Exchanges a still-valid access token for a fresh one. The old session is revoked in the same
- * step, so a token can be refreshed only once, and the new session keeps the ORIGINAL login time:
- * refreshing can never extend a login past SESSION_MAX_HOURS. The role is read from the database
- * again, and a deactivated user cannot refresh.
- */
 export async function refresh(db: Db, env: Env, auth: { userId: string; sessionId: string }, ctx: Ctx): Promise<AuthResult> {
   const old = await db.session.findUnique({
     where: { id: auth.sessionId },
@@ -146,7 +135,7 @@ export async function refresh(db: Db, env: Env, auth: { userId: string; sessionI
   }
 
   const session = await db.$transaction(async (tx) => {
-    // Conditional, so two refreshes of the same token cannot both succeed.
+
     const revoked = await tx.session.updateMany({ where: { id: auth.sessionId, revokedAt: null }, data: { revokedAt: new Date() } });
     if (revoked.count !== 1) throw new AppError("UNAUTHENTICATED");
     const created = await tx.session.create({

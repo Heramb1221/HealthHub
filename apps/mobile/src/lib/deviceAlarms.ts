@@ -1,7 +1,6 @@
 import * as Notifications from "expo-notifications";
 import { Alert, Platform } from "react-native";
 
-// Configure local notification display behavior
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true,
@@ -11,9 +10,6 @@ Notifications.setNotificationHandler({
   }),
 });
 
-/**
- * Requests notification permissions for on-device alarms.
- */
 export async function requestDeviceAlarmPermissions(): Promise<boolean> {
   try {
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
@@ -48,9 +44,6 @@ export async function requestDeviceAlarmPermissions(): Promise<boolean> {
   }
 }
 
-/**
- * Schedules a local offline medication alarm for a specific time of day.
- */
 export async function scheduleMedicationAlarm(options: {
   medicationName: string;
   dose: string;
@@ -81,13 +74,10 @@ export async function scheduleMedicationAlarm(options: {
   }
 }
 
-/**
- * Cancels a scheduled local notification alarm.
- */
 export async function cancelMedicationAlarm(notificationId: string): Promise<void> {
   try {
     await Notifications.cancelScheduledNotificationAsync(notificationId);
   } catch {
-    // Ignore cancellation error
+
   }
 }

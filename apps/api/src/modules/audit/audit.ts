@@ -9,7 +9,7 @@ export interface AuditInput {
   resourceType?: string;
   resourceId?: string;
   requestId?: string;
-  /** Ids and field NAMES only. Never values, medical content, credentials, or tokens. */
+
   metadata?: Record<string, string | number | boolean | string[]>;
 }
 

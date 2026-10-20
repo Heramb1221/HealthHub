@@ -31,7 +31,6 @@ const adminSlotsSchema = z.strictObject({
   })).min(1).max(50),
 });
 
-/** The hospital directory: any signed-in user may read it. */
 export function createHospitalRouter(db: Db, env: Env): Router {
   const router = Router();
   router.use(authenticate(db, env));
@@ -82,7 +81,6 @@ export function createHospitalRouter(db: Db, env: Env): Router {
   return router;
 }
 
-/** Directory management: admins only. An admin role never grants access to medical records. */
 export function createAdminHospitalRouter(db: Db, env: Env): Router {
   const router = Router();
   router.use(authenticate(db, env));

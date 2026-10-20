@@ -181,7 +181,6 @@ export function PrescriptionDetail({ id }: { id: string }) {
   const stamp = rx.status === "ready" ? rx.data.updatedAt : "";
   const { setData } = rx;
 
-  // Poll quietly (no skeleton flicker) while the file is being read.
   React.useEffect(() => {
     if (status !== "pending" && status !== "processing") return;
     startedAt.current ??= Date.now();
@@ -189,7 +188,7 @@ export function PrescriptionDetail({ id }: { id: string }) {
       try {
         setData(await prescriptionsApi.get(id));
       } catch {
-        /* transient failure: try again on the next tick */
+
       }
       if (startedAt.current && Date.now() - startedAt.current > SLOW_AFTER_MS) setSlow(true);
       setTick((n) => n + 1);
@@ -197,7 +196,6 @@ export function PrescriptionDetail({ id }: { id: string }) {
     return () => clearTimeout(timer);
   }, [status, id, tick, setData]);
 
-  // Prompt the medication reminder setup wizard as soon as the prescription reading finishes
   React.useEffect(() => {
     if (
       status === "completed" &&
@@ -297,7 +295,7 @@ export function PrescriptionDetail({ id }: { id: string }) {
 
   const p = rx.data;
   const title = p.prescriptionDate ? `Prescription from ${formatDate(p.prescriptionDate)}` : "Prescription (undated)";
-  /** Corrections and the PDF only make sense once the file has been read. */
+
   const canCorrect = p.processingStatus === "completed";
 
   if (editing) {

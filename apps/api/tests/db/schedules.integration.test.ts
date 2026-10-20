@@ -43,13 +43,12 @@ describe.skipIf(!TEST_DATABASE_URL)("medication schedules and dose events", () =
   });
   const auditOf = (action: string, resourceId: string) => h.db.auditEvent.findMany({ where: { action, resourceId } });
 
-  /** clear-001 extracted, then reviewed by the patient: version 2, both rows confident and complete. */
   async function reviewed(token: string) {
     const rx = await kit.processed(token, "clear-001");
     expect((await kit.correct(token, rx, { baseVersionNumber: 1, prescriberName: "Dr. Reviewed (synthetic)" })).status).toBe(201);
     return rx;
   }
-  /** A prescription with one version added directly, for states the API cannot reach yet. */
+
   async function withVersion(token: string, status: string, meds: Array<Record<string, unknown>>, kind: "extraction" | "patient_correction" = "patient_correction") {
     const rx = await kit.uploadFixture(token, "clear-001");
     await h.db.prescriptionVersion.create({
@@ -64,7 +63,7 @@ describe.skipIf(!TEST_DATABASE_URL)("medication schedules and dose events", () =
   describe("the safety gate", () => {
     it("refuses an unreviewed prescription however confident the reading, and audits why", async () => {
       const p = await registerPatient(app, h.db);
-      const rx = await kit.processed(p.token, "clear-001"); // unverified, row 0 complete at 0.97
+      const rx = await kit.processed(p.token, "clear-001");
       const res = await create(p.token, body(rx, 1, 0));
       expect(res.status).toBe(409);
       expect(res.body.error.code).toBe("CONFLICT");
@@ -79,7 +78,7 @@ describe.skipIf(!TEST_DATABASE_URL)("medication schedules and dose events", () =
     it("refuses needs_review versions too", async () => {
       const p = await registerPatient(app, h.db);
       const rx = await kit.processed(p.token, "ambiguous-001");
-      expect((await create(p.token, body(rx, 1, 2))).status).toBe(409); // row 2 is complete and 0.9, still not reviewed
+      expect((await create(p.token, body(rx, 1, 2))).status).toBe(409);
     });
 
     it("allows a reviewed, complete, confident row, copying its text exactly", async () => {
@@ -105,13 +104,13 @@ describe.skipIf(!TEST_DATABASE_URL)("medication schedules and dose events", () =
     it("refuses rows with missing name, strength, dose, or frequency, even after review", async () => {
       const p = await registerPatient(app, h.db);
       const rx = await kit.processed(p.token, "ambiguous-001");
-      await kit.correct(p.token, rx, { baseVersionNumber: 1, prescriberName: "Dr. Reviewed (synthetic)" }); // v2: reviewed, rows unchanged
+      await kit.correct(p.token, rx, { baseVersionNumber: 1, prescriberName: "Dr. Reviewed (synthetic)" });
       for (const position of [0, 1]) {
-        const res = await create(p.token, body(rx, 2, position)); // dose missing, strength missing
+        const res = await create(p.token, body(rx, 2, position));
         expect(res.status, `row ${position}`).toBe(409);
         expect(res.body.error.message).toMatch(/Name, strength, dose, and frequency/);
       }
-      expect((await create(p.token, body(rx, 2, 2))).status).toBe(201); // Samplex: complete and 0.9
+      expect((await create(p.token, body(rx, 2, 2))).status).toBe(201);
     });
 
     it("refuses a complete row with low confidence until the patient confirms or edits it", async () => {
@@ -122,7 +121,6 @@ describe.skipIf(!TEST_DATABASE_URL)("medication schedules and dose events", () =
       expect(refused.body.error.message).toMatch(/confirmed clearly enough/);
       expect((await auditOf("schedule.refused", rx))[0]?.metadata).toMatchObject({ reason: "low_confidence" });
 
-      // Confirm the row without changing its text.
       const confirm = await kit.correct(p.token, rx, { baseVersionNumber: 1, medications: [{ ...FULL("Lowconf"), confirmed: true }] });
       expect(confirm.status).toBe(201);
       expect(confirm.body.data.changedFields).toEqual(["medications.0.confirmed"]);
@@ -144,7 +142,7 @@ describe.skipIf(!TEST_DATABASE_URL)("medication schedules and dose events", () =
 
     it("requires the version the patient saw, so a different row can never be scheduled by mistake", async () => {
       const p = await registerPatient(app, h.db);
-      const rx = await reviewed(p.token); // latest is 2
+      const rx = await reviewed(p.token);
       for (const stale of [1, 3]) {
         const res = await create(p.token, body(rx, stale, 0));
         expect(res.status, `version ${stale}`).toBe(409);
@@ -178,11 +176,11 @@ describe.skipIf(!TEST_DATABASE_URL)("medication schedules and dose events", () =
       const rx = await reviewed(p.token);
       const first = await create(p.token, body(rx, 2, 0));
       expect((await create(p.token, body(rx, 2, 0))).status).toBe(409);
-      expect((await create(p.token, body(rx, 2, 1))).status).toBe(201); // a different medication is fine
+      expect((await create(p.token, body(rx, 2, 1))).status).toBe(201);
       expect((await patch(p.token, first.body.data.id, { isActive: false })).status).toBe(200);
       const second = await create(p.token, body(rx, 2, 0));
       expect(second.status).toBe(201);
-      // The stopped one cannot be switched back on while another is active.
+
       expect((await patch(p.token, first.body.data.id, { isActive: true })).status).toBe(409);
     });
 
@@ -233,32 +231,30 @@ describe.skipIf(!TEST_DATABASE_URL)("medication schedules and dose events", () =
   describe("when the prescription changes after a schedule was made", () => {
     it("flags the schedule and switches reminders off if the medication changed or was removed, but not for unrelated edits", async () => {
       const p = await registerPatient(app, h.db);
-      const rx = await reviewed(p.token); // v2
+      const rx = await reviewed(p.token);
       const s0 = (await create(p.token, body(rx, 2, 0, { reminderTimes: ["08:00"], remindersEnabled: true }))).body.data;
       const s1 = (await create(p.token, body(rx, 2, 1, { reminderTimes: ["09:00"], remindersEnabled: true }))).body.data;
       expect(s0.remindersActive).toBe(true);
 
-      // An unrelated edit (prescriber) leaves both current.
-      await kit.correct(p.token, rx, { baseVersionNumber: 2, prescriberName: "Dr. Someone Else" }); // v3
+      await kit.correct(p.token, rx, { baseVersionNumber: 2, prescriberName: "Dr. Someone Else" });
       let rows = (await list(p.token)).body.data as Array<{ id: string; sourceStatus: string; remindersActive: boolean }>;
       expect(rows.every((r) => r.sourceStatus === "current" && r.remindersActive)).toBe(true);
 
-      // Change medication 0's dose and drop medication 1.
       const v3 = (await kit.versionsOf(rx))[2];
       const row0 = v3?.medications[0];
       await kit.correct(p.token, rx, {
         baseVersionNumber: 3,
         medications: [{ name: row0?.name, strength: row0?.strength, dose: "2 tablets", route: row0?.route, frequency: row0?.frequency, duration: row0?.duration, instructions: row0?.instructions }],
-      }); // v4
+      });
       rows = (await list(p.token)).body.data;
       const byId = Object.fromEntries(rows.map((r) => [r.id, r]));
       expect(byId[s0.id]).toMatchObject({ sourceStatus: "changed", remindersActive: false });
       expect(byId[s1.id]).toMatchObject({ sourceStatus: "removed", remindersActive: false });
-      // Reminders are still the patient's setting; they are just not active.
+
       expect((await list(p.token)).body.data.every((r: { remindersEnabled: boolean }) => r.remindersEnabled)).toBe(true);
-      // The schedule still shows what it was made from, not the new dose.
+
       expect(((await list(p.token)).body.data as Array<{ id: string; medication: { dose: string } }>).find((r) => r.id === s0.id)?.medication.dose).toBe("1 tablet");
-      // A changed schedule cannot be switched back on after being stopped.
+
       await patch(p.token, s0.id, { isActive: false });
       expect((await patch(p.token, s0.id, { isActive: true })).status).toBe(409);
     });
@@ -293,7 +289,7 @@ describe.skipIf(!TEST_DATABASE_URL)("medication schedules and dose events", () =
       expect(events).toHaveLength(1);
       expect((events[0]?.metadata as { changedFields: string[] }).changedFields.sort()).toEqual(["endDate", "remindersEnabled", "reminderTimes", "timezone"].sort());
       expect(JSON.stringify(events)).not.toMatch(/07:00|21:00|Kolkata/);
-      // A request that changes nothing writes nothing.
+
       await patch(p.token, s.id, { remindersEnabled: false });
       expect(await auditOf("schedule.updated", s.id)).toHaveLength(1);
     });
@@ -304,7 +300,7 @@ describe.skipIf(!TEST_DATABASE_URL)("medication schedules and dose events", () =
       for (const bad of [{ dose: "99" }, { medicationName: "x" }, { strength: "x" }, { frequency: "hourly" }, { startDate: day(-3) }, { sourceMedicationId: s.id }, { prescriptionId: s.id }]) {
         expect((await patch(p.token, s.id, bad)).status, JSON.stringify(bad)).toBe(400);
       }
-      // Mixed with a legitimate field: still an error, never silently ignored.
+
       expect((await patch(p.token, s.id, { isActive: true, dose: "99" })).status).toBe(400);
       expect((await patch(p.token, s.id, { remindersEnabled: false, medicationName: "x" })).status).toBe(400);
       const after = await h.db.medicationSchedule.findUniqueOrThrow({ where: { id: s.id } });
@@ -433,12 +429,12 @@ describe.skipIf(!TEST_DATABASE_URL)("medication schedules and dose events", () =
 
     it("keeps doses inside the schedule and not in the future", async () => {
       const { p, s } = await active({ startDate: day(-2), endDate: day(1) });
-      expect((await dose(p.token, s.id, { scheduledFor: at(-60 * 24 * 10), status: "taken" })).status).toBe(400); // before it started
-      expect((await dose(p.token, s.id, { scheduledFor: at(60 * 24 * 3), status: "taken" })).status).toBe(400); // far future
-      expect((await dose(p.token, s.id, { scheduledFor: at(90), status: "taken" })).status).toBe(400); // over an hour ahead
-      expect((await dose(p.token, s.id, { scheduledFor: at(30), status: "taken" })).status).toBe(201); // a little early is fine
+      expect((await dose(p.token, s.id, { scheduledFor: at(-60 * 24 * 10), status: "taken" })).status).toBe(400);
+      expect((await dose(p.token, s.id, { scheduledFor: at(60 * 24 * 3), status: "taken" })).status).toBe(400);
+      expect((await dose(p.token, s.id, { scheduledFor: at(90), status: "taken" })).status).toBe(400);
+      expect((await dose(p.token, s.id, { scheduledFor: at(30), status: "taken" })).status).toBe(201);
       const { p: p2, s: s2 } = await active({ startDate: day(-5), endDate: day(-2) });
-      expect((await dose(p2.token, s2.id, { scheduledFor: at(-30), status: "taken" })).status).toBe(400); // after it ended
+      expect((await dose(p2.token, s2.id, { scheduledFor: at(-30), status: "taken" })).status).toBe(400);
     });
 
     it("refuses doses for a stopped schedule", async () => {

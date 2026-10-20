@@ -6,7 +6,7 @@ const isLive = process.env.NEXT_PUBLIC_API_MODE === "live";
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   async rewrites() {
-    // Same-origin proxy so the API's httpOnly session cookie is first-party and CORS is not needed.
+
     if (!isLive) return [];
     return [{ source: "/api/v1/:path*", destination: `${API_ORIGIN}/api/v1/:path*` }];
   },

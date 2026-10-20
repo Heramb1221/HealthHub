@@ -12,11 +12,9 @@ import { TEST_DATABASE_URL, closeHarness, openHarness, type Harness } from "./he
 import { bearer, buildApp, loginToken, registerPatient, seedUser, testEnv } from "./appHelpers.js";
 import { rxKit } from "./rxHelpers.js";
 
-
 const have = (cmd: string): boolean => spawnSync("which", [cmd]).status === 0;
 const HAVE_TOOLS = have("pdftoppm") && have("zbarimg") && have("pdftotext");
 
-/** Visible text of a PDF: every `(...) Tj` string, unescaped, joined with spaces. */
 const visibleText = (pdf: Buffer): string =>
   [...pdf.toString("latin1").matchAll(/\(((?:\\.|[^\\)])*)\) Tj/g)].map((m) => (m[1] ?? "").replace(/\\(.)/g, "$1")).join(" ");
 

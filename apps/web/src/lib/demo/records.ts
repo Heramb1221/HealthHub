@@ -2,15 +2,6 @@ import { ApiError } from "@/lib/api/errors";
 import type { AuthUser, Patient, UpdatePatientInput } from "@/lib/api/types";
 import { demoAuthApi } from "@/lib/demo/auth";
 
-/**
- * DEMO ONLY. Typed stand-ins for the patient, prescription, appointment and schedule endpoints.
- *
- * - Every record carries `isDemo: true` so the UI labels it in place.
- * - Only the seeded account "demo-patient" has sample data. Newly registered demo users start with an
- *   empty record so empty states are real. The admin demo account has no patient profile (404).
- * - Dates are generated relative to "now" on each read so the sample never goes stale.
- * - The only thing persisted is what the user edits (their profile), in this browser's localStorage.
- */
 const SEEDED_USER_ID = "demo-patient";
 
 export async function currentUser(): Promise<AuthUser> {
@@ -44,7 +35,6 @@ function writePatient(userId: string, patient: Patient) {
   }
 }
 
-/** Random, non-meaningful ID without look-alike characters (spec: HealthHub ID carries no meaning). */
 function randomHealthId(): string {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   const bytes = crypto.getRandomValues(new Uint8Array(8));
@@ -97,7 +87,7 @@ export const demoPatientsApi = {
     const stored = readPatientOverride(user.id);
     if (stored) return stored;
     const patient = user.id === SEEDED_USER_ID ? seededPatient() : blankPatient(user);
-    // Persist so a new user's random HealthHub ID stays stable across reloads.
+
     writePatient(user.id, patient);
     return patient;
   },

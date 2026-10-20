@@ -1,7 +1,6 @@
 import type { Appointment, Hospital } from "../api/types.ts";
 import { appointmentStart } from "./appointments.ts";
 
-/** Case-insensitive match on name, city, address and specialties. Blank query returns everything. */
 export function filterHospitals(list: Hospital[], query: string): Hospital[] {
   const q = query.trim().toLowerCase();
   if (!q) return list;
@@ -13,7 +12,6 @@ export interface AppointmentGroups {
   past: Appointment[];
 }
 
-/** Upcoming = confirmed and not yet started (soonest first). Everything else is past or cancelled (newest first). */
 export function groupAppointments(list: Appointment[], now: Date = new Date()): AppointmentGroups {
   const time = (a: Appointment): number => {
     const s = appointmentStart(a);

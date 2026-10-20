@@ -27,7 +27,6 @@ export function HealthCardScreen() {
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
 
-  // Tick so the expiry countdown and expired state stay honest.
   useEffect(() => {
     if (!session) return;
     const timer = setInterval(() => setNow(new Date()), 15_000);
@@ -42,7 +41,7 @@ export function HealthCardScreen() {
   const readable = (list.data?.items ?? []).filter((p) => p.processingStatus === "completed");
   const revoked = Boolean(session?.revokedAt);
   const expired = session ? new Date(session.expiresAt).getTime() <= now.getTime() : false;
-  // BACKEND J3: the payload is a link with a random id; it is the only thing the QR code encodes.
+
   const payload = session ? session.qrPayload : null;
 
   async function createQr() {

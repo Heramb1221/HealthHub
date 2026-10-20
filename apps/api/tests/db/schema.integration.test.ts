@@ -11,7 +11,6 @@ import {
   type Harness,
 } from "./helpers.js";
 
-// Skipped (and reported as skipped) when no test database is configured.
 describe.skipIf(!TEST_DATABASE_URL)("database schema integrity", () => {
   let h: Harness;
 
@@ -186,7 +185,7 @@ describe.skipIf(!TEST_DATABASE_URL)("database schema integrity", () => {
       const ok = await h.db.qrAccessSession.create({ data: { ...base, expiresAt: new Date(Date.now() + 60_000) } });
       expect(ok.revokedAt).toBeNull();
       expect(ok.id).toMatch(/^[0-9a-f-]{36}$/);
-      // expiresAt before createdAt violates the CHECK constraint
+
       expect(
         await sqlState(
           h.pg.query(
@@ -195,7 +194,7 @@ describe.skipIf(!TEST_DATABASE_URL)("database schema integrity", () => {
           ),
         ),
       ).toBe("23514");
-      // dangling references are refused
+
       expect(
         await sqlState(
           h.pg.query(
@@ -288,9 +287,9 @@ describe.skipIf(!TEST_DATABASE_URL)("database schema integrity", () => {
     it("rejects state combinations that would break the invariant", async () => {
       const { slot } = await makeSlot(h.db);
       const { patient } = await makePatient(h.db);
-      // confirmed without holding the slot
+
       await expect(h.db.appointment.create({ data: { patientId: patient.id, slotId: slot.id } })).rejects.toBeDefined();
-      // cancelled while still holding the slot
+
       await expect(
         h.db.appointment.create({ data: { patientId: patient.id, slotId: slot.id, status: "cancelled", activeSlotId: slot.id } }),
       ).rejects.toBeDefined();

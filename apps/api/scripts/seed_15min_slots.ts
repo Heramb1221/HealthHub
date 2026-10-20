@@ -87,15 +87,9 @@ const HOSPITALS: HospitalSpec[] = [
   },
 ];
 
-// 15-minute slot intervals in IST (UTC + 5:30)
-// Morning Session:   09:00 AM to 01:00 PM IST (03:30 UTC to 07:30 UTC) -> 16 slots
-// Afternoon Session: 02:00 PM to 05:00 PM IST (08:30 UTC to 11:30 UTC) -> 12 slots
-// Evening Session:   05:30 PM to 08:30 PM IST (12:00 UTC to 15:00 UTC) -> 12 slots
-
 function generateDaily15MinOffsets(): { startOffsetMin: number; durationMin: number }[] {
   const intervals: { startOffsetMin: number; durationMin: number }[] = [];
 
-  // Helper to add range: startHour, startMin, endHour, endMin in UTC
   function addRange(startH: number, startM: number, endH: number, endM: number) {
     const startTotal = startH * 60 + startM;
     const endTotal = endH * 60 + endM;
@@ -104,13 +98,10 @@ function generateDaily15MinOffsets(): { startOffsetMin: number; durationMin: num
     }
   }
 
-  // Morning: 09:00 IST (03:30 UTC) to 13:00 IST (07:30 UTC)
   addRange(3, 30, 7, 30);
 
-  // Afternoon: 14:00 IST (08:30 UTC) to 17:00 IST (11:30 UTC)
   addRange(8, 30, 11, 30);
 
-  // Evening: 17:30 IST (12:00 UTC) to 20:30 IST (15:00 UTC)
   addRange(12, 0, 15, 0);
 
   return intervals;
@@ -124,7 +115,7 @@ async function seed() {
 
   const DAYS_AHEAD = 14;
   const now = new Date();
-  // Anchor to today 00:00 UTC
+
   const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0));
 
   for (const spec of HOSPITALS) {
@@ -164,13 +155,12 @@ async function seed() {
 
     const slotsToInsert: { hospitalId: string; startsAt: Date; endsAt: Date }[] = [];
 
-    // For the next 14 days
     for (let dayOffset = 0; dayOffset <= DAYS_AHEAD; dayOffset++) {
       const dayBaseMs = todayUtc.getTime() + dayOffset * 86_400_000;
 
       for (const interval of slotIntervals) {
         const startsAt = new Date(dayBaseMs + interval.startOffsetMin * 60_000);
-        // Only add slots that are in the future
+
         if (startsAt.getTime() > now.getTime() + 10 * 60_000) {
           const endsAt = new Date(startsAt.getTime() + interval.durationMin * 60_000);
           slotsToInsert.push({
@@ -183,7 +173,7 @@ async function seed() {
     }
 
     if (slotsToInsert.length > 0) {
-      // Chunk insertions by 200 to keep batches fast
+
       let insertedCount = 0;
       const chunkSize = 200;
       for (let i = 0; i < slotsToInsert.length; i += chunkSize) {

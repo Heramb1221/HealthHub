@@ -34,12 +34,10 @@ export function InsuranceView() {
   const [showAddForm, setShowAddForm] = React.useState(false);
   const [searchProviderQuery, setSearchProviderQuery] = React.useState("");
 
-  // Resource for patient policies
   const policiesResource = useResource(() => insuranceApi.listPolicies(), "patient-policies");
-  // Resource for recognized providers
+
   const providersResource = useResource(() => insuranceApi.listProviders(), "insurance-providers");
 
-  // Form states
   const [providerName, setProviderName] = React.useState("");
   const [policyNumber, setPolicyNumber] = React.useState("");
   const [policyHolderName, setPolicyHolderName] = React.useState("");
@@ -72,7 +70,7 @@ export function InsuranceView() {
       });
       toast.success("Insurance policy saved securely.");
       setShowAddForm(false);
-      // Reset form
+
       setProviderName("");
       setPolicyNumber("");
       setPolicyHolderName("");
@@ -136,7 +134,6 @@ export function InsuranceView() {
         )}
       </div>
 
-      {/* Tabs */}
       <div className="border-border flex gap-2 border-b pb-1">
         <button
           type="button"
@@ -164,7 +161,7 @@ export function InsuranceView() {
 
       {activeTab === "policies" && (
         <div className="space-y-6">
-          {/* Informational Disclaimer */}
+
           <Alert tone="neutral">
             <Info className="size-4" />
             <AlertTitle>Informational Record Notice</AlertTitle>
@@ -174,7 +171,6 @@ export function InsuranceView() {
             </AlertDescription>
           </Alert>
 
-          {/* Add Policy Form Modal/Card */}
           {showAddForm && (
             <form onSubmit={handleAddPolicy} className="bg-card border-border space-y-4 rounded-lg border p-6 shadow-xs">
               <div className="flex items-center justify-between border-b pb-3">
@@ -303,7 +299,6 @@ export function InsuranceView() {
             </form>
           )}
 
-          {/* List Policies */}
           {policiesResource.status === "loading" ? (
             <LoadingState label="Loading insurance policies" />
           ) : policiesResource.status === "error" ? (

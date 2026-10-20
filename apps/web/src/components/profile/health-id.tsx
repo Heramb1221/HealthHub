@@ -5,7 +5,6 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 
-/** HealthHub ID in a monospace face so characters can't be misread, with a copy action. */
 export function HealthId({ value }: { value: string }) {
   async function copy() {
     try {

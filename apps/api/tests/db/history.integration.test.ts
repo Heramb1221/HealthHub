@@ -96,17 +96,17 @@ describe.skipIf(!TEST_DATABASE_URL)("health history", () => {
       expect(res.status).toBe(403);
       expect(JSON.stringify(res.body)).not.toContain("Private");
       expect(await h.db.auditEvent.count({ where: { action: "access.denied", actorUserId: a.userId, patientId: b.patientId } })).toBe(1);
-      expect((await list(a.token, `?patientId=${a.patientId}`)).status).toBe(200); // naming yourself is fine
+      expect((await list(a.token, `?patientId=${a.patientId}`)).status).toBe(200);
     });
 
     it("gives a provider access only with a live health_history:read consent, and says which patient", async () => {
       const owner = await registerPatient(app, h.db);
       await add(owner.token, { title: "Shared condition" });
       const prov = await provider();
-      expect((await list(prov.token)).status).toBe(400); // a provider must name the patient
-      expect((await list(prov.token, `?patientId=${owner.patientId}`)).status).toBe(403); // no consent
+      expect((await list(prov.token)).status).toBe(400);
+      expect((await list(prov.token, `?patientId=${owner.patientId}`)).status).toBe(403);
       await consent(owner.patientId, prov.id, "prescriptions:read");
-      expect((await list(prov.token, `?patientId=${owner.patientId}`)).status).toBe(403); // wrong scope
+      expect((await list(prov.token, `?patientId=${owner.patientId}`)).status).toBe(403);
       const c = await consent(owner.patientId, prov.id);
       const ok = await list(prov.token, `?patientId=${owner.patientId}`);
       expect(ok.status).toBe(200);

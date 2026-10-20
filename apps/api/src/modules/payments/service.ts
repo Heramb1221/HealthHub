@@ -8,7 +8,7 @@ import { recordAudit } from "../audit/audit.js";
 
 export interface CreateOrderInput {
   appointmentId: string;
-  amountPaise?: number; // Defaults to standard consultation fee (e.g. ₹500 = 50000 paise)
+  amountPaise?: number;
   currency?: string;
 }
 
@@ -47,7 +47,6 @@ export async function createPaymentOrder(
     throw new AppError("CONFLICT", "Cannot initiate payment for cancelled appointment");
   }
 
-  // Check if there is already a completed payment order for this appointment
   const existingCompleted = await db.paymentOrder.findFirst({
     where: { appointmentId: appointment.id, status: "completed" },
   });
@@ -55,12 +54,11 @@ export async function createPaymentOrder(
     throw new AppError("CONFLICT", "Payment has already been completed for this appointment");
   }
 
-  const amountPaise = input.amountPaise ?? 50000; // ₹500 standard fee
+  const amountPaise = input.amountPaise ?? 50000;
   const currency = input.currency ?? "INR";
   let orderRef = `order_demo_${randomUUID().replace(/-/g, "").slice(0, 16)}`;
   let isSandbox = true;
 
-  // Real Razorpay Order Creation via REST API if configured
   if (env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET) {
     try {
       const basicAuth = Buffer.from(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`).toString("base64");
@@ -169,7 +167,6 @@ export async function verifyPayment(
 
   let isSuccess = !input.simulateFailure;
 
-  // Cryptographic Razorpay Signature Verification
   if (input.signature && input.paymentRef && env.RAZORPAY_KEY_SECRET) {
     const textToSign = `${input.orderRef}|${input.paymentRef}`;
     const expectedSignature = createHmac("sha256", env.RAZORPAY_KEY_SECRET)

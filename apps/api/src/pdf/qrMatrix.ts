@@ -1,6 +1,5 @@
 import qrcode from "qrcode-generator";
 
-/** QR matrix (true = dark) for a text payload, medium error correction. */
 export function qrMatrix(payload: string): boolean[][] {
   const qr = qrcode(0, "M");
   qr.addData(payload);

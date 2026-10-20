@@ -14,7 +14,6 @@ import { QrCode } from "@/components/health-card/qr-code";
 import { DemoTag } from "@/components/status/demo-tag";
 import type { HealthCard } from "@/lib/api/types";
 
-// Helper to format ISO date to DD/MM/YYYY
 function formatNumericDate(iso: string | null | undefined): string {
   if (!iso) return "—";
   const date = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(`${iso}T00:00:00`) : new Date(iso);
@@ -25,7 +24,6 @@ function formatNumericDate(iso: string | null | undefined): string {
   return `${d}/${m}/${y}`;
 }
 
-// Translate gender to bilingual display
 function formatGenderBilingual(gender: string | null | undefined): string {
   if (!gender) return "—";
   const g = gender.toLowerCase();
@@ -35,7 +33,6 @@ function formatGenderBilingual(gender: string | null | undefined): string {
   return gender.toUpperCase();
 }
 
-/** Realistic guilloche wave security background pattern */
 function GuillochePattern() {
   return (
     <svg
@@ -60,8 +57,6 @@ function GuillochePattern() {
   );
 }
 
-
-/** Hologram security badge */
 function HologramSeal() {
   return (
     <div
@@ -77,7 +72,6 @@ function HologramSeal() {
   );
 }
 
-/** Vector Code128-style linear barcode */
 function LinearBarcode({ code }: { code: string }) {
   return (
     <div className="flex flex-col items-center">
@@ -99,9 +93,6 @@ function LinearBarcode({ code }: { code: string }) {
   );
 }
 
-/* =========================================================================
- * 1. CARD FRONT (SEHAT MED IDENTITY FACE)
- * ========================================================================= */
 export function CardFront({ card, className }: { card: HealthCard; className?: string }) {
   const initials = (card.fullName || "SM")
     .split(" ")
@@ -122,7 +113,6 @@ export function CardFront({ card, className }: { card: HealthCard; className?: s
     >
       <GuillochePattern />
 
-      {/* TOP HEADER: Sehat Med Official Brand with Tricolor accent */}
       <div className="relative z-10 space-y-1">
         <div className="flex items-center justify-between gap-2 border-b border-slate-300/80 pb-1">
           <div className="flex items-center gap-1.5 min-w-0">
@@ -152,7 +142,6 @@ export function CardFront({ card, className }: { card: HealthCard; className?: s
           </div>
         </div>
 
-        {/* Tricolor Ribbon Bar */}
         <div className="flex h-[2px] w-full overflow-hidden rounded-full">
           <div className="w-1/3 bg-[#ff9933]" />
           <div className="w-1/3 bg-slate-300" />
@@ -160,15 +149,13 @@ export function CardFront({ card, className }: { card: HealthCard; className?: s
         </div>
       </div>
 
-      {/* CARD BODY: Photo and Demographic Details */}
       <div className="relative z-10 my-auto grid grid-cols-12 items-center gap-2.5 py-1">
-        {/* Left Column: Passport Photo & Security Seal */}
+
         <div className="col-span-4 flex flex-col items-center gap-1">
           <div className="flex w-full items-center justify-end px-1">
             <HologramSeal />
           </div>
 
-          {/* Photo Frame */}
           <div className="relative flex aspect-[35/42] w-[68px] flex-col items-center justify-center overflow-hidden rounded-xs border border-slate-400 bg-white shadow-xs">
             <div className="flex size-full flex-col items-center justify-center bg-slate-100 text-slate-500">
               <div className="flex size-8 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-700">
@@ -184,9 +171,8 @@ export function CardFront({ card, className }: { card: HealthCard; className?: s
           </div>
         </div>
 
-        {/* Right Column: Cardholder Information */}
         <div className="col-span-8 space-y-1 pl-0.5 text-[9.5px]">
-          {/* Health ID in monospace badge */}
+
           <div className="rounded-xs border border-[#0e3a6c]/25 bg-[#0e3a6c]/8 px-1.5 py-0.5">
             <p className="text-[6.5px] font-bold tracking-wider text-[#0e3a6c] uppercase">
               स्वास्थ्य पहचान संख्या / HEALTH ID NO.
@@ -196,7 +182,6 @@ export function CardFront({ card, className }: { card: HealthCard; className?: s
             </p>
           </div>
 
-          {/* Full Name */}
           <div className="leading-tight">
             <p className="text-[6.5px] font-bold tracking-wide text-slate-500 uppercase">नाम / NAME</p>
             <p className="text-[11px] font-black tracking-wide text-slate-900 uppercase truncate" title={card.fullName}>
@@ -204,7 +189,6 @@ export function CardFront({ card, className }: { card: HealthCard; className?: s
             </p>
           </div>
 
-          {/* DOB & Gender Row */}
           <div className="grid grid-cols-2 gap-1 leading-tight">
             <div className="min-w-0">
               <p className="text-[6.5px] font-bold tracking-wide text-slate-500 uppercase">जन्म तिथि / D.O.B</p>
@@ -220,7 +204,6 @@ export function CardFront({ card, className }: { card: HealthCard; className?: s
             </div>
           </div>
 
-          {/* Blood Group & Phone */}
           <div className="grid grid-cols-2 items-center gap-1 leading-tight">
             <div>
               <p className="text-[6.5px] font-bold tracking-wide text-slate-500 uppercase">रक्त समूह / BLOOD</p>
@@ -239,7 +222,6 @@ export function CardFront({ card, className }: { card: HealthCard; className?: s
         </div>
       </div>
 
-      {/* FOOTER: Digital Signature & Issue Notice */}
       <div className="relative z-10 flex items-end justify-between border-t border-slate-300/80 pt-1 text-[7px] text-slate-600 leading-tight">
         <div>
           <p className="font-semibold text-slate-700">
@@ -268,9 +250,6 @@ export function CardFront({ card, className }: { card: HealthCard; className?: s
   );
 }
 
-/* =========================================================================
- * 2. CARD BACK (EMERGENCY QR & CLINICAL NOTICE)
- * ========================================================================= */
 export function CardBack({ card, className }: { card: HealthCard; className?: string }) {
   const qrUrl =
     card.qr?.url ??
@@ -288,7 +267,7 @@ export function CardBack({ card, className }: { card: HealthCard; className?: st
         printColorAdjust: "exact",
       }}
     >
-      {/* MAGNETIC STRIPE */}
+
       <div className="h-6 w-full bg-[#181d24] border-b border-black/40 flex items-center justify-between px-3 text-[7px] font-mono tracking-widest text-slate-400">
         <span>SEHAT MED DIGITAL HEALTH CARD</span>
         <span>ISO/IEC 7810 CR80</span>
@@ -296,9 +275,8 @@ export function CardBack({ card, className }: { card: HealthCard; className?: st
 
       <GuillochePattern />
 
-      {/* MAIN BACK CONTENT */}
       <div className="relative z-10 my-auto grid grid-cols-12 items-center gap-2 px-3 py-1">
-        {/* QR Code Column */}
+
         <div className="col-span-5 flex flex-col items-center text-center">
           <div className="rounded-xs border border-slate-400/80 bg-white p-1 shadow-xs">
             <QrCode
@@ -317,9 +295,8 @@ export function CardBack({ card, className }: { card: HealthCard; className?: st
           </div>
         </div>
 
-        {/* Emergency Info & Instructions Column */}
         <div className="col-span-7 space-y-1 text-[8px]">
-          {/* Emergency Contacts */}
+
           <div className="rounded-xs border border-rose-200 bg-rose-50/90 p-1 text-rose-950">
             <div className="flex items-center gap-1 text-[6.5px] font-black uppercase text-rose-900">
               <AlertCircle className="size-2 text-rose-700" />
@@ -335,7 +312,6 @@ export function CardBack({ card, className }: { card: HealthCard; className?: st
             </div>
           </div>
 
-          {/* National Helplines */}
           <div className="grid grid-cols-3 gap-1 text-center">
             <div className="rounded-xs border border-slate-300 bg-white p-0.5">
               <p className="text-[6px] font-bold text-slate-500 uppercase">AMBULANCE</p>
@@ -351,7 +327,6 @@ export function CardBack({ card, className }: { card: HealthCard; className?: st
             </div>
           </div>
 
-          {/* Legal / Notice */}
           <div className="space-y-0.5 text-[6px] leading-tight text-slate-600">
             <p>
               • <strong>Hospital Access:</strong> Instant scan provides authenticated triage data.
@@ -363,7 +338,6 @@ export function CardBack({ card, className }: { card: HealthCard; className?: st
         </div>
       </div>
 
-      {/* FOOTER: Barcode & Serial */}
       <div className="relative z-10 flex items-center justify-between border-t border-slate-300/80 bg-white/70 px-3 py-1">
         <div className="text-[6px] text-slate-500 leading-tight">
           <p className="font-bold text-slate-700 uppercase">Sehat Med Health Network</p>
@@ -375,13 +349,10 @@ export function CardBack({ card, className }: { card: HealthCard; className?: st
   );
 }
 
-/* =========================================================================
- * 3. PRINTABLE SHEET (STANDARD CR80 WALLET CARD WITH SCISSOR CUT MARKS)
- * ========================================================================= */
 export function PrintableCardSheet({ card }: { card: HealthCard }) {
   return (
     <div className="printable-pan-sheet w-full py-2 text-center">
-      {/* Instructions header (hidden in final print) */}
+
       <div className="mx-auto mb-4 max-w-xl rounded-md border border-info/30 bg-info-surface p-3 text-left text-xs text-info print:hidden">
         <p className="font-bold">🖨️ Wallet Card Print & Cut Guide:</p>
         <ol className="mt-1 list-decimal space-y-1 pl-4 text-muted-foreground">
@@ -391,10 +362,9 @@ export function PrintableCardSheet({ card }: { card: HealthCard }) {
         </ol>
       </div>
 
-      {/* CR80 Cut Sheet Container */}
       <div className="mx-auto inline-block text-left">
         <div className="relative inline-flex flex-col items-center rounded-lg border-2 border-dashed border-slate-400 bg-white p-4 shadow-sm print:border-slate-800 print:p-2 print:shadow-none">
-          {/* Top Indicator */}
+
           <div className="mb-2 flex w-full items-center justify-between text-[10px] font-mono font-bold text-slate-500">
             <span className="flex items-center gap-1">
               <Scissors className="size-3.5" /> ✂ CUT ALONG DOTTED LINE
@@ -404,9 +374,8 @@ export function PrintableCardSheet({ card }: { card: HealthCard }) {
             </span>
           </div>
 
-          {/* Front and Back */}
           <div className="flex flex-col items-center gap-4 sm:flex-row print:flex-row print:gap-4">
-            {/* FRONT */}
+
             <div className="flex flex-col items-center">
               <span className="mb-1 text-[9px] font-bold text-slate-500 tracking-wider uppercase print:hidden">
                 FRONT FACE / सम्मुख भाग
@@ -416,7 +385,6 @@ export function PrintableCardSheet({ card }: { card: HealthCard }) {
               </div>
             </div>
 
-            {/* FOLD LINE */}
             <div className="relative flex flex-col items-center justify-center text-slate-400 print:flex">
               <div className="hidden h-full border-r-2 border-dashed border-slate-400 sm:block print:block" />
               <div className="my-1 flex items-center gap-1 text-[8px] font-bold tracking-widest text-slate-500 uppercase sm:[writing-mode:vertical-rl]">
@@ -425,7 +393,6 @@ export function PrintableCardSheet({ card }: { card: HealthCard }) {
               <div className="hidden h-full border-r-2 border-dashed border-slate-400 sm:block print:block" />
             </div>
 
-            {/* BACK */}
             <div className="flex flex-col items-center">
               <span className="mb-1 text-[9px] font-bold text-slate-500 tracking-wider uppercase print:hidden">
                 BACK FACE / पृष्ठ भाग
@@ -436,7 +403,6 @@ export function PrintableCardSheet({ card }: { card: HealthCard }) {
             </div>
           </div>
 
-          {/* Bottom Indicator */}
           <div className="mt-2 flex w-full items-center justify-between text-[9px] font-mono text-slate-500">
             <span>✂ CUT & LAMINATE IN STANDARD PVC POUCH</span>
             <span>SCALE: 100%</span>
@@ -447,15 +413,12 @@ export function PrintableCardSheet({ card }: { card: HealthCard }) {
   );
 }
 
-/* =========================================================================
- * 4. INTERACTIVE 3D FLIP CARD
- * ========================================================================= */
 export function InteractiveFlipCard({ card }: { card: HealthCard }) {
   const [isFlipped, setIsFlipped] = React.useState(false);
 
   return (
     <div className="flex flex-col items-center gap-3">
-      {/* 3D Flip Card Container */}
+
       <div
         className="group relative aspect-[85.6/54] w-full max-w-[460px] min-h-[270px] cursor-pointer [perspective:1200px]"
         onClick={() => setIsFlipped(!isFlipped)}
@@ -474,19 +437,17 @@ export function InteractiveFlipCard({ card }: { card: HealthCard }) {
             isFlipped ? "[transform:rotateY(180deg)]" : ""
           }`}
         >
-          {/* Front Side */}
+
           <div className="absolute inset-0 size-full [backface-visibility:hidden]">
             <CardFront card={card} className="size-full" />
           </div>
 
-          {/* Back Side */}
           <div className="absolute inset-0 size-full [backface-visibility:hidden] [transform:rotateY(180deg)]">
             <CardBack card={card} className="size-full" />
           </div>
         </div>
       </div>
 
-      {/* Quick Flip Toggle Button */}
       <button
         type="button"
         onClick={() => setIsFlipped(!isFlipped)}
@@ -499,9 +460,6 @@ export function InteractiveFlipCard({ card }: { card: HealthCard }) {
   );
 }
 
-/* =========================================================================
- * 5. MAIN CARD FACE
- * ========================================================================= */
 export function CardFace({ card }: { card: HealthCard }) {
   return <InteractiveFlipCard card={card} />;
 }

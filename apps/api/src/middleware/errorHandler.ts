@@ -10,7 +10,6 @@ function send(res: Response, requestId: string, code: ErrorCode, message?: strin
   });
 }
 
-// Express requires the four-argument signature to treat this as an error handler.
 export function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunction): void {
   if (res.headersSent) return;
   const requestId = req.requestId;
@@ -24,7 +23,6 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
     return;
   }
 
-  // body-parser errors carry a `type` and an HTTP status we can map safely.
   const type = typeof err === "object" && err !== null ? (err as { type?: unknown }).type : undefined;
   if (type === "entity.parse.failed" || type === "encoding.unsupported" || type === "charset.unsupported") {
     send(res, requestId, "VALIDATION_ERROR");
@@ -35,7 +33,6 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
     return;
   }
 
-  // Unknown failure: log only the error name and request metadata, never the message or stack.
   log("error", "unhandled error", {
     requestId,
     method: req.method,

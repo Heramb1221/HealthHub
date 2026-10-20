@@ -232,7 +232,7 @@ describe.skipIf(!TEST_DATABASE_URL)("patient profile, health card, access histor
       const stored = JSON.stringify(events);
       for (const value of ["Audit Person", "secret-allergen-xyz", "90000 00009"]) expect(stored).not.toContain(value);
 
-      await patch(p.token, { fullName: "Audit Person" }); // identical value
+      await patch(p.token, { fullName: "Audit Person" });
       expect(await h.db.auditEvent.count({ where: { patientId: p.patientId, action: "patient.profile_updated" } })).toBe(1);
     });
   });

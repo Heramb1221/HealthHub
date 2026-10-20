@@ -103,7 +103,6 @@ const RED_FLAG_RULES: RedFlagRule[] = [
   },
 ];
 
-/** Generate dynamic rule-based screening questions tailored to the reported symptoms */
 export function getRuleBasedQuestions(symptoms: string[]): RuleQuestion[] {
   const sLower = (symptoms || []).map((s) => s.toLowerCase()).join(" ");
   const isFever = sLower.includes("fever") || sLower.includes("temperature") || sLower.includes("chill");
@@ -150,7 +149,6 @@ export function getRuleBasedQuestions(symptoms: string[]): RuleQuestion[] {
 
   const questions: RuleQuestion[] = [];
 
-  // Question 1: Duration & Timing (Clinical timeline rule)
   questions.push({
     id: "q_duration",
     category: "duration",
@@ -164,7 +162,6 @@ export function getRuleBasedQuestions(symptoms: string[]): RuleQuestion[] {
     ],
   });
 
-  // Question 2: Severity & Trajectory
   questions.push({
     id: "q_progression",
     category: "characteristics",
@@ -178,7 +175,6 @@ export function getRuleBasedQuestions(symptoms: string[]): RuleQuestion[] {
     ],
   });
 
-  // Question 3: Chief Complaint Characteristics
   if (isResp) {
     questions.push({
       id: "q_resp_char",
@@ -373,7 +369,6 @@ export function getRuleBasedQuestions(symptoms: string[]): RuleQuestion[] {
     });
   }
 
-  // Question 4: Targeted Clinical Red Flags Screener (Always included)
   questions.push({
     id: "q_red_flags",
     category: "red_flags",
@@ -389,7 +384,6 @@ export function getRuleBasedQuestions(symptoms: string[]): RuleQuestion[] {
     ],
   });
 
-  // Question 5: Health Background & Comorbidities (Always included)
   questions.push({
     id: "q_context",
     category: "history",
@@ -407,7 +401,6 @@ export function getRuleBasedQuestions(symptoms: string[]): RuleQuestion[] {
   return questions;
 }
 
-/** Rule-based clinical triage and differential diagnosis inference engine */
 export function evaluateRuleBasedTriage(input: SymptomAssessmentInput): SymptomAssessmentResult {
   const combinedText = [...(input.symptoms || []), input.description || ""].join(" ").toLowerCase();
 
@@ -418,7 +411,6 @@ export function evaluateRuleBasedTriage(input: SymptomAssessmentInput): SymptomA
   let urgentAction = "";
   const matchedRules: MatchedRuleDetail[] = [];
 
-  // 1. Check keyword-based red flags
   for (const rule of RED_FLAG_RULES) {
     if (rule.keywords.some((k) => combinedText.includes(k))) {
       detectedRedFlags.push(rule.flag);
@@ -431,7 +423,6 @@ export function evaluateRuleBasedTriage(input: SymptomAssessmentInput): SymptomA
     }
   }
 
-  // 2. Check question-based red flags
   if (selectedOptionIds.has("resp_chest_heavy")) {
     detectedRedFlags.push("Potential Acute Coronary / Cardiac Event: Squeezing chest pressure radiating to arm or jaw.");
     urgentAction = "Call emergency services (112) or go to the nearest emergency department immediately.";
@@ -503,7 +494,6 @@ export function evaluateRuleBasedTriage(input: SymptomAssessmentInput): SymptomA
     if (!urgentAction) urgentAction = "Visit emergency department for cardiac and blood pressure evaluation.";
   }
 
-  // If any red flags or self-reported severe emergency
   if (detectedRedFlags.length > 0 || input.severity === "severe") {
     return {
       urgency: "emergency",
@@ -535,7 +525,6 @@ export function evaluateRuleBasedTriage(input: SymptomAssessmentInput): SymptomA
     };
   }
 
-  // 3. Clinical Rule Inference for Non-Emergency Differentials
   const isFever = combinedText.includes("fever") || combinedText.includes("temperature") || selectedOptionIds.has("fever_low") || selectedOptionIds.has("fever_high_chills") || selectedOptionIds.has("fever_body_ache") || selectedOptionIds.has("fever_intermittent");
   const isCough = combinedText.includes("cough") || combinedText.includes("throat") || combinedText.includes("cold") || selectedOptionIds.has("resp_dry") || selectedOptionIds.has("resp_productive");
   const isAbdominal = combinedText.includes("stomach") || combinedText.includes("abdominal") || combinedText.includes("vomiting") || combinedText.includes("diarrhea") || selectedOptionIds.has("gi_upper_burning") || selectedOptionIds.has("gi_cramping_diarrhea") || selectedOptionIds.has("gi_bloating_constipation");
@@ -548,7 +537,6 @@ export function evaluateRuleBasedTriage(input: SymptomAssessmentInput): SymptomA
   let urgencyLabel = "Routine Medical Consultation";
   let recommendedAction = "Schedule an appointment with a general physician for formal clinical evaluation.";
 
-  // Rule: Respiratory conditions
   if (selectedOptionIds.has("resp_productive")) {
     explanations.push({
       condition: "Acute Bronchitis / Lower Respiratory Tract Infection",
@@ -583,7 +571,6 @@ export function evaluateRuleBasedTriage(input: SymptomAssessmentInput): SymptomA
     });
   }
 
-  // Rule: Reflux / GERD
   if (selectedOptionIds.has("resp_reflux") || selectedOptionIds.has("gi_upper_burning")) {
     explanations.push({
       condition: "Gastroesophageal Reflux Disease (GERD) / Dyspepsia",
@@ -598,7 +585,6 @@ export function evaluateRuleBasedTriage(input: SymptomAssessmentInput): SymptomA
     recommendedAction = "Avoid lying down immediately after meals and avoid spicy/fried foods. Consult a doctor if antacids provide no relief.";
   }
 
-  // Rule: High fever with chills (Endemic febrile illness in India)
   if (selectedOptionIds.has("fever_high_chills") || selectedOptionIds.has("fever_body_ache")) {
     explanations.push({
       condition: "Acute Febrile Illness (Suspected Dengue / Malaria / Viral Syndrome)",
@@ -615,7 +601,6 @@ export function evaluateRuleBasedTriage(input: SymptomAssessmentInput): SymptomA
     recommendedAction = "Consult a physician within 24 hours for Complete Blood Count (CBC), platelet count, and rapid malaria/dengue screening.";
   }
 
-  // Rule: Gastroenteritis
   if (selectedOptionIds.has("gi_cramping_diarrhea") || (isAbdominal && (combinedText.includes("diarrhea") || combinedText.includes("vomit")))) {
     explanations.push({
       condition: "Acute Gastroenteritis / Infectious Enteritis",
@@ -630,7 +615,6 @@ export function evaluateRuleBasedTriage(input: SymptomAssessmentInput): SymptomA
     recommendedAction = "Prevent dehydration by taking Oral Rehydration Solution (ORS), coconut water, or clear fluids. Consult a doctor if vomiting prevents fluid intake.";
   }
 
-  // Rule: Headache classifications
   if (selectedOptionIds.has("neuro_pulsating") || (isHeadache && combinedText.includes("migraine"))) {
     explanations.push({
       condition: "Migraine with / without Aura",
@@ -667,7 +651,6 @@ export function evaluateRuleBasedTriage(input: SymptomAssessmentInput): SymptomA
     });
   }
 
-  // Rule: Musculoskeletal / Joint
   if (selectedOptionIds.has("joint_stiff_morning")) {
     explanations.push({
       condition: "Inflammatory Arthritis / Rheumatologic Evaluation Needed",
@@ -694,7 +677,6 @@ export function evaluateRuleBasedTriage(input: SymptomAssessmentInput): SymptomA
     });
   }
 
-  // Rule: Dermatologic
   if (selectedOptionIds.has("skin_hives") || isSkinRash) {
     explanations.push({
       condition: "Acute Urticaria / Allergic Skin Reaction",
@@ -709,7 +691,6 @@ export function evaluateRuleBasedTriage(input: SymptomAssessmentInput): SymptomA
     recommendedAction = "Avoid rubbing or scratching. Use cool compresses. Consult a dermatologist or physician if hives spread or persist.";
   }
 
-  // Fallback non-specific
   if (explanations.length === 0) {
     explanations.push({
       condition: "Non-specific Symptom Cluster",
@@ -723,7 +704,6 @@ export function evaluateRuleBasedTriage(input: SymptomAssessmentInput): SymptomA
     });
   }
 
-  // Self-care heuristic
   if (
     urgency === "routine" &&
     (selectedOptionIds.has("dur_acute") || (input.durationDays ?? 0) <= 1) &&
@@ -755,12 +735,11 @@ export function evaluateRuleBasedTriage(input: SymptomAssessmentInput): SymptomA
   };
 }
 
-/** Triage powered by Gemini with clinical rule fallback and rule-based questionnaire integration */
 export async function assessSymptoms(env: Env, input: SymptomAssessmentInput): Promise<SymptomAssessmentResult> {
-  // Always run rule-based check first for emergency red flags
+
   const fallback = evaluateRuleBasedTriage(input);
   if (fallback.urgency === "emergency") {
-    // Never let an AI downgrade a detected clinical red flag
+
     return fallback;
   }
 

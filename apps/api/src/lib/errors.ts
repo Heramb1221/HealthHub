@@ -36,7 +36,6 @@ const DEFAULT_MESSAGE: Record<ErrorCode, string> = {
   INTERNAL_ERROR: "An unexpected error occurred",
 };
 
-/** Error whose code and message are safe to return to clients. */
 export class AppError extends Error {
   readonly status: number;
 

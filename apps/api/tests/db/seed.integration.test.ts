@@ -69,7 +69,7 @@ describe.skipIf(!TEST_DATABASE_URL)("demo seed", () => {
   let real: { userId: string; hospitalId: string };
 
   it("leaves real data alone and creates the expected demo data", async () => {
-    // Some real-looking data that already exists.
+
     const user = await h.db.user.create({ data: { email: "real.person@example.test", passwordHash: "keep-me", role: "patient" } });
     const hospital = await h.db.hospital.create({ data: { name: "Real Hospital", isDemo: false } });
     real = { userId: user.id, hospitalId: hospital.id };
@@ -112,7 +112,7 @@ describe.skipIf(!TEST_DATABASE_URL)("demo seed", () => {
     const again = await runDemoSeed({ db: h.db, store, env: env(), password: "A-different-password-9" });
     expect(again).toEqual({ usersCreated: 0, hospitalsCreated: 0, slotsCreated: 0, prescriptionsCreated: 0, consentsCreated: 0, historyEntriesCreated: 0 });
     expect(await counts()).toEqual(mid);
-    // Existing accounts keep their original password.
+
     const login = await request(app).post("/api/v1/auth/login").send({ email: "patient1@demo.healthhub.test", password: PASSWORD });
     expect(login.status).toBe(200);
     const wrong = await request(app).post("/api/v1/auth/login").send({ email: "patient1@demo.healthhub.test", password: "A-different-password-9" });
@@ -146,13 +146,13 @@ describe.skipIf(!TEST_DATABASE_URL)("demo seed", () => {
     expect(rx2[0]).toMatchObject({ processingStatus: "completed", verificationStatus: "needs_review" });
 
     expect((await request(app).get(`/api/v1/prescriptions/${rx1[0].id}`).set(bearer(prov))).status).toBe(200);
-    expect((await request(app).get(`/api/v1/prescriptions/${rx2[0].id}`).set(bearer(prov))).status).toBe(403); // no consent from patient two
+    expect((await request(app).get(`/api/v1/prescriptions/${rx2[0].id}`).set(bearer(prov))).status).toBe(403);
     expect((await request(app).get(`/api/v1/prescriptions/${rx1[0].id}`).set(bearer(admin))).status).toBe(403);
     const p1Id = (await request(app).get("/api/v1/patients/me").set(bearer(p1))).body.data.id;
     const history = await request(app).get(`/api/v1/health-history?patientId=${p1Id}`).set(bearer(prov));
     expect(history.status).toBe(200);
     expect(history.body.data).toHaveLength(1);
-    // The review flow the demo is for: nothing can be scheduled until the patient reviews it.
+
     const refused = await request(app).post("/api/v1/medication-schedules").set(bearer(p1)).send({
       prescriptionId: rx1[0].id, versionNumber: 1, medicationPosition: 0, startDate: new Date().toISOString().slice(0, 10), timezone: "UTC",
     });

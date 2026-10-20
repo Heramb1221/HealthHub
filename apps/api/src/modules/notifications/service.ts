@@ -201,7 +201,7 @@ export async function notifyAppointmentEvent(
       text: `Hello ${patientName},\n\nYour appointment at ${hospitalName} on ${dateStr} has been ${event}.\n\nHealthHub.`,
     });
   } catch {
-    // Non-blocking for primary booking transaction
+
   }
 }
 
@@ -260,7 +260,7 @@ export async function notifyPrescriptionEvent(db: Db, env: Env, prescriptionId: 
       text: `Hello ${patientName},\n\nYour uploaded prescription (${prescriber}) has finished processing and is ready for your review.\n\nHealthHub.`,
     });
   } catch {
-    // Non-blocking
+
   }
 }
 
@@ -385,7 +385,6 @@ export async function notifyContraindicationAlerts(
       text: `Hello ${patientName},\n\nHealthHub detected potential drug interactions in your prescription (${prescriber}):\n\n${textContent}\n\nPlease consult your prescribing physician or pharmacist before taking these medications together.\n\nHealthHub.`,
     });
   } catch {
-    // Non-blocking
+
   }
 }
-

@@ -45,6 +45,6 @@ const liveFamilyApi: FamilyApi = {
 export const familyApi: FamilyApi =
   process.env.NEXT_PUBLIC_API_MODE === "live"
     ? liveFamilyApi
-    : // Required only in demo builds, so demo accounts and sample data never ship in a live bundle.
+    :
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       (require("@/lib/demo/family") as typeof import("@/lib/demo/family")).demoFamilyApi;

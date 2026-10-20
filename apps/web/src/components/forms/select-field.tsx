@@ -15,7 +15,6 @@ interface SelectFieldProps extends Omit<React.ComponentProps<"select">, "id" | "
   options: readonly { value: string; label: string }[];
 }
 
-/** Native select (best keyboard and mobile behaviour) styled to match inputs. */
 export function SelectField({ name, label, hint, error, placeholder = "Select", options, className, ...props }: SelectFieldProps) {
   const id = React.useId();
   const hintId = hint ? `${id}-hint` : undefined;

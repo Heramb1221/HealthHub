@@ -1,7 +1,4 @@
-/**
- * Error envelope from docs/API_CONTRACT.md and apps/api/docs/CONTRACT_DECISIONS.md (A1, A2):
- * { "error": { "code", "message", "requestId" } }
- */
+
 export type ClientErrorCode = "NETWORK_ERROR" | "TIMEOUT" | "INVALID_RESPONSE" | "NOT_CONFIGURED";
 
 export class ApiError extends Error {
@@ -66,11 +63,10 @@ export interface ErrorDescription {
   title: string;
   detail: string;
   requestId?: string;
-  /** True when retrying the same action may succeed (network, rate limit, server fault). */
+
   retryable: boolean;
 }
 
-/** Plain-language, safe-to-show message. Never includes server internals or submitted values. */
 export function describeError(error: unknown): ErrorDescription {
   if (!isApiError(error)) {
     return { title: "Something went wrong", detail: "An unexpected error occurred. Try again.", retryable: true };

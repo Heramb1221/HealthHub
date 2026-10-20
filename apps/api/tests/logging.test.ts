@@ -47,8 +47,7 @@ describe("request logging", () => {
   it("logs unexpected errors by route pattern and error type only", async () => {
     await request(app).get(`/api/v1/boom/${UUID}`);
     const entry = parsed().find((l) => l.message === "unhandled error");
-    // By the time the error handler runs the router has unwound, so only the route pattern is known
-    // (the matching "request" line carries the full pattern). Either way: no ids, no content.
+
     expect(entry).toMatchObject({ route: "/boom/:thingId", errorName: "Error" });
     const text = lines.join("\n");
     expect(text).not.toContain(UUID);

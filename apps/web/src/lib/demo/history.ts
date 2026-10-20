@@ -5,12 +5,6 @@ import type { HistoryEntry } from "@/lib/api/types";
 import { demoPrescriptionsApi } from "./prescriptions";
 import { currentUser, isSeeded, requirePatient } from "./records";
 
-/**
- * DEMO ONLY. Typed stand-in for /health-history.
- * - Conditions are patient-reported and always stored as unverified.
- * - Prescription entries are derived from the prescription records, so their verification status always matches.
- * - One seeded condition for the demo patient; conditions you add are kept in this browser.
- */
 const key = (userId: string) => `healthhub-demo-history:v1:${userId}`;
 
 function load(userId: string): HistoryEntry[] {
@@ -18,7 +12,7 @@ function load(userId: string): HistoryEntry[] {
     const raw = window.localStorage.getItem(key(userId));
     if (raw) return JSON.parse(raw) as HistoryEntry[];
   } catch {
-    /* use empty list */
+
   }
   return [];
 }

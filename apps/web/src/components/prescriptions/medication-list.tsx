@@ -8,7 +8,6 @@ function Value({ value }: { value: string | null }) {
   return value ? <>{value}</> : <span className="text-muted-foreground">Not found</span>;
 }
 
-/** One medicine's status: active in schedule and confidence score. */
 function ReadingState({ med }: { med: PrescriptionMedication }) {
   if (med.source === "patient_entered") {
     return (
@@ -32,9 +31,6 @@ function ReadingState({ med }: { med: PrescriptionMedication }) {
   );
 }
 
-/**
- * Medicines read from a prescription.
- */
 export function MedicationList({ medications }: { medications: PrescriptionMedication[] }) {
   return (
     <>

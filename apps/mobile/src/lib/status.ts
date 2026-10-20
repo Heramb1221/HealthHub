@@ -4,10 +4,10 @@ export type StatusTone = "neutral" | "info" | "success" | "warning" | "danger" |
 
 export interface StatusDescriptor {
   label: string;
-  /** One plain-language sentence explaining what the status means for the patient. */
+
   explanation: string;
   tone: StatusTone;
-  /** Feather icon name (@expo/vector-icons). Status is always icon + text, never colour alone. */
+
   icon: string;
 }
 
@@ -62,7 +62,6 @@ export const DEMO_STATUS: StatusDescriptor = {
   icon: "info",
 };
 
-/** Verification labels for history entries, whose status strings are not yet contract-defined. */
 export function describeHistoryVerification(value: string | undefined): StatusDescriptor | null {
   if (!value) return null;
   if (value in VERIFICATION_STATUS) return VERIFICATION_STATUS[value as VerificationStatus];

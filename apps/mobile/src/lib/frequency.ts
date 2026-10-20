@@ -1,10 +1,4 @@
-/**
- * Suggestions for reminder times and an end date, read from the prescription's own text.
- *
- * These only PRE-FILL the form. The patient sees the prescription's wording next to the times and
- * confirms or changes them. Anything the parser doesn't clearly recognise returns null, so nothing is guessed:
- * "every 8 hours", "once a week", "as needed", "at bedtime" all return null.
- */
+
 export function suggestTimes(frequency: string | null | undefined): string[] | null {
   if (!frequency) return null;
   const f = frequency.toLowerCase();
@@ -16,7 +10,6 @@ export function suggestTimes(frequency: string | null | undefined): string[] | n
   return null;
 }
 
-/** "5 days" or "2 weeks" give a length in days. Anything else gives null. */
 export function durationDays(duration: string | null | undefined): number | null {
   if (!duration) return null;
   const match = /^\s*(\d{1,3})\s*(day|days|week|weeks)\s*$/i.exec(duration);
@@ -25,7 +18,6 @@ export function durationDays(duration: string | null | undefined): number | null
   return match[2].toLowerCase().startsWith("week") ? n * 7 : n;
 }
 
-/** Inclusive: starting on `startIso` (YYYY-MM-DD) for N days ends on day N. */
 export function suggestEndDate(startIso: string, duration: string | null | undefined): string | null {
   const days = durationDays(duration);
   if (!days || days < 1) return null;

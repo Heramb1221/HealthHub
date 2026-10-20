@@ -2,7 +2,6 @@ import { z } from "zod";
 
 import type { HospitalInput } from "@/lib/api/types";
 
-/** Client-side checks for fast feedback. The API validates again and is authoritative. Limits are ASSUMED. */
 const optionalText = (max: number, message: string) =>
   z
     .string()

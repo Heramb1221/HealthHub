@@ -89,7 +89,6 @@ export function AdminHospitalEdit({ id }: { id: string }) {
         </div>
       </div>
 
-      {/* key: after a save the form is rebuilt from the saved values the API returned */}
       <HospitalForm
         key={`${h.name}|${h.city}|${h.address}|${h.phone}|${h.specialties.join(",")}`}
         initial={h}

@@ -17,7 +17,7 @@ type SessionRow = { id: string; prescriptionId: string; expiresAt: Date; revoked
 export interface QrSessionDto {
   id: string;
   prescriptionId: string;
-  /** What the QR code contains: the configured base plus this session's random id. Nothing else. */
+
   qrPayload: string;
   expiresAt: string;
   revokedAt: string | null;
@@ -33,10 +33,8 @@ const toDto = (env: Pick<Env, "QR_LINK_BASE">, row: SessionRow): QrSessionDto =>
   createdAt: row.createdAt.toISOString(),
 });
 
-/** A session is usable only while it has not been revoked and has not expired. */
 const isLive = (row: { revokedAt: Date | null; expiresAt: Date }): boolean => row.revokedAt === null && row.expiresAt.getTime() > Date.now();
 
-/** The patient who owns the prescription creates a short-lived session for it. */
 export async function createQrSession(
   db: Db,
   env: Pick<Env, "QR_LINK_BASE" | "QR_SESSION_TTL_MINUTES">,
@@ -46,7 +44,7 @@ export async function createQrSession(
 ): Promise<QrSessionDto> {
   const record = await db.prescriptionRecord.findUnique({ where: { id: prescriptionId }, select: { patientId: true } });
   if (!record) throw new AppError("NOT_FOUND");
-  // Patients pass only for their own record; anything else is refused and audited.
+
   await authorizePatientData(db, auth, record.patientId, "prescriptions:read", {
     requestId: ctx.requestId,
     resourceType: "prescription",
@@ -74,12 +72,6 @@ export async function createQrSession(
   return toDto(env, row);
 }
 
-/**
- * Reads what a live session points at. The session id alone grants nothing:
- * the caller must be logged in and pass the normal consent check for this
- * patient and the prescriptions:read scope, on every request. Unknown,
- * expired, and revoked sessions are indistinguishable (NOT_FOUND).
- */
 export async function getQrSession(
   db: Db,
   auth: AuthContext,
@@ -99,7 +91,6 @@ export async function getQrSession(
   return { session: { id: row.id, expiresAt: row.expiresAt.toISOString() }, prescription };
 }
 
-/** Ends a session immediately. Only the owning patient may do this; repeating it changes nothing. */
 export async function revokeQrSession(
   db: Db,
   env: Pick<Env, "QR_LINK_BASE">,

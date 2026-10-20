@@ -1,14 +1,5 @@
 import type { PrescriptionMedication } from "@/lib/api/types";
 
-/**
- * Safety policy for extracted prescription data (AGENTS.md, PRODUCT_SPEC.md "Prescription data rules").
- *
- * Extracted values below the threshold, or missing a required field, are shown as "Needs review"
- * and must never be rendered as a definitive dose instruction or turned into a medication schedule.
- *
- * ASSUMPTION: 0.85 is a UI display threshold chosen by the web workstream. The backend may also
- * flag uncertainty; if the contract adds a per-field flag, prefer it and keep this as a fallback.
- */
 export const REVIEW_CONFIDENCE_THRESHOLD = 0.85;
 
 const REQUIRED_FOR_INSTRUCTION = ["name", "strength", "dose", "frequency"] as const;
@@ -32,7 +23,6 @@ export function medicationReviewReasons(med: PrescriptionMedication): ReviewReas
   return reasons;
 }
 
-/** True only when every instruction field is present and confident. Gate for showing a dose line or building a schedule. */
 export function isInstructionSafe(med: PrescriptionMedication): boolean {
   return medicationReviewReasons(med).length === 0;
 }

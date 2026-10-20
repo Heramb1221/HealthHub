@@ -1,15 +1,6 @@
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 
-/**
- * PROTOTYPE: local, on-device reminders only.
- *
- * - They are scheduled by this phone, not delivered by the HealthHub server. They are not reliable
- *   server push: they do not fire if notifications are disabled, the app is reinstalled or its data is
- *   cleared, or the OS restricts background delivery (battery savers on some Android devices).
- * - Text is deliberately generic. Medicine names and doses are never placed in a notification, because
- *   previews can appear on a locked screen (PRODUCT_SPEC: no sensitive health data in notification previews).
- */
 const CHANNEL_ID = "medication-reminders";
 
 export type ReminderPermission = "granted" | "denied" | "undetermined";
@@ -30,7 +21,6 @@ export async function requestReminderPermission(): Promise<ReminderPermission> {
   return res.canAskAgain ? "undetermined" : "denied";
 }
 
-/** Replaces all local reminders with one daily notification per distinct "HH:mm" time. Returns the count scheduled. */
 export async function scheduleLocalReminders(times: string[]): Promise<number> {
   await cancelLocalReminders();
   if (Platform.OS === "android") {
@@ -55,7 +45,7 @@ export async function cancelLocalReminders(): Promise<void> {
   try {
     await Notifications.cancelAllScheduledNotificationsAsync();
   } catch {
-    // Notifications may be unavailable on this device/runtime; nothing to cancel.
+
   }
 }
 

@@ -8,10 +8,6 @@ interface State<T> {
   refreshing: boolean;
 }
 
-/**
- * Loads a resource when the screen gains focus and exposes reload/refresh.
- * Data lives in memory only: nothing from the API is persisted to device storage.
- */
 export function useResource<T>(fetcher: (signal: AbortSignal) => Promise<T>) {
   const fetcherRef = useRef(fetcher);
   fetcherRef.current = fetcher;
@@ -51,7 +47,7 @@ export function useResource<T>(fetcher: (signal: AbortSignal) => Promise<T>) {
     ...state,
     reload: useCallback(() => run("auto"), [run]),
     refresh: useCallback(() => run("refresh"), [run]),
-    /** Re-fetch without flashing a spinner (used for polling). */
+
     poll: useCallback(() => run("silent"), [run]),
   };
 }

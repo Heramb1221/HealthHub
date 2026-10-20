@@ -37,7 +37,6 @@ function translateTextNode(node: Node, lang: SupportedLanguage) {
 
   let translation = lookupTranslation(lang, trimmed);
 
-  // If no direct exact match, perform phrase replacement across text nodes
   if (!translation) {
     const dict = DICTIONARY[lang];
     if (dict) {
@@ -135,7 +134,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
         return stored;
       }
     } catch {
-      // Local storage unavailable
+
     }
     return "en";
   });
@@ -171,7 +170,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.setItem(STORAGE_KEY, lang);
     } catch {
-      // Ignore storage errors
+
     }
   };
 

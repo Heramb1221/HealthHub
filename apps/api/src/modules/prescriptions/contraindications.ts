@@ -27,7 +27,6 @@ export interface ContraindicationReport {
 const DISCLAIMER =
   "Safety notice: This automated analysis identifies potential drug interactions and precautions from medical literature. It is for informational and screening purposes only and is not medical advice. Never stop, start, or change any prescription without consulting your prescribing physician or pharmacist.";
 
-// In-memory cache keyed by `${prescriptionId}:${updatedAt}`
 const reportCache = new Map<string, ContraindicationReport>();
 
 interface MedicationInput {
@@ -37,7 +36,6 @@ interface MedicationInput {
   frequency: string | null;
 }
 
-/** Deterministic rule-based interaction detector (runs offline or as fallback). */
 export function detectRuleBasedInteractions(medications: MedicationInput[]): ContraindicationAlert[] {
   const alerts: ContraindicationAlert[] = [];
   const names = medications
@@ -53,7 +51,6 @@ export function detectRuleBasedInteractions(medications: MedicationInput[]): Con
   const isMetformin = has("metformin");
   const isTramadol = has("tramadol");
 
-  // 1. Triple Whammy: RAAS inhibitor + Diuretic + NSAID
   if (isArbOrAce && isPotassiumSparing && isNsaid) {
     alerts.push({
       id: "triple-whammy-aki-risk",
@@ -74,7 +71,6 @@ export function detectRuleBasedInteractions(medications: MedicationInput[]): Con
     });
   }
 
-  // 2. ARB/ACE + Potassium-Sparing: Hyperkalemia Risk
   if (isArbOrAce && isPotassiumSparing) {
     alerts.push({
       id: "hyperkalemia-losartan-spironolactone",
@@ -95,7 +91,6 @@ export function detectRuleBasedInteractions(medications: MedicationInput[]): Con
     });
   }
 
-  // 3. NSAID + ARB/ACE: Blood Pressure & Renal Interaction
   if (isNsaid && isArbOrAce && !alerts.some((a) => a.id === "triple-whammy-aki-risk")) {
     alerts.push({
       id: "nsaid-antihypertensive-blunting",
@@ -116,7 +111,6 @@ export function detectRuleBasedInteractions(medications: MedicationInput[]): Con
     });
   }
 
-  // 4. Metformin + NSAID
   if (isMetformin && isNsaid) {
     alerts.push({
       id: "metformin-nsaid-renal-risk",
@@ -137,7 +131,6 @@ export function detectRuleBasedInteractions(medications: MedicationInput[]): Con
     });
   }
 
-  // 5. Tramadol precautions
   if (isTramadol && isNsaid) {
     alerts.push({
       id: "tramadol-nsaid-multimodal",
@@ -269,9 +262,6 @@ async function analyzeWithGemini(
   return null;
 }
 
-/**
- * Checks for drug-drug interactions and contraindications for a prescription.
- */
 export async function checkPrescriptionContraindications(
   db: Db,
   prescriptionId: string,
@@ -319,7 +309,6 @@ export async function checkPrescriptionContraindications(
     return report;
   }
 
-  // Get known patient conditions from health history
   const historyEntries = await db.healthHistoryEntry.findMany({
     where: { patientId: record.patientId },
     select: { title: true, notes: true },
@@ -338,7 +327,6 @@ export async function checkPrescriptionContraindications(
     }
   }
 
-  // If AI did not return or offline/fallback, use rule-based detection
   if (alerts.length === 0) {
     alerts = detectRuleBasedInteractions(medications);
     summary =

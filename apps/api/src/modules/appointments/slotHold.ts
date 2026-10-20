@@ -9,9 +9,8 @@ export interface SlotHold {
   expiresAt: number;
 }
 
-export const HOLD_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+export const HOLD_DURATION_MS = 5 * 60 * 1000;
 
-// In-memory slot hold store (concurrency-safe within this instance)
 const holds = new Map<string, SlotHold>();
 
 function purgeExpired() {
@@ -23,9 +22,6 @@ function purgeExpired() {
   }
 }
 
-/**
- * Attempts to reserve/hold a slot for 5 minutes during checkout.
- */
 export function acquireSlotHold(
   slotId: string,
   hospitalId: string,
@@ -45,7 +41,7 @@ export function acquireSlotHold(
         `This slot is temporarily held by another patient. It may become available in ${waitSec}s if not completed.`,
       );
     }
-    // Refresh patient's own hold
+
     existing.expiresAt = now + ttlMs;
     return {
       held: true,
@@ -71,9 +67,6 @@ export function acquireSlotHold(
   };
 }
 
-/**
- * Releases a hold if the patient cancels selection or navigates away.
- */
 export function releaseSlotHold(slotId: string, patientId: string): boolean {
   purgeExpired();
   const existing = holds.get(slotId);
@@ -85,16 +78,10 @@ export function releaseSlotHold(slotId: string, patientId: string): boolean {
   return false;
 }
 
-/**
- * Clears hold unconditionally after successful booking.
- */
 export function clearSlotHold(slotId: string): void {
   holds.delete(slotId);
 }
 
-/**
- * Gets hold status for a single slot from the perspective of a calling patient.
- */
 export function getSlotHoldStatus(
   slotId: string,
   callingPatientId?: string | null,
@@ -114,9 +101,6 @@ export function getSlotHoldStatus(
   };
 }
 
-/**
- * Returns a map of all active slot holds for a hospital.
- */
 export function getHospitalSlotHolds(
   hospitalId: string,
   callingPatientId?: string | null,

@@ -104,13 +104,12 @@ export function SymptomCheckerScreen() {
   return (
     <Screen>
       <Stack gap={space.lg}>
-        {/* Clinical Disclaimer Banner */}
+
         <Banner tone="warning" title="Informational Clinical Triage" icon="alert-triangle">
           This automated checker is for guidance only and does NOT provide a medical diagnosis. If you have sudden chest
           pressure, difficulty breathing, or stroke symptoms, call emergency services immediately.
         </Banner>
 
-        {/* Emergency Call Action */}
         <Card>
           <Row style={{ justifyContent: "space-between", alignItems: "center" }}>
             <View style={{ flex: 1 }}>
@@ -142,7 +141,7 @@ export function SymptomCheckerScreen() {
 
         {!result ? (
           <>
-            {/* 1. Symptoms selection */}
+
             <Card>
               <Heading level={2}>1. Select Symptoms</Heading>
               <AppText variant="small" muted>
@@ -187,7 +186,6 @@ export function SymptomCheckerScreen() {
               ) : null}
             </Card>
 
-            {/* 2. Severity */}
             <Card>
               <Heading level={2}>2. Overall Severity</Heading>
               <Row style={{ gap: space.sm }}>
@@ -197,7 +195,6 @@ export function SymptomCheckerScreen() {
               </Row>
             </Card>
 
-            {/* 3. Duration & Age */}
             <Card>
               <Heading level={2}>3. Duration & Age</Heading>
               <Row style={{ gap: space.md }}>
@@ -222,7 +219,6 @@ export function SymptomCheckerScreen() {
               </Row>
             </Card>
 
-            {/* 4. Notes */}
             <Card>
               <Heading level={2}>4. Additional Context (Optional)</Heading>
               <TextField
@@ -245,9 +241,9 @@ export function SymptomCheckerScreen() {
             />
           </>
         ) : (
-          /* Results View */
+
           <Stack gap={space.lg}>
-            {/* Urgency Card */}
+
             <Card>
               <Row style={{ justifyContent: "space-between", alignItems: "center" }}>
                 <Heading level={2}>{result.urgencyLabel}</Heading>
@@ -265,14 +261,12 @@ export function SymptomCheckerScreen() {
               ) : null}
             </Card>
 
-            {/* Red Flag Warnings */}
             {result.redFlags && result.redFlags.length > 0 ? (
               <Banner tone="danger" title="Critical Red Flags Detected" icon="alert-circle">
                 {result.redFlags.join("\n• ")}
               </Banner>
             ) : null}
 
-            {/* Possible Explanations */}
             <Card>
               <Heading level={2}>Possible Explanations</Heading>
               <AppText variant="small" muted style={{ marginBottom: space.sm }}>
@@ -299,7 +293,6 @@ export function SymptomCheckerScreen() {
               })}
             </Card>
 
-            {/* Questions for Doctor */}
             {result.followUpQuestions && result.followUpQuestions.length > 0 ? (
               <Card>
                 <Heading level={2}>Questions for Your Doctor</Heading>
@@ -314,7 +307,6 @@ export function SymptomCheckerScreen() {
               </Card>
             ) : null}
 
-            {/* Clinical Disclaimer */}
             <Banner tone="neutral" title="Clinical Safety Disclaimer" icon="info">
               {result.clinicalDisclaimer}
             </Banner>

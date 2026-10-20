@@ -67,13 +67,11 @@ export function SymptomCheckerView() {
   const [patientAge, setPatientAge] = React.useState<number | "">(30);
   const [description, setDescription] = React.useState("");
 
-  // Questionnaire state
   const [questions, setQuestions] = React.useState<RuleQuestion[]>([]);
   const [currentQuestionIdx, setCurrentQuestionIdx] = React.useState(0);
   const [answers, setAnswers] = React.useState<Record<string, { optionId: string; optionLabel: string; isRedFlag?: boolean }>>({});
   const [loadingQuestions, setLoadingQuestions] = React.useState(false);
 
-  // Result state
   const [evaluating, setEvaluating] = React.useState(false);
   const [result, setResult] = React.useState<SymptomAssessmentResult | null>(null);
   const [showAnswersRecap, setShowAnswersRecap] = React.useState(false);
@@ -115,7 +113,7 @@ export function SymptomCheckerView() {
       setStep("questionnaire");
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch {
-      // Fallback: Generate standard rule-based questions
+
       const fallbackQuestions: RuleQuestion[] = [
         {
           id: "q_duration",
@@ -256,7 +254,6 @@ export function SymptomCheckerView() {
         description="A structured medical triage system that asks targeted questions about your symptoms to screen red flags, deduce differential conditions, and determine urgency."
       />
 
-      {/* Safety Notice Banner */}
       <Alert tone="neutral" className="bg-muted/40 border-border">
         <Info className="size-4 text-muted-foreground" />
         <AlertTitle className="text-xs font-semibold">Triage & Decision Support Only</AlertTitle>
@@ -265,9 +262,6 @@ export function SymptomCheckerView() {
         </AlertDescription>
       </Alert>
 
-      {/* ========================================================================= */}
-      {/* PHASE 1: CHIEF COMPLAINT & SYMPTOM SELECTION                             */}
-      {/* ========================================================================= */}
       {step === "select_symptoms" && (
         <div className="bg-card border-border rounded-lg border p-6 shadow-xs space-y-6">
           <div className="space-y-1">
@@ -277,7 +271,6 @@ export function SymptomCheckerView() {
             </p>
           </div>
 
-          {/* Quick Symptoms Pills */}
           <div className="flex flex-wrap gap-2">
             {COMMON_SYMPTOMS.map((sym) => {
               const isSelected = symptoms.includes(sym);
@@ -299,7 +292,6 @@ export function SymptomCheckerView() {
             })}
           </div>
 
-          {/* Custom Symptom Input */}
           <div className="space-y-2">
             <Label htmlFor="custom-symptom" className="text-xs font-medium">
               Or type a specific symptom
@@ -330,7 +322,6 @@ export function SymptomCheckerView() {
             </div>
           </div>
 
-          {/* Selected Symptoms Chips */}
           {symptoms.length > 0 && (
             <div className="rounded-lg bg-muted/30 p-3 space-y-2 border">
               <span className="text-muted-foreground text-xs font-medium">
@@ -357,7 +348,6 @@ export function SymptomCheckerView() {
             </div>
           )}
 
-          {/* Optional Age & Context */}
           <div className="grid gap-4 sm:grid-cols-2 pt-2 border-t">
             <div className="space-y-1.5">
               <Label htmlFor="patient-age" className="text-xs font-medium">
@@ -415,12 +405,9 @@ export function SymptomCheckerView() {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* PHASE 2: QUESTION-BY-QUESTION RULE-BASED QUESTIONNAIRE                    */}
-      {/* ========================================================================= */}
       {step === "questionnaire" && currentQuestion && (
         <div className="space-y-6">
-          {/* Progress Bar & Step Navigation */}
+
           <div className="bg-card border-border rounded-lg border p-6 shadow-xs space-y-4">
             <div className="flex items-center justify-between gap-2">
               <button
@@ -435,7 +422,6 @@ export function SymptomCheckerView() {
               </Badge>
             </div>
 
-            {/* Visual Progress Bar */}
             <div className="bg-muted h-1.5 w-full overflow-hidden rounded-full">
               <div
                 className="bg-primary h-full transition-all duration-300"
@@ -443,7 +429,6 @@ export function SymptomCheckerView() {
               />
             </div>
 
-            {/* Category Pill */}
             <div className="pt-2">
               <span className="text-muted-foreground text-[11px] font-semibold tracking-wider uppercase">
                 {currentQuestion.category.replace(/_/g, " ")}
@@ -458,7 +443,6 @@ export function SymptomCheckerView() {
               ) : null}
             </div>
 
-            {/* Options Radio List */}
             <div className="space-y-2.5 pt-2">
               {currentQuestion.options.map((opt) => {
                 const isSelected = currentAnswer?.optionId === opt.id;
@@ -501,7 +485,6 @@ export function SymptomCheckerView() {
               })}
             </div>
 
-            {/* Red Flag Alert Banner if an Emergency Flag is checked */}
             {hasAnyRedFlag && (
               <Alert tone="danger" className="mt-4">
                 <AlertCircle className="size-5" />
@@ -512,7 +495,6 @@ export function SymptomCheckerView() {
               </Alert>
             )}
 
-            {/* Navigation Buttons */}
             <div className="flex items-center justify-between border-t pt-4">
               <Button
                 type="button"
@@ -559,12 +541,9 @@ export function SymptomCheckerView() {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* PHASE 3: FINAL CLINICAL DISEASE & TRIAGE OUTPUT                           */}
-      {/* ========================================================================= */}
       {step === "results" && result && (
         <div className="space-y-6">
-          {/* Triage Urgency Header Banner */}
+
           <div
             className={`flex flex-col gap-3 rounded-lg border-2 p-6 ${
               urgencyConfig[result.urgency].border
@@ -602,7 +581,6 @@ export function SymptomCheckerView() {
             )}
           </div>
 
-          {/* Red Flag Status */}
           {result.redFlags && result.redFlags.length > 0 ? (
             <Alert tone="danger">
               <AlertCircle className="size-5" />
@@ -627,7 +605,6 @@ export function SymptomCheckerView() {
             </div>
           )}
 
-          {/* Rule-Engine Matched Diseases / Conditions */}
           <div className="bg-card border-border space-y-4 rounded-lg border p-6 shadow-xs">
             <div className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center gap-2">
@@ -655,7 +632,6 @@ export function SymptomCheckerView() {
                     possible: "info",
                   };
 
-                  // Find if there is a matching rule reason
                   const matchedRule = result.matchedRules?.find((r) =>
                     exp.condition.toLowerCase().includes(r.condition.toLowerCase()) ||
                     r.condition.toLowerCase().includes(exp.condition.toLowerCase())
@@ -689,7 +665,6 @@ export function SymptomCheckerView() {
             )}
           </div>
 
-          {/* Interactive Questionnaire Summary Accordion */}
           {result.answeredQuestions && result.answeredQuestions.length > 0 && (
             <div className="bg-card border-border rounded-lg border p-6 shadow-xs space-y-3">
               <button
@@ -723,7 +698,6 @@ export function SymptomCheckerView() {
             </div>
           )}
 
-          {/* Doctor Discussion Guide */}
           {result.followUpQuestions && result.followUpQuestions.length > 0 && (
             <div className="bg-card border-border space-y-3 rounded-lg border p-6 shadow-xs">
               <div className="flex items-center gap-2">
@@ -741,7 +715,6 @@ export function SymptomCheckerView() {
             </div>
           )}
 
-          {/* Next Steps: Book Hospital Appointment */}
           <div className="bg-primary/5 border-primary/20 rounded-lg border p-6 flex flex-wrap items-center justify-between gap-4">
             <div className="space-y-1">
               <h3 className="text-sm font-semibold text-foreground">Need a Formal In-Person Consultation?</h3>
@@ -761,7 +734,6 @@ export function SymptomCheckerView() {
             </div>
           </div>
 
-          {/* Clinical Disclaimer */}
           <div className="border-border bg-muted/30 rounded-md border p-4 text-xs leading-relaxed text-muted-foreground">
             <p className="font-semibold text-foreground mb-1">Clinical Safety Disclaimer</p>
             {result.clinicalDisclaimer}

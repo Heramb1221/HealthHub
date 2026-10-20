@@ -66,7 +66,6 @@ export async function createConsent(
   if (input.granteeUserId === auth.userId) throw new AppError("VALIDATION_ERROR");
   if (input.expiresAt && input.expiresAt.getTime() <= Date.now()) throw new AppError("VALIDATION_ERROR");
 
-  // Only an existing, active provider can receive access. Anything else looks the same as "no such user".
   const grantee = await db.user.findFirst({
     where: { id: input.granteeUserId, role: "provider", isActive: true },
     select: { id: true },
@@ -92,7 +91,7 @@ export async function createConsent(
       resourceType: "consent",
       resourceId: row.id,
       requestId: ctx.requestId,
-      // Scope and ids only; the free-text purpose is not copied into the audit log.
+
       metadata: { resourceScope: row.resourceScope, granteeUserId: row.granteeUserId },
     });
     return row;
@@ -109,7 +108,7 @@ export async function listConsents(
   if (auth.role === "patient") {
     where = { patientId: await ownPatientId(db, auth) };
   } else if (auth.role === "provider") {
-    // A provider sees consents granted to them, so they know what they may access.
+
     where = { granteeUserId: auth.userId };
   } else {
     throw new AppError("FORBIDDEN");
@@ -130,15 +129,9 @@ export async function listConsents(
   };
 }
 
-/**
- * Revokes future access. Also revokes any other still-active consent for the
- * same grantee and scope, so a duplicate can never silently keep access alive.
- * Revoking an already-revoked consent is a no-op that returns it unchanged.
- */
 export async function revokeConsent(db: Db, auth: AuthContext, consentId: string, ctx: Ctx): Promise<ConsentDto> {
   const patientId = await ownPatientId(db, auth);
 
-  // A consent that is not yours looks exactly like one that does not exist.
   const target = await db.consent.findFirst({ where: { id: consentId, patientId }, select: SELECT });
   if (!target) throw new AppError("NOT_FOUND");
   if (target.revokedAt) return toDto(target);

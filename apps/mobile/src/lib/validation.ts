@@ -1,12 +1,8 @@
-/**
- * Client-side validation is for fast, friendly feedback only. The server validates every request
- * and its decision is final (AGENTS.md: validate untrusted input at API boundaries).
- */
+
 export function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()) && value.trim().length <= 254;
 }
 
-/** Backend note B1 (proposed): length 10 to 128. */
 export const PASSWORD_MIN = 10;
 export const PASSWORD_MAX = 128;
 
@@ -16,7 +12,6 @@ export function passwordProblem(value: string): string | null {
   return null;
 }
 
-/** "YYYY-MM-DD" that is a real calendar date. */
 export function isValidDateOnly(value: string): boolean {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (!m) return false;
@@ -37,7 +32,6 @@ export function isValidTimeOfDay(value: string): boolean {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 }
 
-/** Comma/newline separated text to a trimmed, de-duplicated list. */
 export function parseList(text: string): string[] {
   const seen = new Set<string>();
   for (const part of text.split(/[,\n]/)) {
@@ -51,13 +45,11 @@ export function listToText(list: string[] | undefined): string {
   return (list ?? []).join(", ");
 }
 
-/** Empty or whitespace text to null (for nullable API fields). */
 export function blankToNull(value: string): string | null {
   const trimmed = value.trim();
   return trimmed === "" ? null : trimmed;
 }
 
-/** Backend note G3: 7 to 20 characters of digits, spaces, parentheses, hyphens, with an optional leading "+". */
 export function phoneProblem(value: string): string | null {
   const v = value.trim();
   if (v === "") return null;
@@ -67,7 +59,6 @@ export function phoneProblem(value: string): string | null {
   return null;
 }
 
-/** Backend note G3: a real calendar date from 1900-01-01 up to today. */
 export function dateOfBirthProblem(value: string, now: Date = new Date()): string | null {
   if (value === "") return null;
   if (!isValidDateOnly(value)) return "Use the format YYYY-MM-DD, for example 1998-04-23.";
@@ -76,7 +67,6 @@ export function dateOfBirthProblem(value: string, now: Date = new Date()): strin
   return null;
 }
 
-/** Backend note G3: at most 30 items of 100 characters each. */
 export function listProblem(items: string[]): string | null {
   if (items.length > 30) return "Use at most 30 items.";
   if (items.some((i) => i.length > 100)) return "Keep each item under 100 characters.";

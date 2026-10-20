@@ -11,7 +11,7 @@ import { log } from "../lib/logger.js";
 
 export interface AuthContext {
   userId: string;
-  /** Always read from the database for this request, never from the token. */
+
   role: UserRole;
   sessionId: string;
 }
@@ -40,18 +40,11 @@ function extractToken(req: Request): string | undefined {
   return undefined;
 }
 
-
-/**
- * Requires a valid bearer token whose session exists, is not revoked or
- * expired, and whose user is still active.
- * Supports both Clerk session tokens and internal HMAC JWT tokens.
- */
 export function authenticate(db: Db, env: Pick<Env, "JWT_SECRET" | "CLERK_SECRET_KEY">): RequestHandler {
   return async (req: Request, _res: Response, next: NextFunction) => {
     const token = extractToken(req);
     if (!token) throw new AppError("UNAUTHENTICATED");
 
-    // 1. Try Clerk Token verification if CLERK_SECRET_KEY is configured
     if (env.CLERK_SECRET_KEY) {
       let isClerk = false;
       try {
@@ -130,17 +123,16 @@ export function authenticate(db: Db, env: Pick<Env, "JWT_SECRET" | "CLERK_SECRET
           }
 
           if (isClerk && !user) {
-            // Token is valid Clerk user, but DB is unreachable or user could not be provisioned
+
             throw new AppError("UNAUTHENTICATED", "User record could not be loaded from database. Verify database connection.");
           }
         }
       } catch (clerkErr) {
         if (isClerk) throw clerkErr;
-        // Not a Clerk token; fall through to local JWT check
+
       }
     }
 
-    // 2. Fallback to local JWT token verification
     const claims = await verifyAccessToken(env.JWT_SECRET, token);
     if (!claims || !uuidSchema.safeParse(claims.sessionId).success) throw new AppError("UNAUTHENTICATED");
 
@@ -163,7 +155,6 @@ export function authenticate(db: Db, env: Pick<Env, "JWT_SECRET" | "CLERK_SECRET
   };
 }
 
-/** For handlers: returns the auth context or throws if `authenticate` did not run. */
 export function requireAuth(req: Request): AuthContext {
   if (!req.auth) throw new AppError("UNAUTHENTICATED");
   return req.auth;

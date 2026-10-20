@@ -2,7 +2,6 @@ import { FlaskConical } from "lucide-react";
 
 import { IS_DEMO } from "@/lib/api/config";
 
-/** Persistent banner while the web app runs against the demo adapter instead of the real API. */
 export function DemoBanner() {
   if (!IS_DEMO) return null;
   return (

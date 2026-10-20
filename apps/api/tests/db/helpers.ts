@@ -5,7 +5,6 @@ import { createDb, type Db } from "../../src/db/client.js";
 
 export const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
 
-/** Refuses to touch any database whose name does not end in `_test`. */
 export function assertTestDatabase(url: string): void {
   const name = new URL(url).pathname.replace(/^\//, "");
   if (!name.endsWith("_test")) {
@@ -15,7 +14,6 @@ export function assertTestDatabase(url: string): void {
 
 const MIGRATIONS_DIR = join(import.meta.dirname, "..", "..", "prisma", "migrations");
 
-/** Drops everything and applies every migration.sql in order, as `prisma migrate deploy` would. */
 export async function resetAndMigrate(client: pg.Client): Promise<void> {
   await client.query("DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;");
   const dirs = readdirSync(MIGRATIONS_DIR, { withFileTypes: true })
@@ -81,7 +79,6 @@ export async function makePrescription(db: Db, patientId: string) {
   });
 }
 
-/** Postgres SQLSTATE of a rejected raw query, or undefined if it did not fail. */
 export async function sqlState(promise: Promise<unknown>): Promise<string | undefined> {
   try {
     await promise;

@@ -48,7 +48,6 @@ const NOT_YET = [
   "Government ABDM mandatory registry data linking",
 ];
 
-
 export default function Home() {
   return (
     <>

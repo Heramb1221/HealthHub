@@ -29,10 +29,6 @@ export function useSession(): SessionContextValue {
   return value;
 }
 
-/**
- * Client-side gate for the signed-in area. It verifies the Clerk session,
- * syncs the Clerk session token with HealthHub API client, and provides the user context.
- */
 export function SessionGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();

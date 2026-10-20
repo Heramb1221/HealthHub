@@ -69,7 +69,7 @@ function AuthForm({ mode, navigation }: { mode: "signIn" | "register"; navigatio
       } else {
         await signIn(email, password);
       }
-      // Navigation switches automatically when auth state becomes signedIn.
+
     } catch (error: unknown) {
       const err = error as { errors?: { message?: string; longMessage?: string }[]; message?: string };
       const msg = err.errors?.[0]?.longMessage || err.errors?.[0]?.message || err.message || "An authentication error occurred.";

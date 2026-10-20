@@ -17,6 +17,6 @@ export const addConditionSchema = z.strictObject({
 export const listHistoryQuerySchema = z.strictObject({
   limit: z.coerce.number().int().min(1).max(100).default(20),
   cursor: z.uuid().optional(),
-  // Providers must name the patient; patients may omit it.
+
   patientId: z.uuid().optional(),
 });

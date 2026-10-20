@@ -39,7 +39,7 @@ const SEVERITY_CONFIG: Record<
 };
 
 export function ContraindicationAlerts({ prescriptionId, status }: ContraindicationAlertsProps) {
-  // Only load contraindications once the prescription reading has completed
+
   const report = useResource(
     () => (status === "completed" ? prescriptionsApi.contraindications(prescriptionId) : Promise.resolve(null)),
     `contraindications:${prescriptionId}:${status}`,

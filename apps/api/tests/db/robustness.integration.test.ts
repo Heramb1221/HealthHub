@@ -3,8 +3,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TEST_DATABASE_URL, closeHarness, openHarness, type Harness } from "./helpers.js";
 import { bearer, buildApp, loginToken, registerPatient, seedUser, testEnv } from "./appHelpers.js";
 
-// Hostile or malformed input must always produce a 4xx with the contract error
-// shape, never a 5xx and never a stack trace or internal detail.
 describe.skipIf(!TEST_DATABASE_URL)("hostile input never causes a server error", () => {
   let h: Harness;
   let app: ReturnType<typeof buildApp>;
@@ -51,7 +49,7 @@ describe.skipIf(!TEST_DATABASE_URL)("hostile input never causes a server error",
     for (const endpoint of ENDPOINTS) {
       for (const raw of RAW_BODIES) {
         const token = endpoint.auth === "patient" ? patientToken : endpoint.auth === "provider" ? providerToken : undefined;
-        // Logout with a valid token would revoke the shared session, so use a throwaway one.
+
         const useToken = endpoint.path === "/auth/logout" ? "garbage.token.value" : token;
         const url = `/api/v1${endpoint.path}`;
         const pending = endpoint.method === "post" ? request(app).post(url) : request(app).patch(url);

@@ -12,11 +12,9 @@ interface Ctx {
   requestId: string;
 }
 
-/** A run stuck in "processing" longer than this (for example after a crash) may be started again. */
 export const PROCESSING_STALE_MS = 5 * 60_000;
 const EXTRACTION_TIMEOUT_MS = 60_000;
 
-/** Raised when patient-entered data appears while a run is in flight; the run must release its claim. */
 class PatientEntriesExistError extends AppError {
   constructor() {
     super("CONFLICT", "This prescription already has patient-entered data");
@@ -37,32 +35,26 @@ export function inferReminderTimes(frequency: string | null | undefined): string
   if (!frequency) return ["08:00"];
   const f = frequency.toLowerCase().trim();
 
-  // 1-1-1-1 or four times
   if (f.includes("1-1-1-1") || f.includes("four times") || f.includes("qds") || f.includes("qid")) {
     return ["08:00", "12:00", "16:00", "20:00"];
   }
 
-  // 1-1-1 or thrice or TDS or TID
   if (f.includes("1-1-1") || f.includes("three times") || f.includes("thrice") || f.includes("tds") || f.includes("tid")) {
     return ["08:00", "14:00", "20:00"];
   }
 
-  // 1-0-1 or twice or BD or BID
   if (f.includes("1-0-1") || f.includes("0-1-1") || f.includes("twice") || f.includes("bd") || f.includes("bid")) {
     return ["08:00", "20:00"];
   }
 
-  // Afternoon only (0-1-0)
   if (f.includes("0-1-0") || f.includes("afternoon")) {
     return ["14:00"];
   }
 
-  // Night only (0-0-1 or bedtime or hs)
   if (f.includes("0-0-1") || f.includes("night") || f.includes("bedtime") || f.includes("hs") || f.includes("at bed")) {
     return ["20:00"];
   }
 
-  // Morning only (1-0-0 or morning or OD or once)
   if (f.includes("1-0-0") || f.includes("morning") || f.includes("od") || f.includes("once")) {
     return ["08:00"];
   }
@@ -82,17 +74,6 @@ function parseDurationDays(duration: string | null | undefined): number | null {
   return null;
 }
 
-/**
- * Runs extraction for one prescription record the caller owns.
- *
- * - No provider configured: refuses with PROVIDER_DISABLED and changes nothing.
- * - Only `pending` or `failed` records start a run (or a stale `processing`
- *   one). A `completed` record is never silently re-processed, because a new
- *   version would supersede a later patient correction as "latest".
- * - The claim is one conditional update, so concurrent calls cannot both run.
- * - Output goes through the safety gate; the original file and earlier
- *   versions are never touched. A failed run creates no version and is audited.
- */
 export async function processPrescription(
   deps: { db: Db; store: PrivateFileStore; provider: ExtractionProvider | null },
   auth: AuthContext,
@@ -118,7 +99,6 @@ export async function processPrescription(
     throw new AppError("PROVIDER_DISABLED");
   }
 
-  // Automatic extraction would become the "latest" version and bury what the patient entered.
   const patientEntries = await db.prescriptionVersion.count({ where: { prescriptionId, kind: "patient_correction" } });
   if (patientEntries > 0) throw new PatientEntriesExistError();
 
@@ -155,7 +135,7 @@ export async function processPrescription(
     raw = await withTimeout(provider.extract({ bytes, mimeType: record.originalMimeType }), EXTRACTION_TIMEOUT_MS);
   } catch (err) {
     if (err instanceof ExtractionUnrecognizedError) return fail("unrecognized_input");
-    // Log sanitized error info; provider errors can echo document content if uncurated.
+
     const message = err instanceof Error ? err.message.replace(/([a-zA-Z0-9_-]{20,})/g, "[redacted]") : "unknown";
     log("error", "extraction provider error", { requestId: ctx.requestId, errorName: err instanceof Error ? err.name : "unknown", errorDetails: message.slice(0, 300) });
     return fail("provider_error");
@@ -167,7 +147,7 @@ export async function processPrescription(
 
   try {
     await db.$transaction(async (tx) => {
-      // Same lock corrections take, so the two can never interleave on one record.
+
       await tx.$queryRaw`SELECT "id" FROM "PrescriptionRecord" WHERE "id" = ${prescriptionId}::uuid FOR UPDATE`;
       const patientEntriesNow = await tx.prescriptionVersion.count({ where: { prescriptionId, kind: "patient_correction" } });
       if (patientEntriesNow > 0) throw new PatientEntriesExistError();
@@ -192,7 +172,6 @@ export async function processPrescription(
         include: { medications: true },
       });
 
-      // Automatically create MedicationSchedule for each read medication
       const today = new Date();
       for (const med of createdVersion.medications) {
         if (!med.name) continue;
@@ -232,7 +211,6 @@ export async function processPrescription(
         }
       }
 
-      // Automatically record in Medical History section
       const doctorTitle = result.prescriberName
         ? `Prescription: Dr. ${result.prescriberName.replace(/^Dr\.?\s*/i, "")}`
         : "Prescription Consultation";
@@ -250,7 +228,6 @@ export async function processPrescription(
         },
       });
 
-      // Still our claim? If another call reclaimed a stale run, abandon this one.
       const completed = await tx.prescriptionRecord.updateMany({
         where: { id: prescriptionId, processingStatus: "processing" },
         data: { processingStatus: "completed" },
@@ -265,7 +242,7 @@ export async function processPrescription(
         resourceType: "prescription",
         resourceId: prescriptionId,
         requestId: ctx.requestId,
-        // Provider, version, status, and reason CODES only. No medical content.
+
         metadata: {
           provider: provider.name,
           versionNumber,
@@ -275,7 +252,7 @@ export async function processPrescription(
       });
     });
   } catch (err) {
-    // Patient data arrived mid-run: give the record back instead of leaving it "processing".
+
     if (err instanceof PatientEntriesExistError) {
       await db.prescriptionRecord.updateMany({
         where: { id: prescriptionId, processingStatus: "processing" },

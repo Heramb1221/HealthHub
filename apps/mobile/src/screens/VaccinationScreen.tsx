@@ -18,12 +18,10 @@ export function VaccinationScreen() {
   const [search, setSearch] = useState("");
   const [expandedName, setExpandedName] = useState<string | null>(null);
 
-  // Extra details state for editing date & notes
   const [detailDate, setDetailDate] = useState("");
   const [detailNotes, setDetailNotes] = useState("");
   const [savingName, setSavingName] = useState<string | null>(null);
 
-  // Custom vaccine modal state
   const [customModal, setCustomModal] = useState(false);
   const [customName, setCustomName] = useState("");
   const [customStatus, setCustomStatus] = useState<"taken" | "not_taken">("taken");
@@ -143,7 +141,6 @@ export function VaccinationScreen() {
           Track which vaccines you have received. Based on India's National Immunization Programme, IAP recommendations, and approved vaccines.
         </Banner>
 
-        {/* Summary counts */}
         <Row style={{ flexWrap: "wrap", gap: space.sm }}>
           <Badge label={`Total: ${summary.total}`} tone="neutral" />
           <Badge label={`Taken: ${summary.taken}`} tone="success" icon="check-circle" />
@@ -151,7 +148,6 @@ export function VaccinationScreen() {
           <Badge label={`Unrecorded: ${summary.unrecorded}`} tone="neutral" />
         </Row>
 
-        {/* Category Filter Chips */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryScroll}>
           {VACCINE_CATEGORIES.map((cat) => (
             <Chip
@@ -163,7 +159,6 @@ export function VaccinationScreen() {
           ))}
         </ScrollView>
 
-        {/* Search */}
         <TextField
           label="Search vaccines"
           value={search}
@@ -172,7 +167,6 @@ export function VaccinationScreen() {
           clearButtonMode="while-editing"
         />
 
-        {/* Status Filter Row */}
         <Row style={{ flexWrap: "wrap" }}>
           <Chip label="All" selected={statusFilter === "all"} onPress={() => setStatusFilter("all")} />
           <Chip label="Taken" selected={statusFilter === "taken"} onPress={() => setStatusFilter("taken")} />
@@ -187,7 +181,6 @@ export function VaccinationScreen() {
           onPress={() => setCustomModal(true)}
         />
 
-        {/* Vaccine List */}
         {filtered.length === 0 ? (
           <EmptyState
             icon="shield"
@@ -245,7 +238,6 @@ export function VaccinationScreen() {
 
                 <Divider />
 
-                {/* Primary Action Buttons: Taken vs Not Taken */}
                 <Row style={{ gap: space.sm }}>
                   <Button
                     label="Taken"
@@ -267,7 +259,6 @@ export function VaccinationScreen() {
                   />
                 </Row>
 
-                {/* Date & Notes Disclosure */}
                 <Row style={{ justifyContent: "space-between", marginTop: space.sm, alignItems: "center" }}>
                   <TouchableOpacity
                     onPress={() => {
@@ -302,7 +293,6 @@ export function VaccinationScreen() {
                   ) : null}
                 </Row>
 
-                {/* Expanded Details Form */}
                 {isExpanded ? (
                   <View style={styles.expandedBox}>
                     <TextField
@@ -346,7 +336,6 @@ export function VaccinationScreen() {
         )}
       </Stack>
 
-      {/* Add Custom Vaccine Modal */}
       <Modal visible={customModal} animationType="slide" transparent>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalContent}>

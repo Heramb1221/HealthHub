@@ -9,7 +9,7 @@ export interface UpcomingReminder {
 export interface DoseSlot {
   schedule: MedicationSchedule;
   at: Date;
-  /** The latest self-reported event for this slot, if any. */
+
   event: DoseEvent | null;
 }
 
@@ -37,14 +37,12 @@ function inRange(schedule: MedicationSchedule, at: Date): boolean {
   return true;
 }
 
-/** Latest event recorded for exactly this reminder slot (matched to the minute). */
 export function eventForSlot(schedule: MedicationSchedule, at: Date): DoseEvent | null {
   const minute = Math.floor(at.getTime() / 60_000);
   const matches = (schedule.doseEvents ?? []).filter((e) => Math.floor(new Date(e.scheduledFor).getTime() / 60_000) === minute);
   return matches.sort((a, b) => b.recordedAt.localeCompare(a.recordedAt))[0] ?? null;
 }
 
-/** All reminder slots for one calendar day across active schedules, earliest first. */
 export function slotsForDay(schedules: MedicationSchedule[], day: Date): DoseSlot[] {
   const slots: DoseSlot[] = [];
   for (const schedule of schedules) {
@@ -58,7 +56,6 @@ export function slotsForDay(schedules: MedicationSchedule[], day: Date): DoseSlo
   return slots.sort((a, b) => a.at.getTime() - b.at.getTime());
 }
 
-/** Earliest upcoming reminder within 14 days that has not already been recorded, or null. Pure; takes `now` for testability. */
 export function nextReminder(schedules: MedicationSchedule[], now: Date = new Date()): UpcomingReminder | null {
   for (let offset = 0; offset < 14; offset++) {
     const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
@@ -76,10 +73,6 @@ export const CONCERN_TEXT: Record<ScheduleConcern, string> = {
   needs_review: "This medicine now needs review.",
 };
 
-/**
- * Re-checks a schedule against its source prescription. If the medicine, strength or dose no longer matches,
- * or the medicine is no longer clear enough to rely on, the schedule is flagged so the person checks it.
- */
 export function scheduleConcern(schedule: MedicationSchedule, prescriptions: Prescription[]): ScheduleConcern | null {
   const rx = prescriptions.find((p) => p.id === schedule.prescriptionId);
   if (!rx) return "prescription_missing";

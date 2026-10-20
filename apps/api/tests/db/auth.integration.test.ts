@@ -5,7 +5,6 @@ import { TEST_DATABASE_URL, closeHarness, openHarness, type Harness } from "./he
 import { refresh as refreshService } from "../../src/modules/auth/service.js";
 import { JWT_SECRET, PASSWORD, bearer, buildApp, loginToken, seedUser, testEnv } from "./appHelpers.js";
 
-// Lets one test force health ID collisions; otherwise the real generator runs.
 const forced = vi.hoisted(() => ({ ids: [] as string[] }));
 vi.mock("../../src/modules/patients/healthId.js", async (importOriginal) => {
   const original = await importOriginal<typeof import("../../src/modules/patients/healthId.js")>();
@@ -125,7 +124,7 @@ describe.skipIf(!TEST_DATABASE_URL)("authentication", () => {
   });
 
   describe("protected routes and sessions", () => {
-    // /consents is the first protected route; any authenticate()-guarded route behaves the same.
+
     const protectedGet = (headers: Record<string, string> = {}) => request(app).get("/api/v1/consents").set(headers);
 
     it("returns 401 without a token or with a malformed one", async () => {
@@ -205,7 +204,7 @@ describe.skipIf(!TEST_DATABASE_URL)("authentication", () => {
       const token = await loginToken(app, u.email);
       expect((await protectedGet(bearer(token))).status).toBe(200);
       await h.db.user.update({ where: { id: u.id }, data: { role: "admin" } });
-      // Same token, but the user is now an admin, who has no consent access.
+
       expect((await protectedGet(bearer(token))).status).toBe(403);
     });
   });
@@ -257,11 +256,11 @@ describe.skipIf(!TEST_DATABASE_URL)("authentication", () => {
       const u = await seedUser(h.db, "patient");
       const token = await loginToken(app, u.email);
       const session = await h.db.session.findFirstOrThrow({ where: { userId: u.id, revokedAt: null } });
-      await h.db.session.update({ where: { id: session.id }, data: { originAt: new Date(Date.now() - 169 * 3_600_000) } }); // limit is 168 hours
+      await h.db.session.update({ where: { id: session.id }, data: { originAt: new Date(Date.now() - 169 * 3_600_000) } });
       const res = await refresh(token);
       expect(res.status).toBe(401);
       expect(res.body.error.code).toBe("UNAUTHENTICATED");
-      expect((await protectedGet(token)).status).toBe(401); // and the session is ended
+      expect((await protectedGet(token)).status).toBe(401);
     });
 
     it("keeps the original login time through refreshes and caps the new expiry by it", async () => {
@@ -269,7 +268,7 @@ describe.skipIf(!TEST_DATABASE_URL)("authentication", () => {
       const u = await seedUser(h.db, "patient");
       const token = (await request(tight).post("/api/v1/auth/login").send({ email: u.email, password: PASSWORD })).body.data.accessToken as string;
       const first = await h.db.session.findFirstOrThrow({ where: { userId: u.id, revokedAt: null } });
-      // A day-long token lifetime is cut to the one-hour absolute limit already at login.
+
       expect(first.expiresAt.getTime() - first.originAt.getTime()).toBeLessThanOrEqual(3_600_000);
       const origin = new Date(Date.now() - 30 * 60_000);
       await h.db.session.update({ where: { id: first.id }, data: { originAt: origin } });
@@ -301,25 +300,21 @@ describe.skipIf(!TEST_DATABASE_URL)("authentication", () => {
         return { u, session };
       };
 
-      // A session revoked between the check and the swap (the lost race) must not produce a new one.
       const a = await live();
       await h.db.session.update({ where: { id: a.session.id }, data: { revokedAt: new Date() } });
       await expect(refreshService(h.db, env, { userId: a.u.id, sessionId: a.session.id }, ctx)).rejects.toMatchObject({ code: "UNAUTHENTICATED" });
       expect(await h.db.session.count({ where: { userId: a.u.id, revokedAt: null } })).toBe(0);
 
-      // A deactivated user cannot refresh.
       const b = await live();
       await h.db.user.update({ where: { id: b.u.id }, data: { isActive: false } });
       await expect(refreshService(h.db, env, { userId: b.u.id, sessionId: b.session.id }, ctx)).rejects.toMatchObject({ code: "UNAUTHENTICATED" });
       expect(await h.db.session.count({ where: { userId: b.u.id, revokedAt: null } })).toBe(0);
 
-      // Past the absolute maximum age.
       const c = await live();
       await h.db.session.update({ where: { id: c.session.id }, data: { originAt: new Date(Date.now() - 200 * 3_600_000) } });
       await expect(refreshService(h.db, env, { userId: c.u.id, sessionId: c.session.id }, ctx)).rejects.toMatchObject({ code: "UNAUTHENTICATED" });
       expect(await h.db.session.count({ where: { userId: c.u.id, revokedAt: null } })).toBe(0);
 
-      // An unknown session.
       await expect(refreshService(h.db, env, { userId: a.u.id, sessionId: "00000000-0000-4000-8000-000000000000" }, ctx)).rejects.toMatchObject({ code: "UNAUTHENTICATED" });
     });
 
@@ -332,7 +327,7 @@ describe.skipIf(!TEST_DATABASE_URL)("authentication", () => {
       const u = await seedUser(h.db, "patient");
       const token = await loginToken(app, u.email);
       await request(app).post("/api/v1/auth/logout").set(bearer(token));
-      expect((await refresh(token)).status).toBe(401); // a logged-out session cannot be refreshed
+      expect((await refresh(token)).status).toBe(401);
     });
 
     it("takes no body, and rejects one rather than ignoring it", async () => {
@@ -341,7 +336,7 @@ describe.skipIf(!TEST_DATABASE_URL)("authentication", () => {
       for (const junk of [{ role: "admin" }, { userId: u.id }, { sessionId: "x" }, []]) {
         expect((await refresh(token, junk)).status, JSON.stringify(junk)).toBe(400);
       }
-      // A JSON string or number is not an object either.
+
       for (const raw of ['"x"', "5", "null", "{bad"]) {
         const res = await request(app).post("/api/v1/auth/refresh").set("Content-Type", "application/json").set(bearer(token)).send(raw);
         expect(res.status, raw).toBeGreaterThanOrEqual(400);
@@ -350,7 +345,7 @@ describe.skipIf(!TEST_DATABASE_URL)("authentication", () => {
       const ok = await refresh(token, {});
       expect(ok.status).toBe(200);
       token = ok.body.data.accessToken;
-      expect((await refresh(token)).status).toBe(200); // and no body at all
+      expect((await refresh(token)).status).toBe(200);
     });
 
     it("is rate limited like login", async () => {

@@ -88,7 +88,6 @@ describe.skipIf(!TEST_DATABASE_URL)("prescription processing, versions, latest",
       });
       expect(await h.db.prescriptionMedication.count({ where: { versionId: versions[0]?.id } })).toBe(2);
 
-      // The original file and its record fields are untouched.
       const after = await h.db.prescriptionRecord.findUniqueOrThrow({ where: { id } });
       for (const key of ["originalStorageKey", "originalFileName", "originalMimeType", "originalSizeBytes", "originalSha256"] as const) {
         expect(after[key]).toEqual(before[key]);
@@ -195,7 +194,7 @@ describe.skipIf(!TEST_DATABASE_URL)("prescription processing, versions, latest",
       expect(audit[0]?.metadata).toEqual({ provider: "mock-synthetic", reason: "unrecognized_input" });
       expect((await getPath(p.token, `/prescriptions/${id}/latest`)).status).toBe(404);
 
-      expect((await processRx(p.token, id)).body.data.processingStatus).toBe("failed"); // retry is allowed
+      expect((await processRx(p.token, id)).body.data.processingStatus).toBe("failed");
       expect(await versionsOf(id)).toHaveLength(0);
     });
 
@@ -253,9 +252,9 @@ describe.skipIf(!TEST_DATABASE_URL)("prescription processing, versions, latest",
       expect(res.status).toBe(500);
       expect(JSON.stringify(res.body)).not.toContain("simulated");
       expect(await versionsOf(id)).toHaveLength(0);
-      // Still "processing" and fresh, so an immediate retry is refused...
+
       expect((await processRx(p.token, id)).status).toBe(409);
-      // ...but once the run is stale it can be started again.
+
       await h.pg.query(`UPDATE "PrescriptionRecord" SET "updatedAt" = now() - interval '10 minutes' WHERE "id" = $1`, [id]);
       const retry = await processRx(p.token, id);
       expect(retry.status).toBe(200);
@@ -392,8 +391,8 @@ describe.skipIf(!TEST_DATABASE_URL)("prescription processing, versions, latest",
       expect(latest.body.data.medications).toHaveLength(2);
       expect(await h.db.auditEvent.count({ where: { action: "access.granted", actorUserId: provider.id, resourceId: id } })).toBe(1);
 
-      expect((await getPath(provider.token, `/prescriptions/${id}/versions`)).status).toBe(403); // history is owner-only
-      expect((await processRx(provider.token, id)).status).toBe(403); // a consent never grants processing
+      expect((await getPath(provider.token, `/prescriptions/${id}/versions`)).status).toBe(403);
+      expect((await processRx(provider.token, id)).status).toBe(403);
     });
 
     it("never lets a provider process, even with consent, and leaves the record untouched", async () => {
@@ -407,7 +406,7 @@ describe.skipIf(!TEST_DATABASE_URL)("prescription processing, versions, latest",
     it("denies a provider without a live consent for this scope", async () => {
       const { owner, id, provider } = await scene();
       await processRx(owner.token, id);
-      expect((await getPath(provider.token, `/prescriptions/${id}/latest`)).status).toBe(403); // none
+      expect((await getPath(provider.token, `/prescriptions/${id}/latest`)).status).toBe(403);
       const wrongScope = await grant(owner.patientId, provider.id, "profile:read");
       expect((await getPath(provider.token, `/prescriptions/${id}/latest`)).status).toBe(403);
       await h.db.consent.delete({ where: { id: wrongScope.id } }).catch(() => undefined);
@@ -439,7 +438,7 @@ describe.skipIf(!TEST_DATABASE_URL)("prescription processing, versions, latest",
     it("pages through history newest first, and latest is always the highest version", async () => {
       const { owner, id } = await scene();
       await processRx(owner.token, id);
-      // Later versions (for example patient corrections, added in the next milestone) go on top.
+
       for (const n of [2, 3]) {
         await h.db.prescriptionVersion.create({
           data: { prescriptionId: id, versionNumber: n, kind: "patient_correction", verificationStatus: "patient_corrected", createdByUserId: owner.userId, changedFields: ["medications"] },

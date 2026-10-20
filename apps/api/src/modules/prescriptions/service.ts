@@ -16,7 +16,6 @@ interface Ctx {
   requestId: string;
 }
 
-// The metadata accepted with an upload.
 const uploadFieldsSchema = z.strictObject({
   sourceType: z.literal("uploaded_physical").optional(),
   prescriptionDate: z.string().optional(),
@@ -30,7 +29,7 @@ export const PRESCRIPTION_SELECT = {
   processingStatus: true,
   createdAt: true,
   updatedAt: true,
-  // The record-level view always reflects the latest version.
+
   versions: {
     orderBy: { versionNumber: "desc" },
     take: 1,
@@ -83,11 +82,6 @@ export interface PrescriptionDto {
   updatedAt: string;
 }
 
-/**
- * Contract "minimum fields" only. Storage keys, file names, hashes, and any
- * URL are deliberately not part of the response. Before any extraction has
- * run there is no version: the record is `unverified` with no medications.
- */
 export function toPrescriptionDto(row: PrescriptionRow): PrescriptionDto {
   const latest = row.versions[0];
   return {
@@ -117,14 +111,12 @@ export async function createPrescription(
   const { buffer } = upload.file;
   if (buffer.length === 0) throw new AppError("VALIDATION_ERROR");
 
-  // The type comes from the file's own bytes; the declared type must agree with it.
   const mime = sniffMime(buffer);
   if (!mime || normalizeDeclaredMime(upload.file.declaredMime) !== mime) throw new AppError("UNSUPPORTED_MEDIA_TYPE");
 
   const existing = await db.prescriptionRecord.count({ where: { patientId } });
   if (existing >= env.PATIENT_PRESCRIPTION_LIMIT) throw new AppError("CONFLICT", "Prescription limit reached");
 
-  // Storage key is generated here; no client-supplied text is ever part of it.
   const storageKey = `prescriptions/${patientId}/${randomUUID()}`;
   await store.put(storageKey, buffer);
 
@@ -157,7 +149,7 @@ export async function createPrescription(
     });
     return toPrescriptionDto(row);
   } catch (err) {
-    // Do not leave an orphaned file behind if the record could not be saved.
+
     await store.delete(storageKey).catch(() => {
       log("error", "orphan cleanup failed", { requestId: ctx.requestId });
     });
@@ -186,7 +178,6 @@ export async function listPrescriptions(
   };
 }
 
-/** Call only after the access guard has authorized this caller for the owning patient. */
 export async function getPrescription(db: Db, prescriptionId: string): Promise<PrescriptionDto> {
   const row = await db.prescriptionRecord.findUnique({ where: { id: prescriptionId }, select: PRESCRIPTION_SELECT });
   if (!row) throw new AppError("NOT_FOUND");
@@ -214,62 +205,53 @@ export async function deletePrescription(
   }
 
   await deps.db.$transaction(async (tx) => {
-    // Disable triggers temporarily in this transaction to permit cascade deletion
+
     await tx.$executeRawUnsafe("SET LOCAL session_replication_role = 'replica'");
 
-    // Find versions
     const versions = await tx.prescriptionVersion.findMany({
       where: { prescriptionId: target.prescriptionId },
       select: { id: true },
     });
     const versionIds = versions.map((v) => v.id);
 
-    // Find medications
     const medications = await tx.prescriptionMedication.findMany({
       where: { versionId: { in: versionIds } },
       select: { id: true },
     });
     const medIds = medications.map((m) => m.id);
 
-    // Find schedules
     const schedules = await tx.medicationSchedule.findMany({
       where: { sourceMedicationId: { in: medIds } },
       select: { id: true },
     });
     const scheduleIds = schedules.map((s) => s.id);
 
-    // 1. Delete dose events
     if (scheduleIds.length > 0) {
       await tx.doseEvent.deleteMany({
         where: { scheduleId: { in: scheduleIds } },
       });
     }
 
-    // 2. Delete medication schedules
     if (scheduleIds.length > 0) {
       await tx.medicationSchedule.deleteMany({
         where: { id: { in: scheduleIds } },
       });
     }
 
-    // 3. Delete prescription medications
     if (versionIds.length > 0) {
       await tx.prescriptionMedication.deleteMany({
         where: { versionId: { in: versionIds } },
       });
     }
 
-    // 4. Delete prescription versions
     await tx.prescriptionVersion.deleteMany({
       where: { prescriptionId: target.prescriptionId },
     });
 
-    // 5. Delete QR access sessions
     await tx.qrAccessSession.deleteMany({
       where: { prescriptionId: target.prescriptionId },
     });
 
-    // 6. Delete prescription record
     await tx.prescriptionRecord.delete({
       where: { id: target.prescriptionId },
     });
@@ -286,11 +268,9 @@ export async function deletePrescription(
     });
   });
 
-  // 7. Delete physical file from storage
   await deps.store.delete(record.originalStorageKey).catch(() => {
     log("error", "Storage delete failed on prescription deletion", { requestId: ctx.requestId });
   });
 
   return { deleted: true };
 }
-

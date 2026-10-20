@@ -2,13 +2,6 @@ import { ApiError } from "@/lib/api/errors";
 import type { AuthApi } from "@/lib/api/auth";
 import type { AuthUser } from "@/lib/api/types";
 
-/**
- * DEMO ONLY. Replaces the Express auth endpoints when NEXT_PUBLIC_API_MODE=demo.
- *
- * - Two seeded synthetic accounts, with credentials shown on the sign-in screen.
- * - Signing up creates a demo session without storing any password.
- * - The session is kept in localStorage of this browser. It grants nothing real.
- */
 export const DEMO_ACCOUNTS = [
   { id: "demo-patient", email: "demo.patient@healthhub.test", password: "DemoPatient#1", role: "patient", displayName: "Demo Patient" },
   { id: "demo-admin", email: "demo.admin@healthhub.test", password: "DemoAdmin#1", role: "admin", displayName: "Demo Admin" },

@@ -10,13 +10,6 @@ import { processPrescription } from "../modules/prescriptions/processing.js";
 import { createPrescription } from "../modules/prescriptions/service.js";
 import type { PrivateFileStore } from "../storage/types.js";
 
-/**
- * Demo data for development and demos. Everything it creates is fictional and
- * labelled: accounts use the reserved @demo.healthhub.test domain, hospitals
- * are flagged isDemo and say "(demo data)", people say "(synthetic)", and the
- * prescriptions come from the synthetic fixtures. It never edits or removes
- * anything that already exists, so running it twice changes nothing.
- */
 export const DEMO_PASSWORD_MIN_LENGTH = 12;
 
 export interface SeedSummary {
@@ -28,7 +21,6 @@ export interface SeedSummary {
   historyEntriesCreated: number;
 }
 
-/** Throws unless seeding is clearly intended. Call before touching the database. */
 export function assertSeedAllowed(input: { nodeEnv: string; allowDemoSeed: boolean; password: string | undefined }): string {
   if (!input.password || input.password.length < DEMO_PASSWORD_MIN_LENGTH) {
     throw new Error(`DEMO_SEED_PASSWORD is required and must be at least ${DEMO_PASSWORD_MIN_LENGTH} characters`);
@@ -92,7 +84,7 @@ const HOSPITALS = [
   },
 ];
 const SLOT_DAYS = 14;
-const SLOT_MINUTES = Array.from({ length: 14 }, (_, i) => 4 * 60 + i * 30); // 04:00 to 10:30 UTC, every 30 minutes
+const SLOT_MINUTES = Array.from({ length: 14 }, (_, i) => 4 * 60 + i * 30);
 
 const ACCOUNTS = [
   { local: "admin", role: "admin" as const },
@@ -108,7 +100,6 @@ export async function runDemoSeed(deps: { db: Db; store: PrivateFileStore; env: 
   const summary: SeedSummary = { usersCreated: 0, hospitalsCreated: 0, slotsCreated: 0, prescriptionsCreated: 0, consentsCreated: 0, historyEntriesCreated: 0 };
   const passwordHash = await hashPassword(deps.password);
 
-  // Accounts. Existing ones are left exactly as they are, including their passwords.
   const users: Record<string, { id: string; patientId?: string }> = {};
   for (const account of ACCOUNTS) {
     const email = `${account.local}${DEMO_EMAIL_DOMAIN}`;
@@ -134,13 +125,12 @@ export async function runDemoSeed(deps: { db: Db; store: PrivateFileStore; env: 
           users[account.local] = { id: user.id, patientId: patient.id };
           break;
         } catch (err) {
-          if (!isUnique(err)) throw err; // a health ID collision: try another
+          if (!isUnique(err)) throw err;
         }
       }
     }
   }
 
-  // Hospitals and their open slots for the next two weeks.
   const start = new Date();
   start.setUTCHours(0, 0, 0, 0);
   for (const spec of HOSPITALS) {
@@ -172,7 +162,6 @@ export async function runDemoSeed(deps: { db: Db; store: PrivateFileStore; env: 
     summary.slotsCreated += (await db.availabilitySlot.createMany({ data, skipDuplicates: true })).count;
   }
 
-  // Two synthetic prescriptions, run through the real upload and extraction code.
   const provider = new MockExtractionProvider();
   for (const [local, fixture] of [["patient1", "clear-001"], ["patient2", "ambiguous-001"]] as const) {
     const patient = users[local];
@@ -189,7 +178,6 @@ export async function runDemoSeed(deps: { db: Db; store: PrivateFileStore; env: 
     summary.prescriptionsCreated += 1;
   }
 
-  // The demo provider may read patient one's prescriptions and history.
   const one = users["patient1"];
   const prov = users["provider"];
   if (one?.patientId && prov) {

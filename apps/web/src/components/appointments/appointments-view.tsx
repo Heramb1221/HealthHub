@@ -21,7 +21,6 @@ import { formatDayLong, formatTime } from "@/lib/format";
 import { useResource } from "@/lib/use-resource";
 import { buildWhatsAppAppointmentUrl } from "@/lib/whatsapp";
 
-
 function whenText(a: Appointment) {
   const start = new Date(a.startsAt);
   const end = a.endsAt ? ` to ${formatTime(new Date(a.endsAt))}` : "";
@@ -122,13 +121,11 @@ export function AppointmentsView({ justBookedId }: { justBookedId?: string }) {
   const hospitalsList = hospitalsRes.status === "ready" ? hospitalsRes.data : [];
   const activeHospitalId = selectedHospitalId || (hospitalsList.length > 0 ? hospitalsList[0].id : null);
 
-  // Load availability slots for selected hospital
   const slotsRes = useResource(
     () => (activeHospitalId ? hospitalsApi.availability(activeHospitalId) : Promise.resolve([])),
     `slots:${activeHospitalId}`,
   );
 
-  // Real-time polling every 4 seconds when looking at slots
   React.useEffect(() => {
     if (activeTab !== "book" || !activeHospitalId) return;
     const interval = setInterval(() => {
@@ -171,7 +168,7 @@ export function AppointmentsView({ justBookedId }: { justBookedId?: string }) {
     try {
       await hospitalsApi.releaseSlot(activeHospitalId, currentId);
     } catch {
-      // Ignore
+
     } finally {
       await slotsRes.reload();
     }
@@ -238,7 +235,6 @@ export function AppointmentsView({ justBookedId }: { justBookedId?: string }) {
         </Alert>
       ) : null}
 
-      {/* Navigation Tabs */}
       <div className="flex border-b">
         <button
           type="button"
@@ -266,7 +262,7 @@ export function AppointmentsView({ justBookedId }: { justBookedId?: string }) {
 
       {activeTab === "book" ? (
         <div className="space-y-6">
-          {/* Hospital Selector */}
+
           <div className="bg-card rounded-xl border p-5 shadow-xs">
             <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Select Hospital</h2>
             <p className="text-muted-foreground mt-0.5 text-xs">
@@ -309,7 +305,6 @@ export function AppointmentsView({ justBookedId }: { justBookedId?: string }) {
             )}
           </div>
 
-          {/* Real-time 15-Min Movie-Ticket Style Slot Picker */}
           {activeHospitalId ? (
             slotsRes.status === "loading" ? (
               <LoadingState label="Loading 15-minute consultation slots…" rows={4} />
@@ -332,7 +327,6 @@ export function AppointmentsView({ justBookedId }: { justBookedId?: string }) {
                   onReleaseSlot={handleReleaseSlot}
                 />
 
-                {/* Floating Bottom Checkout Bar */}
                 <div className="bg-card/95 supports-[backdrop-filter]:bg-card/85 sticky bottom-4 z-20 rounded-xl border p-4 shadow-lg backdrop-blur-md" aria-live="polite">
                   {chosenSlot && selectedHospital ? (
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -379,7 +373,7 @@ export function AppointmentsView({ justBookedId }: { justBookedId?: string }) {
           ) : null}
         </div>
       ) : (
-        /* My Appointments Tab */
+
         <div className="space-y-6">
           {appointments.status === "loading" ? (
             <LoadingState label="Loading your appointments" rows={3} />

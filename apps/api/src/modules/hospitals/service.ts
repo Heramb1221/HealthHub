@@ -21,7 +21,7 @@ type Row = {
 export interface HospitalDto {
   id: string; name: string; address: string | null; city: string | null; phone: string | null; website: string | null; timings: string | null; locationUrl: string | null; specialties: string[];
   isActive: boolean;
-  /** True for seeded demo data. Clients must show it as demo, never as a real hospital. */
+
   isDemo: boolean;
   ratingAverage?: number;
   reviewCount?: number;
@@ -46,7 +46,7 @@ export async function listHospitals(
   auth: AuthContext,
   query: { limit: number; cursor?: string | undefined; q?: string | undefined; city?: string | undefined; specialty?: string | undefined; includeInactive?: "true" | "false" | undefined },
 ): Promise<{ data: HospitalDto[]; page: { limit: number; nextCursor: string | null } }> {
-  // Only an admin may see deactivated hospitals.
+
   if (query.includeInactive === "true" && !isAdmin(auth)) throw new AppError("FORBIDDEN");
   const rows = await db.hospital.findMany({
     where: {
@@ -90,7 +90,6 @@ export async function listHospitals(
   };
 }
 
-/** A deactivated hospital looks like it does not exist, except to an admin. */
 export async function getHospital(db: Db, auth: AuthContext, id: string): Promise<HospitalDto> {
   const row = await db.hospital.findFirst({ where: { id, ...(isAdmin(auth) ? {} : { isActive: true }) }, select: SELECT });
   if (!row) throw new AppError("NOT_FOUND");
@@ -181,7 +180,6 @@ export async function updateHospital(
   return toHospitalDto(row);
 }
 
-/** Stops new bookings. Existing appointments are left as they are; nothing is cancelled silently. */
 export async function deactivateHospital(db: Db, auth: AuthContext, id: string, ctx: Ctx): Promise<HospitalDto> {
   return updateHospital(db, auth, id, { isActive: false }, ctx).then(async (dto) => {
     await recordAudit(db, { action: "hospital.deactivated", outcome: "success", actorUserId: auth.userId, resourceType: "hospital", resourceId: id, requestId: ctx.requestId });
@@ -198,7 +196,6 @@ export interface SlotDto {
   secondsRemaining?: number;
 }
 
-/** Upcoming slots with real-time states (open/booked/holding/held_by_me). Inactive hospitals show no slots to non-admins. */
 export async function listAvailability(
   db: Db,
   auth: AuthContext,
@@ -222,7 +219,7 @@ export async function listAvailability(
   try {
     patientId = await ownPatientId(db, auth);
   } catch {
-    // Non-patient
+
   }
 
   const activeHolds = getHospitalSlotHolds(hospitalId, patientId);
@@ -280,7 +277,6 @@ export async function releaseHospitalSlot(
   return { released };
 }
 
-/** Admin-only schedule management: creates availability slots for a hospital. */
 export async function addAvailabilitySlots(
   db: Db,
   auth: AuthContext,
@@ -394,7 +390,6 @@ export async function createHospitalReview(
   const hospital = await db.hospital.findUnique({ where: { id: hospitalId } });
   if (!hospital) throw new AppError("NOT_FOUND");
 
-  // Check if patient has visited/booked at this hospital
   const hasVisited = await db.appointment.findFirst({
     where: {
       patientId: patient.id,

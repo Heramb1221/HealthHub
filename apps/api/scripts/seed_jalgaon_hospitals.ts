@@ -57,7 +57,7 @@ const HOSPITALS = [
 ];
 
 const SLOT_DAYS = 14;
-const SLOT_MINUTES = Array.from({ length: 14 }, (_, i) => 4 * 60 + i * 30); // 04:00 to 10:30 UTC, every 30 minutes
+const SLOT_MINUTES = Array.from({ length: 14 }, (_, i) => 4 * 60 + i * 30);
 
 async function main() {
   console.log("Seeding Jalgaon hospitals...");

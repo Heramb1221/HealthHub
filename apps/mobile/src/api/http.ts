@@ -1,18 +1,12 @@
 import { ApiError, apiErrorFromResponse } from "./errors.ts";
 
-/**
- * Low-level typed HTTP client. No React Native imports so it can be unit-tested in Node.
- *
- * Auth: access token sent as `Authorization: Bearer <token>` (backend note B1: JWT in the response body,
- * no cookies, no refresh). The token is supplied through `getToken`; this module never stores it.
- */
 export interface HttpConfig {
-  /** Absolute base URL including the `/api/v1` prefix, or null when the app is not configured. */
+
   baseUrl: string | null;
   getToken: () => string | null;
-  /** Called once when an authenticated request is rejected with 401. */
+
   onUnauthorized: () => void;
-  /** Replaces the global fetch. Used only by labelled demo mode (src/demo) and tests. */
+
   fetchImpl?: typeof fetch;
 }
 
@@ -31,7 +25,7 @@ export interface RequestOptions {
   formData?: FormData;
   signal?: AbortSignal;
   timeoutMs?: number;
-  /** Skip the global 401 handler (used by sign-in/register, where 401 means "wrong credentials"). */
+
   skipUnauthorizedHandler?: boolean;
 }
 
@@ -58,7 +52,6 @@ export function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-/** Backend note A1: success is `{ data: ... }`. Also tolerate a bare resource, as the contract allows either. */
 export function unwrapEnvelope<T>(body: unknown): T {
   if (typeof body === "object" && body !== null && !Array.isArray(body)) {
     const keys = Object.keys(body);
@@ -90,7 +83,7 @@ async function send(path: string, options: RequestOptions): Promise<RawResult> {
 
   let body: FormData | string | undefined;
   if (formData) {
-    body = formData; // Content-Type with boundary is set by the platform.
+    body = formData;
   } else if (json !== undefined) {
     headers["Content-Type"] = "application/json";
     body = JSON.stringify(json);
@@ -110,7 +103,7 @@ async function send(path: string, options: RequestOptions): Promise<RawResult> {
     try {
       response = await (config.fetchImpl ?? fetch)(url, { method, headers, body, signal: controller.signal });
     } catch (cause) {
-      if (signal?.aborted) throw cause; // caller cancelled; let it propagate untouched
+      if (signal?.aborted) throw cause;
       if (timedOut) throw new ApiError({ code: "TIMEOUT", message: "The server did not respond in time.", status: 0 });
       throw new ApiError({ code: "NETWORK_ERROR", message: "The server could not be reached.", status: 0 });
     }
@@ -126,7 +119,6 @@ async function send(path: string, options: RequestOptions): Promise<RawResult> {
   }
 }
 
-/** Typed JSON request returning the unwrapped resource. */
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { parsed } = await send(path, options);
   if (parsed === undefined) return undefined as T;
@@ -138,7 +130,6 @@ export interface Page<T> {
   nextCursor: string | null;
 }
 
-/** Backend note B2 (proposed): `{ data: [...], page: { limit, nextCursor } }`. Also accepts a bare array. */
 export async function requestList<T>(path: string, options: RequestOptions = {}): Promise<Page<T>> {
   const { parsed } = await send(path, options);
   if (Array.isArray(parsed)) return { items: parsed as T[], nextCursor: null };

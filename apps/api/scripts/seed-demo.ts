@@ -1,6 +1,4 @@
-// Loads demo data. Needs DATABASE_URL, JWT_SECRET, and DEMO_SEED_PASSWORD (12+ characters).
-// Refuses to run when NODE_ENV=production unless ALLOW_DEMO_SEED=true.
-// Run with: npm run seed:demo
+
 import { loadEnv } from "../src/config/env.js";
 import { createDb } from "../src/db/client.js";
 import { assertSeedAllowed, runDemoSeed } from "../src/seed/demoSeed.js";

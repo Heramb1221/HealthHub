@@ -281,4 +281,3 @@ describe("frequency and duration suggestions", () => {
     assert.equal(suggestEndDate("2026-10-16", null), null);
   });
 });
-

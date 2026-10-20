@@ -56,7 +56,7 @@ describe("correctionSchema", () => {
     expect(ok({ baseVersionNumber: 1, medications: [{ name: null, dose: null }] })).toBe(false);
     expect(ok({ baseVersionNumber: 1, medications: ["x"] })).toBe(false);
     expect(ok({ baseVersionNumber: 1, medications: "x" })).toBe(false);
-    expect(ok({ baseVersionNumber: 1, medications: [{ dose: "1 tablet" }] })).toBe(true); // a row needs only some content
+    expect(ok({ baseVersionNumber: 1, medications: [{ dose: "1 tablet" }] })).toBe(true);
     expect(ok({ baseVersionNumber: 1, medications: Array.from({ length: 30 }, () => med) })).toBe(true);
     expect(ok({ baseVersionNumber: 1, medications: Array.from({ length: 31 }, () => med) })).toBe(false);
   });
@@ -65,7 +65,7 @@ describe("correctionSchema", () => {
     expect(ok({ baseVersionNumber: 1, medications: [{ ...med, confirmed: true }] })).toBe(true);
     expect(ok({ baseVersionNumber: 1, medications: [{ ...med, confirmed: false }] })).toBe(true);
     for (const bad of ["true", 1, null, {}, []]) expect(ok({ baseVersionNumber: 1, medications: [{ ...med, confirmed: bad }] }), JSON.stringify(bad)).toBe(false);
-    // "confirmed" alone is not a row: there is nothing to confirm.
+
     expect(ok({ baseVersionNumber: 1, medications: [{ confirmed: true }] })).toBe(false);
     expect(ok({ baseVersionNumber: 1, confirmed: true })).toBe(false);
   });

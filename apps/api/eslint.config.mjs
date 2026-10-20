@@ -9,6 +9,7 @@ export default tseslint.config(
     rules: {
       "no-console": "error",
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
+      "no-empty": ["error", { allowEmptyCatch: true }],
     },
   },
 );

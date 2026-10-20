@@ -26,17 +26,15 @@ import { lookupTranslation } from "../i18n/languages";
 
 export type IconName = ComponentProps<typeof Feather>["name"];
 
-// ---------- Layout ----------
 interface ScreenProps {
   children: ReactNode;
-  /** Pass for headerless screens (auth) so content clears the notch/home indicator. */
+
   safeEdges?: ("top" | "bottom")[];
   refreshing?: boolean;
   onRefresh?: () => void;
   contentStyle?: StyleProp<ViewStyle>;
 }
 
-/** Scrolling, keyboard-aware screen container. Navigators provide headers and tab bars. */
 export function Screen({ children, safeEdges, refreshing, onRefresh, contentStyle }: ScreenProps) {
   const body = (
     <ScrollView
@@ -75,7 +73,6 @@ export function Divider() {
   return <View style={styles.divider} />;
 }
 
-// ---------- Text ----------
 type Variant = keyof typeof type;
 interface AppTextProps extends TextProps {
   variant?: Variant;
@@ -112,13 +109,12 @@ export function Heading({ children, level = 2 }: { children: ReactNode; level?: 
   );
 }
 
-// ---------- Buttons ----------
 interface ButtonProps {
   label: string;
   onPress: () => void;
   variant?: "primary" | "secondary" | "danger" | "ghost";
   icon?: IconName;
-  /** Custom leading element (for example a brand glyph). Takes the place of `icon`. */
+
   leading?: ReactNode;
   loading?: boolean;
   disabled?: boolean;
@@ -159,7 +155,6 @@ const buttonPalette = {
   ghost: { bg: "transparent", fg: colors.primary, border: "transparent" },
 } as const;
 
-/** Small tappable text row (min touch target) for list rows. */
 export function ListRow({
   title,
   subtitle,
@@ -199,7 +194,6 @@ export function ListRow({
   );
 }
 
-// ---------- Forms ----------
 interface TextFieldProps extends Omit<TextInputProps, "style"> {
   label: string;
   error?: string | null;
@@ -297,7 +291,6 @@ export function Banner({ tone, title, children, icon }: { tone: Tone; title: str
   );
 }
 
-/** Labelled value used on detail screens. Absent values read "Not provided", never invented. */
 export function Field({ label, value }: { label: string; value: string }) {
   const { language } = useLanguage();
   const translatedLabel = lookupTranslation(language, label) || label;
@@ -313,7 +306,6 @@ export function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** Always-visible notice while the app runs on built-in sample data instead of a server. */
 function DemoBar() {
   return (
     <View style={styles.demoBar} accessible accessibilityRole="alert" accessibilityLabel="Demo mode. Sample data only. Nothing is saved to a server.">

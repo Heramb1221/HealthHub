@@ -9,18 +9,10 @@ export interface VersionContent {
   medications: MedicationFields[];
 }
 
-/** True when every text field of the two rows is identical. Confidence is not compared. */
 export function sameMedication(a: MedicationFields, b: MedicationFields): boolean {
   return MEDICATION_FIELDS.every((field) => a[field] === b[field]);
 }
 
-/**
- * Names of what changed between two versions, never the values themselves, so
- * the result is safe to store in the audit log and the version history.
- * Rows are compared by position:
- *   prescriptionDate, prescriberName, medications.<i>.<field>,
- *   medications.<i>.added, medications.<i>.removed
- */
 export function diffVersions(previous: VersionContent, next: VersionContent): string[] {
   const changed: string[] = [];
   if (previous.prescriptionDate !== next.prescriptionDate) changed.push("prescriptionDate");

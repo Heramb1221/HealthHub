@@ -12,7 +12,6 @@ const translateSchema = z.object({
 export function createLocalizationRouter(env: Env) {
   const router = Router();
 
-  // GET /api/v1/localization/languages - List supported regional languages
   router.get("/languages", (_req, res) => {
     res.json({
       data: {
@@ -22,7 +21,6 @@ export function createLocalizationRouter(env: Env) {
     });
   });
 
-  // GET /api/v1/localization/dictionary/:lang - Fetch pre-compiled dictionary
   router.get("/dictionary/:lang", (req, res) => {
     const lang = req.params.lang as keyof typeof CORE_DICTIONARY;
     const dict = CORE_DICTIONARY[lang] || CORE_DICTIONARY.en;
@@ -34,7 +32,6 @@ export function createLocalizationRouter(env: Env) {
     });
   });
 
-  // POST /api/v1/localization/translate - Translate arbitrary content via Bhashini
   router.post("/translate", async (req, res, next) => {
     try {
       const parsed = translateSchema.parse(req.body);

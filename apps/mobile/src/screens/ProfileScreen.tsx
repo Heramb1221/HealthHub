@@ -109,7 +109,7 @@ export function ProfileScreen() {
     };
     try {
       const updated = await patientApi.update(body);
-      setPatient(updated); // show exactly what the server stored
+      setPatient(updated);
       setEditing(false);
       setSaved(true);
     } catch (error) {
@@ -122,7 +122,7 @@ export function ProfileScreen() {
 
   async function doSignOut() {
     setSigningOut(true);
-    await signOut(); // any server-confirmation warning is shown on the Welcome screen
+    await signOut();
   }
 
   if (editing && form) {

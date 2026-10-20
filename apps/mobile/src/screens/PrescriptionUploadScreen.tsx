@@ -89,7 +89,7 @@ export function PrescriptionUploadScreen({ navigation }: Props) {
     setError(null);
     try {
       const created = await prescriptionApi.upload(file);
-      // Server response is the proof of success: continue to its real processing status.
+
       navigation.replace("PrescriptionDetail", { id: created.id });
     } catch (e) {
       const info = describeError(e);

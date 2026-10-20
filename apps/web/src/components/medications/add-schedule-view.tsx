@@ -102,7 +102,7 @@ export function AddScheduleView() {
   const ready = all.filter((o) => o.reasons.length === 0 && !o.already);
   const optionKey = (o: Option) => `${o.rx.id}:${o.index}`;
   const chosen = all.find((o) => optionKey(o) === selected) ?? null;
-  // Anything read automatically from a prescription no clinician has verified needs the patient's own check first.
+
   const needsConfirmation = !!chosen && chosen.med.source !== "patient_entered" && chosen.rx.verificationStatus !== "verified_by_authorized_clinician";
 
   function choose(o: Option) {

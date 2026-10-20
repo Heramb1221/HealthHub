@@ -19,7 +19,7 @@ function loadStored(userId: string): Record<string, StoredVaccination> {
     const raw = window.localStorage.getItem(key(userId));
     if (raw) return JSON.parse(raw);
   } catch {
-    /* empty */
+
   }
   return {};
 }
@@ -28,12 +28,12 @@ function saveStored(userId: string, data: Record<string, StoredVaccination>) {
   try {
     window.localStorage.setItem(key(userId), JSON.stringify(data));
   } catch {
-    /* ignore */
+
   }
 }
 
 const DIRECTORY: (Omit<PatientVaccination, "recordId" | "status" | "administeredDate" | "notes" | "updatedAt" | "isCustom"> & { id: string })[] = [
-  // 1. UIP
+
   { id: "bcg", vaccineId: "bcg", vaccineName: "Bacillus Calmette–Guérin (BCG)", category: "uip", categoryLabel: "Universal Immunization Programme (UIP)", description: "Prevents severe childhood Tuberculosis (TB)." },
   { id: "opv", vaccineId: "opv", vaccineName: "Oral Polio Vaccine (OPV & Bivalent OPV)", category: "uip", categoryLabel: "Universal Immunization Programme (UIP)", description: "Prevents poliomyelitis (administered as zero-dose at birth and subsequent booster/bivalent drops)." },
   { id: "ipv", vaccineId: "ipv", vaccineName: "Inactivated Polio Vaccine (IPV / fIPV)", category: "uip", categoryLabel: "Universal Immunization Programme (UIP)", description: "Fractional intradermal or intramuscular injectable polio vaccine." },
@@ -46,7 +46,6 @@ const DIRECTORY: (Omit<PatientVaccination, "recordId" | "status" | "administered
   { id: "dpt_booster", vaccineId: "dpt_booster", vaccineName: "DPT Booster", category: "uip", categoryLabel: "Universal Immunization Programme (UIP)", description: "Early childhood and school-age booster shots for Diphtheria, Pertussis, and Tetanus." },
   { id: "td", vaccineId: "td", vaccineName: "Td (Tetanus and adult Diphtheria)", category: "uip", categoryLabel: "Universal Immunization Programme (UIP)", description: "Adolescent and adult booster vaccine given at ages 10 and 16, and routinely for pregnant women." },
 
-  // 2. IAP
   { id: "mmr", vaccineId: "mmr", vaccineName: "MMR (Measles, Mumps, Rubella)", category: "iap_private", categoryLabel: "IAP & Private Healthcare Recommendations", description: "Replaces or supplements standard MR vaccine to provide explicit protection against mumps." },
   { id: "tcv", vaccineId: "tcv", vaccineName: "Typhoid Conjugate Vaccine (TCV)", category: "iap_private", categoryLabel: "IAP & Private Healthcare Recommendations", description: "Superior long-lasting protection against typhoid fever, typically given around 9–12 months with boosters." },
   { id: "hepa", vaccineId: "hepa", vaccineName: "Hepatitis A Vaccine", category: "iap_private", categoryLabel: "IAP & Private Healthcare Recommendations", description: "Two-dose regimen protecting against HAV-driven liver infections." },
@@ -54,7 +53,6 @@ const DIRECTORY: (Omit<PatientVaccination, "recordId" | "status" | "administered
   { id: "flu", vaccineId: "flu", vaccineName: "Influenza (Flu) Vaccine", category: "iap_private", categoryLabel: "IAP & Private Healthcare Recommendations", description: "Quadrivalent/trivalent annual shots protecting against shifting seasonal influenza strains." },
   { id: "hpv", vaccineId: "hpv", vaccineName: "Human Papillomavirus (HPV) Vaccine", category: "iap_private", categoryLabel: "IAP & Private Healthcare Recommendations", description: "Gardasil/Cervarix types protecting pre-teens and young adults against cervical, anal, and throat cancers linked to HPV." },
 
-  // 3. COVID-19
   { id: "covishield", vaccineId: "covishield", vaccineName: "Covishield", category: "covid19", categoryLabel: "COVID-19 Vaccines Approved in India", description: "Oxford-AstraZeneca viral vector vaccine manufactured by Serum Institute of India." },
   { id: "covaxin", vaccineId: "covaxin", vaccineName: "Covaxin", category: "covid19", categoryLabel: "COVID-19 Vaccines Approved in India", description: "Whole-virion inactivated Vero cell vaccine developed by Bharat Biotech." },
   { id: "corbevax", vaccineId: "corbevax", vaccineName: "Corbevax", category: "covid19", categoryLabel: "COVID-19 Vaccines Approved in India", description: "Protein subunit vaccine manufactured by Biological E." },
@@ -64,7 +62,6 @@ const DIRECTORY: (Omit<PatientVaccination, "recordId" | "status" | "administered
   { id: "zycov_d", vaccineId: "zycov_d", vaccineName: "ZyCoV-D", category: "covid19", categoryLabel: "COVID-19 Vaccines Approved in India", description: "Plasmid DNA vaccine developed by Zydus Cadila." },
   { id: "gemcovac_om", vaccineId: "gemcovac_om", vaccineName: "Gemcovac-OM", category: "covid19", categoryLabel: "COVID-19 Vaccines Approved in India", description: "Indigenously developed Omicron-adapted mRNA booster." },
 
-  // 4. Special & Travel
   { id: "yellow_fever", vaccineId: "yellow_fever", vaccineName: "Yellow Fever Vaccine", category: "special_travel", categoryLabel: "Travel, Outbreak & High-Risk Vaccines", description: "Legally mandated for international travelers entering India from endemic zones or traveling outward to them." },
   { id: "meningococcal", vaccineId: "meningococcal", vaccineName: "Meningococcal Vaccine", category: "special_travel", categoryLabel: "Travel, Outbreak & High-Risk Vaccines", description: "Protects against Neisseria meningitidis; mandatory for certain international pilgrims (like Hajj) and recommended for high-density hostel residents." },
   { id: "cholera", vaccineId: "cholera", vaccineName: "Oral Cholera Vaccine (OCV)", category: "special_travel", categoryLabel: "Travel, Outbreak & High-Risk Vaccines", description: "Used during flood relief operations or localized outbreaks." },
@@ -80,7 +77,6 @@ export const demoVaccinationsApi: VaccinationsApi = {
 
     const stored = loadStored(user.id);
 
-    // Initial seed for demo account if empty
     if (Object.keys(stored).length === 0 && isSeeded(user)) {
       stored["bcg"] = { vaccineName: "Bacillus Calmette–Guérin (BCG)", vaccineId: "bcg", category: "uip", status: "taken", administeredDate: "1995-04-10", notes: "Childhood routine", updatedAt: new Date().toISOString() };
       stored["opv"] = { vaccineName: "Oral Polio Vaccine (OPV & Bivalent OPV)", vaccineId: "opv", category: "uip", status: "taken", administeredDate: "1995-04-10", notes: "Pulse Polio routine", updatedAt: new Date().toISOString() };
@@ -114,7 +110,6 @@ export const demoVaccinationsApi: VaccinationsApi = {
       });
     }
 
-    // Custom entries
     for (const [key, val] of Object.entries(stored)) {
       if (!matchedKeys.has(key) && !matchedKeys.has(val.vaccineName.toLowerCase())) {
         items.push({

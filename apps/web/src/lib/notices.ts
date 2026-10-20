@@ -11,14 +11,10 @@ export interface Notice {
   icon: LucideIcon;
   title: string;
   body: string;
-  /** Where to act on it. Only set for destinations that exist. */
+
   action?: { href: string; label: string };
 }
 
-/**
- * Notices are derived only from the state of the person's own records (never invented clinical alerts).
- * Each one says what is unfinished and why it matters.
- */
 export function buildNotices(
   patient: Patient | null,
   prescriptions: Prescription[] | null,

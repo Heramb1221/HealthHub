@@ -7,13 +7,6 @@ import { toIsoDate } from "@/lib/schedule";
 import { demoPrescriptionsApi } from "./prescriptions";
 import { currentUser, isSeeded, requirePatient } from "./records";
 
-/**
- * DEMO ONLY. Typed stand-in for /medication-schedules.
- *
- * It enforces the same rule the real server must: a schedule can only be created from a medicine that is
- * complete and confident enough (isInstructionSafe). Schedules and dose events you create are kept in this browser.
- * The seeded schedule and its earlier dose events are generated relative to now.
- */
 interface State {
   created: MedicationSchedule[];
   edits: Record<string, Partial<Pick<MedicationSchedule, "times" | "endDate" | "active">>>;
@@ -28,7 +21,7 @@ function load(userId: string): State {
     const raw = window.localStorage.getItem(key(userId));
     if (raw) return JSON.parse(raw) as State;
   } catch {
-    /* use empty state */
+
   }
   return { created: [], edits: {}, events: [] };
 }
@@ -103,12 +96,12 @@ export const demoSchedulesApi: MedicationSchedulesApi = {
     if (rx.processingStatus !== "completed" || !med || (med.name ?? "").toLowerCase() !== input.medicationName.toLowerCase()) {
       throw new ApiError({ code: "VALIDATION_ERROR", message: "That medicine isn’t on this prescription any more. Refresh and choose again.", status: 422 });
     }
-    // Server-side rule: ambiguous or low-confidence medicines can never become a schedule.
+
     if (!isInstructionSafe(med)) {
       const why = medicationReviewReasons(med).map((r) => REVIEW_REASON_LABEL[r].toLowerCase()).join("; ");
       throw new ApiError({ code: "VALIDATION_ERROR", message: `This medicine needs review before it can be scheduled (${why}).`, status: 422 });
     }
-    // Server-side rule: values read automatically, from a prescription no clinician verified, need the patient's confirmation.
+
     if (med.source !== "patient_entered" && rx.verificationStatus !== "verified_by_authorized_clinician" && !input.confirmedAgainstPaper) {
       throw new ApiError({ code: "VALIDATION_ERROR", message: "Confirm that you checked this medicine against your paper prescription.", status: 422 });
     }

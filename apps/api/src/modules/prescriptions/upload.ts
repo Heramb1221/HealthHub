@@ -7,14 +7,8 @@ export interface ParsedUpload {
   fields: Record<string, string>;
 }
 
-// Headroom for multipart boundaries and the small metadata fields.
 const OVERHEAD_BYTES = 64 * 1024;
 
-/**
- * Reads a multipart request containing exactly one file part named `file`.
- * Enforces the size limit while streaming (the body is never buffered beyond
- * `maxBytes`) and rejects malformed or oversized requests with contract errors.
- */
 export function parseUpload(req: Request, maxBytes: number): Promise<ParsedUpload> {
   const contentType = req.headers["content-type"] ?? "";
   if (!/^multipart\/form-data\s*;/i.test(contentType)) {
@@ -30,8 +24,7 @@ export function parseUpload(req: Request, maxBytes: number): Promise<ParsedUploa
     try {
       busboy = Busboy({
         headers: req.headers,
-        // busboy reports "limit" once a file REACHES fileSize, so allow one extra byte:
-        // the event then means the file is genuinely larger than maxBytes.
+
         limits: { files: 1, fileSize: maxBytes + 1, fields: 5, fieldSize: 1024, parts: 6 },
       });
     } catch {

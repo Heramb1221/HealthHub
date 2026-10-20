@@ -75,7 +75,6 @@ export function toVersionDto(row: VersionRow): VersionDto {
   };
 }
 
-/** Newest first. Call only after the access guard has authorized this caller. */
 export async function listVersions(
   db: Db,
   prescriptionId: string,
@@ -96,11 +95,6 @@ export async function listVersions(
   };
 }
 
-/**
- * The newest version of the record, whatever its verification status. The
- * status is part of the response so a reader can never mistake an unverified
- * or needs_review version for a verified one. Call only after the access guard.
- */
 export async function getLatestVersion(db: Db, prescriptionId: string): Promise<VersionDto> {
   const row = await db.prescriptionVersion.findFirst({
     where: { prescriptionId },

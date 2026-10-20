@@ -13,7 +13,6 @@ import type { Hospital, HospitalInput } from "@/lib/api/types";
 import { focusFirstInvalid, formValues, validate, type FieldErrors } from "@/lib/forms";
 import { hospitalSchema, toHospitalInput } from "@/lib/validation/hospital";
 
-/** Shared by "Add hospital" and "Edit hospital". `onSubmit` resolves only when the API has accepted the change. */
 export function HospitalForm({
   initial,
   submitLabel,
@@ -44,7 +43,7 @@ export function HospitalForm({
     try {
       await onSubmit(toHospitalInput(result.data));
     } catch (error) {
-      // A conflict or validation answer from the server (e.g. a duplicate name) is the useful message, not "something went wrong".
+
       if (isApiError(error) && (error.status === 409 || error.status === 422)) {
         setFormError(error.message);
       } else {

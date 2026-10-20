@@ -24,7 +24,7 @@ export function PaymentsScreen() {
     try {
       const order = await paymentApi.createOrder({
         appointmentId,
-        amountPaise: 50000, // ₹500
+        amountPaise: 50000,
         currency: "INR",
       });
       setActiveOrder(order);
@@ -79,7 +79,6 @@ export function PaymentsScreen() {
           Payments are processed in sandbox test mode. No real debit/credit cards or bank accounts will be charged.
         </Banner>
 
-        {/* Active Checkout Card */}
         {activeOrder ? (
           <Card style={styles.checkoutCard}>
             <Heading level={2}>Pay Consultation Fee</Heading>
@@ -149,7 +148,6 @@ export function PaymentsScreen() {
           </Card>
         ) : null}
 
-        {/* Pending Consultation Payments */}
         <Heading level={2}>Pending Consultation Fees ({pendingAppointments.length})</Heading>
         {appointmentsRes.loading ? (
           <LoadingState label="Loading booked appointments…" />
@@ -189,7 +187,6 @@ export function PaymentsScreen() {
           ))
         )}
 
-        {/* Payment History */}
         <Heading level={2}>Payment History & Receipts</Heading>
         {historyRes.loading ? (
           <LoadingState label="Loading payment history…" />

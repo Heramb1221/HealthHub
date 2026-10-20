@@ -9,7 +9,6 @@ const PHONE = /^\+?[0-9][0-9 ()-]{5,18}[0-9]$/;
 const text = (max: number) => z.string().trim().min(1).max(max).refine(hasNoControlChars);
 const phone = z.string().trim().regex(PHONE);
 
-/** Trims, bounds, and removes case-insensitive duplicates while keeping the first spelling and order. */
 const list = z
   .array(text(100))
   .max(30)
@@ -25,7 +24,6 @@ const list = z
 
 const MIN_DOB = "1900-01-01";
 
-// Refinements may still run after the format check fails, so none of them may throw.
 const dateOfBirth = z.iso
   .date()
   .refine((value) => parseDateOnly(value) !== null, "not a real calendar date")
@@ -44,11 +42,6 @@ const emergencyContact = z
   })
   .refine((value) => Object.keys(value).length > 0);
 
-/**
- * Strict: anything not listed (healthId, id, userId, role, timestamps, ...) is
- * rejected, not ignored. Nullable fields can be cleared with null. Arrays
- * replace the stored list.
- */
 export const updateProfileSchema = z
   .strictObject({
     fullName: emptyToNull(text(120).nullable().optional()),

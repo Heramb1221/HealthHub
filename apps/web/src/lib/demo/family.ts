@@ -135,7 +135,7 @@ function loadStored(user: AuthUser): FamilyMember[] {
     const raw = window.localStorage.getItem(key(user.id));
     if (raw) return JSON.parse(raw);
   } catch {
-    /* empty */
+
   }
 
   if (isSeeded(user)) {
@@ -156,7 +156,7 @@ function saveStored(userId: string, members: FamilyMember[]) {
   try {
     window.localStorage.setItem(key(userId), JSON.stringify(members));
   } catch {
-    /* ignore */
+
   }
 }
 

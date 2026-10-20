@@ -61,21 +61,19 @@ describe.skipIf(!TEST_DATABASE_URL)("patient corrections", () => {
         verificationStatus: "patient_corrected",
         extractionProvider: null,
         extractionConfidence: null,
-        prescriberName: "Dr. A. Example (synthetic)", // omitted fields carry over
+        prescriberName: "Dr. A. Example (synthetic)",
         prescriptionDate: "2026-09-01",
         changedFields: ["medications.0.dose", "medications.1.removed"],
       });
       expect(medsOf(res)).toHaveLength(1);
-      expect(medsOf(res)[0]).toMatchObject({ dose: "2 tablets", confidence: 1 }); // edited row: stated by a person
+      expect(medsOf(res)[0]).toMatchObject({ dose: "2 tablets", confidence: 1 });
 
-      // Version 1 is exactly as it was.
       const versions = await kit.versionsOf(id);
       expect(versions.map((v) => v.versionNumber)).toEqual([1, 2]);
       expect(versions[0]).toEqual(v1Before);
       expect(versions[0]?.medications).toHaveLength(2);
       expect(versions[0]?.medications[0]?.dose).toBe("1 tablet");
 
-      // The original upload is untouched.
       const after = await h.db.prescriptionRecord.findUniqueOrThrow({ where: { id } });
       for (const key of ["originalStorageKey", "originalFileName", "originalMimeType", "originalSizeBytes", "originalSha256"] as const) {
         expect(after[key]).toEqual(before[key]);
@@ -106,7 +104,7 @@ describe.skipIf(!TEST_DATABASE_URL)("patient corrections", () => {
 
     it("keeps the previous confidence for unchanged rows and gives edited or added rows 1", async () => {
       const p = await registerPatient(app, h.db);
-      const id = await kit.processed(p.token, "ambiguous-001"); // confidences 0.55, 0.4, 0.9
+      const id = await kit.processed(p.token, "ambiguous-001");
       const v1 = (await kit.versionsOf(id))[0];
       const original = v1?.medications.map((m) => ({
         name: m.name, strength: m.strength, dose: m.dose, route: m.route, frequency: m.frequency, duration: m.duration, instructions: m.instructions,
@@ -115,10 +113,10 @@ describe.skipIf(!TEST_DATABASE_URL)("patient corrections", () => {
       const res = await kit.correct(p.token, id, {
         baseVersionNumber: 1,
         medications: [
-          original[0], // unchanged: keeps 0.55
-          { ...original[1], strength: "5 mg" }, // edited: 1
-          original[2], // unchanged: keeps 0.9
-          { name: "Added by patient", dose: "1" }, // added: 1
+          original[0],
+          { ...original[1], strength: "5 mg" },
+          original[2],
+          { name: "Added by patient", dose: "1" },
         ],
       });
       expect(res.status).toBe(201);
@@ -128,7 +126,7 @@ describe.skipIf(!TEST_DATABASE_URL)("patient corrections", () => {
 
     it("lets the patient explicitly confirm a row: it reaches confidence 1 and the history says so", async () => {
       const p = await registerPatient(app, h.db);
-      const id = await kit.processed(p.token, "ambiguous-001"); // 0.55, 0.4, 0.9
+      const id = await kit.processed(p.token, "ambiguous-001");
       const v1 = (await kit.versionsOf(id))[0];
       const rows = v1?.medications.map((m) => ({
         name: m.name, strength: m.strength, dose: m.dose, route: m.route, frequency: m.frequency, duration: m.duration, instructions: m.instructions,
@@ -136,9 +134,9 @@ describe.skipIf(!TEST_DATABASE_URL)("patient corrections", () => {
       const res = await kit.correct(p.token, id, {
         baseVersionNumber: 1,
         medications: [
-          { ...rows[0], confirmed: true }, // unchanged text, confirmed: 0.55 -> 1
-          { ...rows[1], strength: "5 mg" }, // edited: already 1, no separate "confirmed" entry
-          { ...rows[2], confirmed: true }, // 0.9 -> 1
+          { ...rows[0], confirmed: true },
+          { ...rows[1], strength: "5 mg" },
+          { ...rows[2], confirmed: true },
         ],
       });
       expect(res.status).toBe(201);
@@ -149,7 +147,7 @@ describe.skipIf(!TEST_DATABASE_URL)("patient corrections", () => {
     it("does not list a confirmation for a row that was already at confidence 1, or one that was removed", async () => {
       const p = await registerPatient(app, h.db);
       const id = await kit.processed(p.token, "clear-001");
-      await kit.correct(p.token, id, { baseVersionNumber: 1, medications: [{ name: "Entered", dose: "1" }] }); // v2: one row at 1
+      await kit.correct(p.token, id, { baseVersionNumber: 1, medications: [{ name: "Entered", dose: "1" }] });
       const res = await kit.correct(p.token, id, { baseVersionNumber: 2, medications: [{ name: "Entered", dose: "1", confirmed: true }] });
       expect(res.body.data.changedFields).toEqual([]);
     });
@@ -241,9 +239,6 @@ describe.skipIf(!TEST_DATABASE_URL)("patient corrections", () => {
       const p = await registerPatient(app, h.db);
       const id = await kit.processed(p.token, "clear-001");
 
-      // Hold a lock that conflicts with the one corrections take, from a separate connection.
-      // (NO KEY UPDATE conflicts with FOR UPDATE but not with the foreign-key checks, so only the
-      // explicit lock in the correction code can make it wait.)
       await h.pg.query("BEGIN");
       await h.pg.query(`SELECT "id" FROM "PrescriptionRecord" WHERE "id" = $1 FOR NO KEY UPDATE`, [id]);
       try {
@@ -267,12 +262,12 @@ describe.skipIf(!TEST_DATABASE_URL)("patient corrections", () => {
     it("builds on the newest version even when it was added outside the API", async () => {
       const p = await registerPatient(app, h.db);
       const id = await kit.processed(p.token, "clear-001");
-      // A version 2 that the client has already seen (so its base is 2).
+
       await h.db.prescriptionVersion.create({
         data: { prescriptionId: id, versionNumber: 2, kind: "patient_correction", verificationStatus: "patient_corrected", changedFields: [] },
       });
       const res = await kit.correct(p.token, id, { baseVersionNumber: 2, prescriberName: "Next" });
-      expect(res.status).toBe(201); // base 2 is the real latest now: it becomes version 3
+      expect(res.status).toBe(201);
       expect(res.body.data.versionNumber).toBe(3);
     });
   });
@@ -280,7 +275,7 @@ describe.skipIf(!TEST_DATABASE_URL)("patient corrections", () => {
   describe("entering data by hand", () => {
     it("lets a patient enter data for an illegible document, as version 1", async () => {
       const p = await registerPatient(app, h.db);
-      const id = await kit.processed(p.token, "illegible-001"); // extraction finds nothing
+      const id = await kit.processed(p.token, "illegible-001");
       const res = await kit.correct(p.token, id, {
         baseVersionNumber: 1,
         prescriberName: "Dr. Typed By Hand (synthetic)",
@@ -293,12 +288,12 @@ describe.skipIf(!TEST_DATABASE_URL)("patient corrections", () => {
 
     it("lets a patient enter data when nothing has been extracted yet (base 0)", async () => {
       const p = await registerPatient(app, h.db);
-      const id = await kit.uploadFixture(p.token, "clear-001"); // uploaded, never processed
+      const id = await kit.uploadFixture(p.token, "clear-001");
       const res = await kit.correct(p.token, id, { baseVersionNumber: 0, medications: [{ name: "Examplecillin", dose: "1 tablet" }] });
       expect(res.status).toBe(201);
       expect(res.body.data).toMatchObject({ versionNumber: 1, kind: "patient_correction", verificationStatus: "patient_corrected" });
       expect(res.body.data.changedFields).toEqual(["medications.0.added"]);
-      expect((await kit.correct(p.token, id, { baseVersionNumber: 0, prescriberName: "x" })).status).toBe(409); // base 0 only once
+      expect((await kit.correct(p.token, id, { baseVersionNumber: 0, prescriberName: "x" })).status).toBe(409);
     });
 
     it("then refuses automatic extraction, so it can never bury what the patient entered", async () => {
@@ -338,14 +333,14 @@ describe.skipIf(!TEST_DATABASE_URL)("patient corrections", () => {
       const slowApp = buildApp(h.db, testEnv(url), undefined, store, delayed(600));
       const slowRun = kit.processRx(p.token, id, slowApp).then((r) => r);
       await new Promise((resolve) => setTimeout(resolve, 150));
-      await h.pg.query(`UPDATE "PrescriptionRecord" SET "updatedAt" = now() - interval '10 minutes' WHERE "id" = $1`, [id]); // run now looks stale
+      await h.pg.query(`UPDATE "PrescriptionRecord" SET "updatedAt" = now() - interval '10 minutes' WHERE "id" = $1`, [id]);
       expect((await kit.correct(p.token, id, { baseVersionNumber: 0, medications: [{ name: "Entered mid-run" }] })).status).toBe(201);
       const slow = await slowRun;
       expect(slow.status).toBe(409);
       const versions = await kit.versionsOf(id);
       expect(versions).toHaveLength(1);
       expect(versions[0]?.kind).toBe("patient_correction");
-      // Released, not stuck in "processing".
+
       expect((await h.db.prescriptionRecord.findUniqueOrThrow({ where: { id } })).processingStatus).toBe("failed");
     });
   });

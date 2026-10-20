@@ -27,7 +27,7 @@ export function createPrescriptionRouter(
   db: Db,
   env: Env,
   store: PrivateFileStore,
-  /** null means extraction is disabled: processing is refused with PROVIDER_DISABLED. */
+
   extraction: ExtractionProvider | null,
 ): Router {
   const router = Router();
@@ -41,7 +41,6 @@ export function createPrescriptionRouter(
     handler: (_req, _res, next) => next(new AppError("RATE_LIMITED")),
   });
 
-  // Role check and rate limit run before the request body is read.
   router.post("/", requireRole("patient"), uploadLimiter, async (req, res) => {
     const upload = await parseUpload(req, env.UPLOAD_MAX_BYTES);
     const prescription = await createPrescription({ db, store, env }, requireAuth(req), upload, { requestId: req.requestId });
@@ -53,8 +52,6 @@ export function createPrescriptionRouter(
     res.json(await listPrescriptions(db, requireAuth(req), query));
   });
 
-  // Resolves the owning patient from the route and runs the consent check
-  // before any handler. Patients pass only for their own record.
   const accessGuard = () =>
     requirePatientAccess(db, {
       scope: "prescriptions:read",
@@ -77,17 +74,14 @@ export function createPrescriptionRouter(
     handler: (_req, _res, next) => next(new AppError("RATE_LIMITED")),
   });
 
-  // Owner or a provider with a live prescriptions:read consent.
   router.get("/:prescriptionId", accessGuard(), async (req, res) => {
     res.json({ data: await getPrescription(db, uuidParam(req.params.prescriptionId)) });
   });
 
-  // Same access as the record itself. Always carries its verification status.
   router.get("/:prescriptionId/latest", accessGuard(), async (req, res) => {
     res.json({ data: await getLatestVersion(db, uuidParam(req.params.prescriptionId)) });
   });
 
-  // Contraindications and drug-drug interaction safety analysis.
   router.get("/:prescriptionId/contraindications", accessGuard(), async (req, res) => {
     const pId = uuidParam(req.params.prescriptionId);
     const contra = await checkPrescriptionContraindications(db, pId, env);
@@ -97,14 +91,11 @@ export function createPrescriptionRouter(
     res.json({ data: contra });
   });
 
-  // History is owner-only: the patient role is required first, so providers
-  // are refused even when they hold a consent.
   router.get("/:prescriptionId/versions", requireRole("patient"), accessGuard(), async (req, res) => {
     const query = parse(listQuerySchema, req.query);
     res.json(await listVersions(db, uuidParam(req.params.prescriptionId), query));
   });
 
-  // Owner-only for the same reason: a consent grants reading, never processing.
   router.post("/:prescriptionId/process", requireRole("patient"), processLimiter, accessGuard(), async (req, res) => {
     const access = req.access;
     if (!access) throw new AppError("FORBIDDEN");
@@ -114,7 +105,7 @@ export function createPrescriptionRouter(
       { prescriptionId: uuidParam(req.params.prescriptionId), patientId: access.patientId },
       { requestId: req.requestId },
     );
-    // Fire and forget prescription completion notification
+
     notifyPrescriptionEvent(db, env, prescription.id);
     void checkPrescriptionContraindications(db, prescription.id, env).then((contra) => {
       if (contra.hasInteractions) {
@@ -124,7 +115,6 @@ export function createPrescriptionRouter(
     res.json({ data: prescription });
   });
 
-  // A patient's correction or confirmation becomes a NEW version; nothing is overwritten.
   router.patch("/:prescriptionId/extracted-fields", requireRole("patient"), accessGuard(), async (req, res) => {
     const access = req.access;
     if (!access) throw new AppError("FORBIDDEN");
@@ -144,7 +134,6 @@ export function createPrescriptionRouter(
     res.status(201).json({ data: version });
   });
 
-  // A file download, not a JSON response. Owner only, never cached.
   router.get("/:prescriptionId/pdf", requireRole("patient"), accessGuard(), async (req, res) => {
     const access = req.access;
     if (!access) throw new AppError("FORBIDDEN");
@@ -161,7 +150,6 @@ export function createPrescriptionRouter(
     res.end(bytes);
   });
 
-  // Streams the original uploaded physical prescription file (image or PDF)
   router.get("/:prescriptionId/file", accessGuard(), async (req, res) => {
     const record = await db.prescriptionRecord.findUnique({
       where: { id: uuidParam(req.params.prescriptionId) },
@@ -177,7 +165,6 @@ export function createPrescriptionRouter(
     res.end(bytes);
   });
 
-  // Owner-only deletion of a prescription record and associated data
   router.delete("/:prescriptionId", requireRole("patient"), accessGuard(), async (req, res) => {
     const access = req.access;
     if (!access) throw new AppError("FORBIDDEN");

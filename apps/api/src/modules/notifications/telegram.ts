@@ -14,11 +14,6 @@ export interface TelegramResult {
   error?: string;
 }
 
-/**
- * Sends a real-time notification alert via the Telegram Bot API.
- * When TELEGRAM_BOT_TOKEN is not configured, it runs in simulated mode with
- * safe structured logging so local testing and development never fails.
- */
 export async function sendTelegramNotification(
   env: Env,
   options: TelegramMessageOptions,
@@ -27,7 +22,7 @@ export async function sendTelegramNotification(
   const chatId = options.chatId || env.TELEGRAM_CHAT_ID;
 
   if (!token || !chatId) {
-    // Simulated/demo mode: log and return simulated success
+
     return {
       success: true,
       simulated: true,

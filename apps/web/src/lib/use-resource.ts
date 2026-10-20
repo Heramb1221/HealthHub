@@ -7,10 +7,6 @@ export type Resource<T> =
   | { status: "ready"; data: T }
   | { status: "error"; error: unknown };
 
-/**
- * Minimal data hook for screens: loading, ready, error, and a reload function for "Try again".
- * Re-runs when `key` changes. The fetcher receives an AbortSignal that fires on unmount or re-run.
- */
 export function useResource<T>(fetcher: (signal: AbortSignal) => Promise<T>, key: string = ""): Resource<T> & { reload: () => void; setData: (data: T) => void } {
   const [state, setState] = React.useState<Resource<T>>({ status: "loading" });
   const [attempt, setAttempt] = React.useState(0);

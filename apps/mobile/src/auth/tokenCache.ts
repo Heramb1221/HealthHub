@@ -13,14 +13,14 @@ export const tokenCache: TokenCache = {
     try {
       await SecureStore.setItemAsync(key, token);
     } catch {
-      // Ignore secure store write failures
+
     }
   },
   async clearToken(key: string): Promise<void> {
     try {
       await SecureStore.deleteItemAsync(key);
     } catch {
-      // Ignore secure store delete failures
+
     }
   },
 };

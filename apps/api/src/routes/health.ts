@@ -1,9 +1,5 @@
 import { Router } from "express";
 
-/**
- * Liveness plus a database check. `checkDatabase` is injected so the route can
- * be tested without a database. The response never includes connection details.
- */
 export function createHealthRouter(checkDatabase?: () => Promise<boolean>): Router {
   const router = Router();
 

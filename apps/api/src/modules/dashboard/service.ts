@@ -116,7 +116,6 @@ export async function getDashboardSummary(db: Db, auth: AuthContext): Promise<Da
 
   if (!patient) throw new AppError("NOT_FOUND");
 
-  // Calculate profile completion percentage
   let completedPoints = 0;
   const totalPoints = 7;
   if (patient.fullName) completedPoints++;
@@ -128,7 +127,6 @@ export async function getDashboardSummary(db: Db, auth: AuthContext): Promise<Da
   if (patient.allergies.length > 0 || patient.existingConditions.length > 0) completedPoints++;
   const profileCompletionPercentage = Math.round((completedPoints / totalPoints) * 100);
 
-  // Next reminder from schedules
   let nextReminder: DashboardSummaryDto["nextMedicationReminder"] = null;
   const firstActive = schedules[0];
   if (firstActive) {
@@ -142,7 +140,6 @@ export async function getDashboardSummary(db: Db, auth: AuthContext): Promise<Da
     };
   }
 
-  // Latest prescription & safety checks
   let latestRxSummary: DashboardSummaryDto["latestPrescription"] = null;
   if (latestRx) {
     const latestVersion = latestRx.versions[0];
@@ -161,7 +158,6 @@ export async function getDashboardSummary(db: Db, auth: AuthContext): Promise<Da
     };
   }
 
-  // Educational Family Risk Insights
   const familyInsights: EducationalFamilyInsight[] = [];
   const conditionMap = new Map<string, string[]>();
   for (const member of familyMembers) {

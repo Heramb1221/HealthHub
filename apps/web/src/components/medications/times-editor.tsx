@@ -9,7 +9,6 @@ import { Label } from "@/components/ui/label";
 
 const MAX_TIMES = 6;
 
-/** Editable list of reminder times. Each input is labelled; adding a time moves focus to it. */
 export function TimesEditor({ times, onChange, error }: { times: string[]; onChange: (times: string[]) => void; error?: string }) {
   const refs = React.useRef<(HTMLInputElement | null)[]>([]);
   const focusLast = React.useRef(false);

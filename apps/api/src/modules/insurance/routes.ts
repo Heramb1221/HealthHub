@@ -26,13 +26,11 @@ export function createInsuranceRouter(db: Db, env: Env): Router {
   const router = Router();
   router.use(authenticate(db, env));
 
-  // Public/all authenticated users can list recognized insurance providers
   router.get("/providers", async (_req, res) => {
     const providers = await listInsuranceProviders();
     res.json({ data: providers });
   });
 
-  // Patient policy management
   router.get("/policies", requireRole("patient"), async (req, res) => {
     const policies = await listPatientPolicies(db, requireAuth(req));
     res.json({ data: policies });

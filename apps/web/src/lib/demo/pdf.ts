@@ -1,12 +1,9 @@
-/**
- * DEMO ONLY. A tiny, dependency-free PDF writer (text only, Helvetica) so the "Download PDF" action works
- * end to end without the real API. The real PDF comes from GET /prescriptions/:id/pdf.
- */
+
 export interface PdfLine {
   text: string;
   bold?: boolean;
   size?: number;
-  /** Extra space above this line, in points. */
+
   gap?: number;
 }
 
@@ -61,7 +58,6 @@ export function buildPdf(input: PdfLine[]): Blob {
     }
   }
 
-  // Object layout: 1 catalog, 2 pages, 3 font regular, 4 font bold, then (page, content) pairs.
   const objects: string[] = [];
   const pageIds = pages.map((_, i) => 5 + i * 2);
   objects[1] = "<< /Type /Catalog /Pages 2 0 R >>";

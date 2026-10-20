@@ -33,11 +33,9 @@ const input = (versionOverrides: object = {}, o: Partial<PrescriptionPdfInput> =
 });
 const textOf = (pdf: Buffer) => pdf.toString("latin1");
 
-/** The visible text: every `(...) Tj` string, unescaped, joined with spaces (wrapped lines rejoin). */
 const visibleText = (pdf: Buffer): string =>
   [...textOf(pdf).matchAll(/\(((?:\\.|[^\\)])*)\) Tj/g)].map((m) => (m[1] ?? "").replace(/\\(.)/g, "$1")).join(" ");
 
-/** Checks the cross-reference table points at every object. */
 function expectValidStructure(pdf: Buffer): void {
   const text = textOf(pdf);
   expect(text.startsWith("%PDF-1.4\n")).toBe(true);
@@ -105,7 +103,7 @@ describe("qrMatrix", () => {
   it("is a square with the three finder patterns, and deterministic", () => {
     const m = qrMatrix(`healthhub://prescription/${ID}`);
     expect(m.every((row) => row.length === m.length)).toBe(true);
-    expect((m.length - 17) % 4).toBe(0); // valid QR version sizes
+    expect((m.length - 17) % 4).toBe(0);
     const finder = (r0: number, c0: number) => [0, 6].every((d) => m[r0]?.[c0 + d] && m[r0 + 6]?.[c0 + d] && m[r0 + d]?.[c0] && m[r0 + d]?.[c0 + 6]);
     expect(finder(0, 0)).toBe(true);
     expect(finder(0, m.length - 7)).toBe(true);
@@ -143,7 +141,7 @@ describe("buildPrescriptionPdf", () => {
     for (const status of ["needs_review", "unverified", "patient_corrected"]) {
       expect(visibleText(buildPrescriptionPdf(input({ verificationStatus: status }))), status).not.toContain("VERIFIED by an authorized clinician");
     }
-    // An unknown status falls back to the cautious label.
+
     expect(visibleText(buildPrescriptionPdf(input({ verificationStatus: "something_new" })))).toContain("UNVERIFIED");
   });
 

@@ -7,7 +7,6 @@ import { bookAppointmentSchema, listAppointmentsQuerySchema } from "./schemas.js
 import { bookAppointment, cancelAppointment, listAppointments } from "./service.js";
 import { notifyAppointmentEvent } from "../notifications/service.js";
 
-/** Appointments belong to one patient. Providers and admins are refused. */
 export function createAppointmentRouter(db: Db, env: Env): Router {
   const router = Router();
   router.use(authenticate(db, env));
@@ -15,7 +14,7 @@ export function createAppointmentRouter(db: Db, env: Env): Router {
   router.post("/", async (req, res) => {
     const { slotId } = parse(bookAppointmentSchema, req.body);
     const appointment = await bookAppointment(db, requireAuth(req), slotId, { requestId: req.requestId });
-    // Fire and forget email notification
+
     notifyAppointmentEvent(db, env, appointment.id, "booked");
     res.status(201).json({ data: appointment });
   });
@@ -24,7 +23,7 @@ export function createAppointmentRouter(db: Db, env: Env): Router {
   });
   router.post("/:appointmentId/cancel", async (req, res) => {
     const appointment = await cancelAppointment(db, requireAuth(req), uuidParam(req.params.appointmentId), { requestId: req.requestId });
-    // Fire and forget email notification
+
     notifyAppointmentEvent(db, env, appointment.id, "cancelled");
     res.json({ data: appointment });
   });

@@ -35,19 +35,14 @@ import { createHealthRouter } from "./routes/health.js";
 
 export const API_PREFIX = "/api/v1";
 
-/**
- * Builds the Express app. `register` lets later modules (and tests) mount
- * routers under the API prefix; they are mounted after the rate limiter and
- * before the 404 and error handlers.
- */
 export interface AppDeps {
-  /** Reports whether the database is reachable; omitted in tests that do not need it. */
+
   checkDatabase?: () => Promise<boolean>;
-  /** Database access; when omitted only the health route is mounted. */
+
   db?: Db;
-  /** Private file storage; prescription routes are mounted only when both db and store are given. */
+
   store?: PrivateFileStore;
-  /** Extraction provider; null or omitted means extraction is disabled. */
+
   extraction?: ExtractionProvider | null;
 }
 
@@ -60,7 +55,7 @@ export function createApp(env: Env, register?: (router: Router) => void, deps: A
   app.use(
     cors({
       origin(origin, callback) {
-        // Requests without an Origin header (curl, mobile apps) are not browser cross-origin calls.
+
         callback(null, origin === undefined || env.CORS_ORIGINS.includes(origin));
       },
     }),

@@ -18,11 +18,6 @@ export const SUPPORTED_LANGUAGES: LanguageInfo[] = [
   { code: "bn", name: "Bengali", nativeName: "বাংলা", flag: "🇮🇳" },
 ];
 
-/**
- * Curated high-confidence medical and navigation dictionary.
- * Ensures zero-latency, 100% offline-resilient translation across
- * core patient journeys, emergency triage, and digital health cards.
- */
 export const CORE_DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
   en: {
     dashboard: "Dashboard",
@@ -237,10 +232,6 @@ export interface TranslateResponse {
   provider: "bhashini_api" | "curated_dictionary";
 }
 
-/**
- * Translates text into the target Indian language.
- * Uses curated dictionary first; falls back to Bhashini API if configured.
- */
 export async function translateContent(
   env: Env,
   req: TranslateRequest,
@@ -252,17 +243,14 @@ export async function translateContent(
     return { translatedText: req.text, sourceLang: source, targetLang: target, provider: "curated_dictionary" };
   }
 
-  // 1. Check dictionary by key or exact English string
   const targetDict = CORE_DICTIONARY[target] || CORE_DICTIONARY.en;
   const enDict = CORE_DICTIONARY.en;
 
-  // Search if text matches any key
   const directMatch = targetDict[req.text];
   if (directMatch) {
     return { translatedText: directMatch, sourceLang: source, targetLang: target, provider: "curated_dictionary" };
   }
 
-  // Search if text matches an English value
   for (const [key, val] of Object.entries(enDict)) {
     const translation = targetDict[key];
     if (val.toLowerCase() === req.text.toLowerCase() && translation) {
@@ -270,8 +258,6 @@ export async function translateContent(
     }
   }
 
-
-  // 2. Bhashini Live API Integration (if credentials configured)
   if (env.BHASHINI_API_KEY && env.BHASHINI_USER_ID) {
     try {
       const bhashiniRes = await fetch("https://nmt-api.bhashini.gov.in/v1/translate", {
@@ -296,7 +282,7 @@ export async function translateContent(
         }
       }
     } catch {
-      // Fallback gracefully to original text
+
     }
   }
 

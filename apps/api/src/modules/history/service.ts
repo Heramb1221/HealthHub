@@ -24,9 +24,9 @@ export interface HistoryEntryDto {
   description: string | null;
   diagnosedOn: string | null;
   occurredOn: string | null;
-  /** Where the entry came from. Always patient_reported today. */
+
   source: string;
-  /** Never above "unverified": this system does not verify medical history. */
+
   verificationStatus: string;
   createdAt: string;
 }
@@ -47,10 +47,6 @@ const toDto = (r: Row): HistoryEntryDto => {
   };
 };
 
-/**
- * The owner reads their own history. A provider must name the patient and hold a live
- * health_history:read consent for them (checked, and audited, on every read). Admins never.
- */
 export async function listHistory(
   db: Db,
   auth: AuthContext,
@@ -73,7 +69,6 @@ export async function listHistory(
   return { data: items.map(toDto), page: { limit: query.limit, nextCursor: hasMore ? (items[items.length - 1]?.id ?? null) : null } };
 }
 
-/** Adds a patient-reported condition. It is stored as patient_reported and unverified, always. */
 export async function addCondition(
   db: Db,
   auth: AuthContext,

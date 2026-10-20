@@ -17,24 +17,20 @@ describe("Bhashini Localization & Multi-Language Dictionary", () => {
   });
 
   it("translates core clinical and navigation terms instantly across languages", async () => {
-    // English to Hindi
+
     const hi = await translateContent(mockEnv, { text: "dashboard", targetLang: "hi" });
     expect(hi.translatedText).toBe("डैशबोर्ड");
     expect(hi.provider).toBe("curated_dictionary");
 
-    // English to Tamil
     const ta = await translateContent(mockEnv, { text: "prescriptions", targetLang: "ta" });
     expect(ta.translatedText).toBe("மருந்து சீட்டு");
 
-    // English to Telugu
     const te = await translateContent(mockEnv, { text: "medications", targetLang: "te" });
     expect(te.translatedText).toBe("మందులు & వేళలు");
 
-    // English to Marathi
     const mr = await translateContent(mockEnv, { text: "health_card", targetLang: "mr" });
     expect(mr.translatedText).toBe("डिजिटल हेल्थ कार्ड");
 
-    // English to Bengali
     const bn = await translateContent(mockEnv, { text: "emergency_call", targetLang: "bn" });
     expect(bn.translatedText).toBe("জরুরী কল 112 / 108");
   });

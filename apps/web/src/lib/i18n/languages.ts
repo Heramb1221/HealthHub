@@ -18,7 +18,7 @@ export const SUPPORTED_LANGUAGES: LanguageInfo[] = [
 
 export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
   en: {
-    // Navigation & Global
+
     "dashboard": "Dashboard",
     "Dashboard": "Dashboard",
     "symptoms": "Symptom Checker",
@@ -107,7 +107,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Govt of India Bhashini Mission": "Govt of India Bhashini Mission",
     "Govt of India Bhashini": "Govt of India Bhashini",
 
-    // Dashboard & Sehat Med
     "Your Sehat Med ID": "Your Sehat Med ID",
     "Next up": "Next up",
     "Next medicine reminder": "Next medicine reminder",
@@ -133,7 +132,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Sharing and access": "Sharing and access",
     "About Sehat Med": "About Sehat Med",
 
-    // Medications & Reminders
     "You record your own doses": "You record your own doses",
     "Taken": "Taken",
     "Mark as Taken": "Mark as Taken",
@@ -177,7 +175,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Twice a day": "Twice a day",
     "Once a day": "Once a day",
 
-    // Symptoms & Triage
     "emergency_title": "Emergency Care (Call 112 / 108)",
     "Emergency Care (Call 112 / 108)": "Emergency Care (Call 112 / 108)",
     "Emergency Warning": "Emergency Warning",
@@ -205,7 +202,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Book Appointment Now": "Book Appointment Now",
     "Book Appointment": "Book Appointment",
 
-    // Hospitals & Appointments
     "Find Hospitals & Book Appointments": "Find Hospitals & Book Appointments",
     "Verified government and private medical centers across Bharat": "Verified government and private medical centers across Bharat",
     "Search hospitals, doctors or specialties...": "Search hospitals, doctors or specialties...",
@@ -221,7 +217,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Write a Review": "Write a Review",
     "Submit Review": "Submit Review",
 
-    // Insurance & Payments
     "Health Insurance Policy Vault": "Health Insurance Policy Vault",
     "Add Policy": "Add Policy",
     "Policy Number": "Policy Number",
@@ -236,7 +231,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Total Fee": "Total Fee",
     "Transaction ID": "Transaction ID",
 
-    // Profile & Medical Info
     "Health information (self-reported)": "Health information (self-reported)",
     "Allergies": "Allergies",
     "Existing conditions": "Existing conditions",
@@ -268,7 +262,7 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Not verified": "Not verified",
   },
   hi: {
-    // Navigation & Global
+
     "dashboard": "डैशबोर्ड",
     "Dashboard": "डैशबोर्ड",
     "symptoms": "लक्षण जांच",
@@ -357,7 +351,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Govt of India Bhashini Mission": "भारत सरकार भाषिणी मिशन",
     "Govt of India Bhashini": "भारत सरकार भाषिणी",
 
-    // Dashboard & Sehat Med
     "Your Sehat Med ID": "आपकी सेहत मेद आईडी",
     "Next up": "अगला कार्य",
     "Next medicine reminder": "अगली दवा का समय",
@@ -383,7 +376,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Sharing and access": "साझाकरण और पहुंच",
     "About Sehat Med": "सेहत मेद के बारे में",
 
-    // Medications & Reminders
     "You record your own doses": "आप अपनी खुराक स्वयं दर्ज करते हैं",
     "Taken": "दवा ली",
     "Mark as Taken": "दवा ले ली",
@@ -427,7 +419,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Twice a day": "दिन में दो बार",
     "Once a day": "दिन में एक बार",
 
-    // Symptoms & Triage
     "emergency_title": "आपातकालीन सेवा (कॉल 112 / 108)",
     "Emergency Care (Call 112 / 108)": "आपातकालीन सेवा (कॉल 112 / 108)",
     "Emergency Warning": "आपातकालीन चेतावनी",
@@ -455,7 +446,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Book Appointment Now": "अभी अपॉइंटमेंट बुक करें",
     "Book Appointment": "अपॉइंटमेंट बुक करें",
 
-    // Hospitals & Appointments
     "Find Hospitals & Book Appointments": "अस्पताल खोजें एवं अपॉइंटमेंट बुक करें",
     "Verified government and private medical centers across Bharat": "पूरे भारत में सत्यापित सरकारी और निजी चिकित्सा केंद्र",
     "Search hospitals, doctors or specialties...": "अस्पताल, डॉक्टर या विशेषता खोजें...",
@@ -471,7 +461,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Write a Review": "समीक्षा लिखें",
     "Submit Review": "समीक्षा जमा करें",
 
-    // Insurance & Payments
     "Health Insurance Policy Vault": "स्वास्थ्य बीमा पॉलिसी वॉल्ट",
     "Add Policy": "पॉलिसी जोड़ें",
     "Policy Number": "पॉलिसी संख्या",
@@ -486,7 +475,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Total Fee": "कुल शुल्क",
     "Transaction ID": "लेनदेन आईडी",
 
-    // Profile & Medical Info
     "Health information (self-reported)": "स्वास्थ्य जानकारी (स्व-रिपोर्ट)",
     "Allergies": "एलर्जी",
     "Existing conditions": "वर्तमान बीमारियां",
@@ -518,7 +506,7 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Not verified": "असत्यापित",
   },
   ta: {
-    // Navigation & Global
+
     "dashboard": "முகப்பு பலகை",
     "Dashboard": "முகப்பு பலகை",
     "symptoms": "அறிகுறி சரிபார்ப்பு",
@@ -607,7 +595,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Govt of India Bhashini Mission": "இந்திய அரசு பாஷிணி திட்டம்",
     "Govt of India Bhashini": "இந்திய அரசு பாஷிணி",
 
-    // Dashboard & Sehat Med
     "Your Sehat Med ID": "உங்கள் சேஹத் மேட் ஐடி",
     "Next up": "அடுத்த நிகழ்வு",
     "Next medicine reminder": "அடுத்த மருந்து நேரம்",
@@ -633,7 +620,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Sharing and access": "பகிர்வு & அணுகல்",
     "About Sehat Med": "சேஹத் மேட் பற்றி",
 
-    // Medications & Reminders
     "You record your own doses": "மருந்துகளை நீங்களே பதிவு செய்கிறீர்கள்",
     "Taken": "எடுத்தாயிற்று",
     "Mark as Taken": "மருந்து எடுத்தாயிற்று",
@@ -677,7 +663,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Twice a day": "நாளைக்கு இருமுறை",
     "Once a day": "நாளைக்கு ஒருமுறை",
 
-    // Symptoms & Triage
     "emergency_title": "அவசர உதவி (அழைக்க 112 / 108)",
     "Emergency Care (Call 112 / 108)": "அவசர உதவி (அழைக்க 112 / 108)",
     "Emergency Warning": "அவசர எச்சரிக்கை",
@@ -705,7 +690,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Book Appointment Now": "முன்பதிவு செய்க",
     "Book Appointment": "முன்பதிவு செய்க",
 
-    // Hospitals & Appointments
     "Find Hospitals & Book Appointments": "மருத்துவமனைகளைத் தேடி முன்பதிவு செய்க",
     "Verified government and private medical centers across Bharat": "இந்தியா முழுவதும் உள்ள சரிபார்க்கப்பட்ட மருத்துவமனைகள்",
     "Search hospitals, doctors or specialties...": "மருத்துவமனை அல்லது மருத்துவரைத் தேடவும்...",
@@ -721,7 +705,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Write a Review": "மதிப்புரை எழுதுக",
     "Submit Review": "சமர்ப்பிக்கவும்",
 
-    // Insurance & Payments
     "Health Insurance Policy Vault": "காப்பீட்டு பெட்டகம்",
     "Add Policy": "பாலிசியைச் சேர்",
     "Policy Number": "பாலிசி எண்",
@@ -736,7 +719,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Total Fee": "மொத்த கட்டணம்",
     "Transaction ID": "பரிவர்த்தனை எண்",
 
-    // Profile & Medical Info
     "Health information (self-reported)": "சுகாதார தகவல்கள்",
     "Allergies": "ஒவ்வாமை",
     "Existing conditions": "தற்போதைய நோய்கள்",
@@ -768,7 +750,7 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Not verified": "சரிபார்க்கப்படவில்லை",
   },
   te: {
-    // Navigation & Global
+
     "dashboard": "డాష్‌బోర్డ్",
     "Dashboard": "డాష్‌బోర్డ్",
     "symptoms": "లక్షణాల తనిఖీ",
@@ -857,7 +839,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Govt of India Bhashini Mission": "భారత ప్రభుత్వం భాషిణి మిషన్",
     "Govt of India Bhashini": "భారత ప్రభుత్వం భాషిణి",
 
-    // Dashboard & Sehat Med
     "Your Sehat Med ID": "మీ సేహత్ మేడ్ ఐడీ",
     "Next up": "తదుపరి కార్యం",
     "Next medicine reminder": "తదుపరి మందు సమయం",
@@ -883,7 +864,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Sharing and access": "భాగస్వామ్యం & యాక్సెస్",
     "About Sehat Med": "సేహత్ మేడ్ గురించి",
 
-    // Medications & Reminders
     "You record your own doses": "మీ మందుల మోతాదులను మీరే నమోదు చేస్తారు",
     "Taken": "తీసుకున్నాను",
     "Mark as Taken": "మందు తీసుకున్నాను",
@@ -927,7 +907,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Twice a day": "రోజుకు రెండుసార్లు",
     "Once a day": "రోజుకు ఒకసారి",
 
-    // Symptoms & Triage
     "emergency_title": "అత్యవసర సంరక్షణ (కాల్ 112 / 108)",
     "Emergency Care (Call 112 / 108)": "అత్యవసర సంరక్షణ (కాల్ 112 / 108)",
     "Emergency Warning": "అత్యవసర హెచ్చరిక",
@@ -955,7 +934,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Book Appointment Now": "అపాయింట్‌మెంట్ బుక్ చేయండి",
     "Book Appointment": "అపాయింట్‌మెంట్ బుక్ చేయండి",
 
-    // Hospitals & Appointments
     "Find Hospitals & Book Appointments": "ఆసుపత్రులను కనుగొని అపాయింట్‌మెంట్ తీసుకోండి",
     "Verified government and private medical centers across Bharat": "భారతదేశం అంతటా ధృవీకరించబడిన ఆసుపత్రులు",
     "Search hospitals, doctors or specialties...": "ఆసుపత్రి లేదా వైద్యుడిని శోధించండి...",
@@ -971,7 +949,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Write a Review": "సమీక్ష రాయండి",
     "Submit Review": "సమర్పించండి",
 
-    // Insurance & Payments
     "Health Insurance Policy Vault": "ఆరోగ్య బీమా వాల్ట్",
     "Add Policy": "పాలసీని జోడించండి",
     "Policy Number": "పాలసీ నంబర్",
@@ -986,7 +963,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Total Fee": "మొత్తం ఫీజు",
     "Transaction ID": "లావాదేవీ ఐడీ",
 
-    // Profile & Medical Info
     "Health information (self-reported)": "ఆరోగ్య సమాచారం",
     "Allergies": "అలెర్జీలు",
     "Existing conditions": "ప్రస్తుత వ్యాధులు",
@@ -1018,7 +994,7 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Not verified": "ధృవీకరించబడలేదు",
   },
   mr: {
-    // Navigation & Global
+
     "dashboard": "डॅशबोर्ड",
     "Dashboard": "डॅशबोर्ड",
     "symptoms": "लक्षण तपासणी",
@@ -1107,7 +1083,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Govt of India Bhashini Mission": "भारत सरकार भाषिणी मिशन",
     "Govt of India Bhashini": "भारत सरकार भाषिणी",
 
-    // Dashboard & Sehat Med
     "Your Sehat Med ID": "तुमची सेहत मेद आयडी",
     "Next up": "पुढील कार्य",
     "Next medicine reminder": "पुढील औषधाची वेळ",
@@ -1133,7 +1108,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Sharing and access": "सामायिकरण आणि प्रवेश",
     "About Sehat Med": "सेहत मेद बद्दल",
 
-    // Medications & Reminders
     "You record your own doses": "तुम्ही तुमचे डोस स्वतः नोंदवता",
     "Taken": "घेतले",
     "Mark as Taken": "औषध घेतले",
@@ -1177,7 +1151,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Twice a day": "दिवसातून दोनदा",
     "Once a day": "दिवसातून एकदा",
 
-    // Symptoms & Triage
     "emergency_title": "आपत्कालीन सेवा (कॉल करा 112 / 108)",
     "Emergency Care (Call 112 / 108)": "आपत्कालीन सेवा (कॉल करा 112 / 108)",
     "Emergency Warning": "आपत्कालीन चेतावणी",
@@ -1205,7 +1178,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Book Appointment Now": "अपॉइंटमेंट बुक करा",
     "Book Appointment": "अपॉइंटमेंट बुक करा",
 
-    // Hospitals & Appointments
     "Find Hospitals & Book Appointments": "रुग्णालये शोधा व अपॉइंटमेंट बुक करा",
     "Verified government and private medical centers across Bharat": "संपूर्ण भारतातील सत्यापित रुग्णालये",
     "Search hospitals, doctors or specialties...": "रुग्णालय किंवा डॉक्टर शोधा...",
@@ -1221,7 +1193,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Write a Review": "पुनरावलोकन लिहा",
     "Submit Review": "जमा करा",
 
-    // Insurance & Payments
     "Health Insurance Policy Vault": "आरोग्य विमा व्हॉल्ट",
     "Add Policy": "पॉलिसी जोडा",
     "Policy Number": "पॉलिसी क्रमांक",
@@ -1236,7 +1207,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Total Fee": "एकूण फी",
     "Transaction ID": "व्यवहार आयडी",
 
-    // Profile & Medical Info
     "Health information (self-reported)": "आरोग्य माहिती",
     "Allergies": "ॲलर्जी",
     "Existing conditions": "सध्याचे आजार",
@@ -1268,7 +1238,7 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Not verified": "असत्यापित",
   },
   bn: {
-    // Navigation & Global
+
     "dashboard": "ড্যাশবোর্ড",
     "Dashboard": "ড্যাশবোর্ড",
     "symptoms": "উপসর্গ পরীক্ষক",
@@ -1357,7 +1327,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Govt of India Bhashini Mission": "ভারত সরকার ভাষিণী মিশন",
     "Govt of India Bhashini": "ভারত সরকার ভাষিণী",
 
-    // Dashboard & Sehat Med
     "Your Sehat Med ID": "আপনার सेहत মেদ আইডি",
     "Next up": "পরবর্তী করণীয়",
     "Next medicine reminder": "পরবর্তী ওষুধের সময়",
@@ -1383,7 +1352,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Sharing and access": "শেয়ারিং ও অ্যাক্সেস",
     "About Sehat Med": "সেহত মেদ সম্পর্কে",
 
-    // Medications & Reminders
     "You record your own doses": "আপনি আপনার ওষুধের মাত্রা নিজেই রেকর্ড করেন",
     "Taken": "নিয়েছি",
     "Mark as Taken": "ওষুধ নিয়েছি",
@@ -1427,7 +1395,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Twice a day": "দিনে দুবার",
     "Once a day": "দিনে একবার",
 
-    // Symptoms & Triage
     "emergency_title": "জরুরী সেবা (কল 112 / 108)",
     "Emergency Care (Call 112 / 108)": "জরুরী সেবা (কল 112 / 108)",
     "Emergency Warning": "জরুরী সতর্কতা",
@@ -1455,7 +1422,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Book Appointment Now": "এখনই অ্যাপয়েন্টমেন্ট বুক করুন",
     "Book Appointment": "অ্যাপয়েন্টমেন্ট বুক করুন",
 
-    // Hospitals & Appointments
     "Find Hospitals & Book Appointments": "হাসপাতাল খুঁজুন ও অ্যাপয়েন্টমেন্ট নিন",
     "Verified government and private medical centers across Bharat": "ভারত জুড়ে যাচাইকৃত হাসপাতাল",
     "Search hospitals, doctors or specialties...": "হাসপাতাল বা ডাক্তার খুঁজুন...",
@@ -1471,7 +1437,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Write a Review": "রিভিউ লিখুন",
     "Submit Review": "জমা দিন",
 
-    // Insurance & Payments
     "Health Insurance Policy Vault": "স্বাস্থ্য বীমা ভল্ট",
     "Add Policy": "পলিসি যোগ করুন",
     "Policy Number": "পলিসি নম্বর",
@@ -1486,7 +1451,6 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     "Total Fee": "মোট ফি",
     "Transaction ID": "লেনদেন আইডি",
 
-    // Profile & Medical Info
     "Health information (self-reported)": "স্বাস্থ্য সম্পর্কিত তথ্য",
     "Allergies": "অ্যালার্জি",
     "Existing conditions": "বর্তমান রোগসমূহ",
@@ -1519,23 +1483,16 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
   },
 };
 
-/**
- * Looks up translation for any text string in O(1) time.
- * Falls back to case-insensitive and trimmed lookups.
- */
 export function lookupTranslation(lang: SupportedLanguage, text: string): string | null {
   if (lang === "en" || !text) return null;
   const dict = DICTIONARY[lang];
   if (!dict) return null;
 
-  // 1. Exact match
   if (dict[text]) return dict[text];
 
-  // 2. Trimmed match
   const trimmed = text.trim();
   if (dict[trimmed]) return dict[trimmed];
 
-  // 3. Lowercase trimmed match
   const lower = trimmed.toLowerCase();
   if (dict[lower]) return dict[lower];
 

@@ -2,10 +2,6 @@ import { z } from "zod";
 
 import type { UpdatePatientInput } from "@/lib/api/types";
 
-/**
- * Profile form validation. Enum values and limits are ASSUMED until the API contract defines them;
- * the API validates again and is authoritative.
- */
 export const GENDER_OPTIONS = [
   { value: "female", label: "Female" },
   { value: "male", label: "Male" },

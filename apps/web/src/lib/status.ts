@@ -7,7 +7,7 @@ export type StatusTone = "neutral" | "info" | "success" | "warning" | "danger" |
 
 export interface StatusDescriptor {
   label: string;
-  /** One plain-language sentence explaining what the status means for the patient. */
+
   explanation: string;
   tone: StatusTone;
   icon: LucideIcon;
@@ -76,7 +76,6 @@ export const DEMO_STATUS: StatusDescriptor = {
 
 import type { PrescriptionSourceType } from "@/lib/api/types";
 
-/** Never describe a scanned paper prescription as a digitally issued or signed prescription (AGENTS.md). */
 export const SOURCE_TYPE_LABEL: Record<PrescriptionSourceType, string> = {
   uploaded_physical: "Scanned from a paper prescription",
 };

@@ -42,7 +42,7 @@ export function DashboardScreen() {
   });
 
   const d = res.data;
-  // If the core profile call failed, the whole screen can't be trusted: show one retryable error.
+
   if (res.loading) return <Screen><LoadingState label="Loading your dashboard…" /></Screen>;
   if (res.error || !d) return <Screen><ErrorState error={res.error} onRetry={res.reload} /></Screen>;
   if (!d.patient.ok) return <Screen><ErrorState error={d.patient.error} onRetry={res.reload} /></Screen>;

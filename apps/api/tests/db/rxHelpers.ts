@@ -4,7 +4,6 @@ import { buildSyntheticPdf } from "../../src/extraction/syntheticDocuments.js";
 import { bearer } from "./appHelpers.js";
 import type { Harness } from "./helpers.js";
 
-/** Shared helpers for tests that need prescriptions in various states. */
 export function rxKit(app: Express, h: Harness) {
   const upload = async (token: string, bytes: Buffer, contentType: string, filename: string): Promise<string> => {
     const res = await request(app).post("/api/v1/prescriptions").set(bearer(token)).attach("file", bytes, { filename, contentType });
@@ -17,7 +16,7 @@ export function rxKit(app: Express, h: Harness) {
 
   const processRx = (token: string | undefined, id: string, target: Express = app) =>
     request(target).post(`/api/v1/prescriptions/${id}/process`).set(token ? bearer(token) : {});
-  /** Upload a fixture and run extraction: leaves version 1. */
+
   const processed = async (token: string, fixtureId: string): Promise<string> => {
     const id = await uploadFixture(token, fixtureId);
     const res = await processRx(token, id);

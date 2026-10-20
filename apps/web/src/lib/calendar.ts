@@ -1,6 +1,3 @@
-/**
- * Helpers for exporting medication reminders to Google Calendar web URL and .ics format.
- */
 
 export interface MedicationCalendarItem {
   medicationName: string;
@@ -8,9 +5,9 @@ export interface MedicationCalendarItem {
   dose?: string | null;
   frequency?: string | null;
   instructions?: string | null;
-  time: string; // HH:MM
-  startDate: string; // YYYY-MM-DD
-  endDate?: string | null; // YYYY-MM-DD
+  time: string;
+  startDate: string;
+  endDate?: string | null;
   timezone?: string;
 }
 

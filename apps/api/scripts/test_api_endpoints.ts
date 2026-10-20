@@ -8,7 +8,7 @@ async function main() {
   const env = loadEnv();
   const db = createDb(env.DATABASE_URL);
   const id = "182f4529-9d6d-4c3e-a17a-5a5616770589";
-  
+
   try {
     const rx = await getPrescription(db, id);
     console.log("Prescription:", rx.id, rx.processingStatus, rx.medications.length);

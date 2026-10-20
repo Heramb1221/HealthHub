@@ -1,7 +1,3 @@
-/**
- * HealthHub Shared API Domain Types
- * Single source of truth across Backend, Web, and Mobile workstreams.
- */
 
 export type Role = "patient" | "admin" | "provider";
 

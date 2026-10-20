@@ -1,22 +1,15 @@
-/**
- * Synthetic prescription fixtures for development and tests. Every name,
- * drug, dose, and date here is fictional and must never be used as medical
- * information. Drug names are deliberately made up.
- *
- * Each fixture is the RAW provider output (before the safety gate), keyed by
- * the id embedded in a synthetic document as `HEALTHHUB-SYNTHETIC-FIXTURE:<id>`.
- */
+
 export const FIXTURE_MARKER = "HEALTHHUB-SYNTHETIC-FIXTURE:";
 
 export interface SyntheticFixture {
-  /** Human-readable lines printed on the generated synthetic PDF. */
+
   documentLines: string[];
-  /** Raw provider output for this document. Intentionally untyped: some fixtures are malformed on purpose. */
+
   raw: unknown;
 }
 
 export const FIXTURES: Record<string, SyntheticFixture> = {
-  // Every field present and read with high confidence. Still only "unverified": only a person can verify.
+
   "clear-001": {
     documentLines: [
       "Prescriber: Dr. A. Example (synthetic)",
@@ -35,7 +28,6 @@ export const FIXTURES: Record<string, SyntheticFixture> = {
     },
   },
 
-  // Handwriting unclear: a missing dose, a missing strength, and low confidence. Must need review.
   "ambiguous-001": {
     documentLines: [
       "Prescriber: Dr. B. Sample (synthetic)",
@@ -56,14 +48,11 @@ export const FIXTURES: Record<string, SyntheticFixture> = {
     },
   },
 
-  // Nothing could be read.
   "illegible-001": {
     documentLines: ["(illegible synthetic document)"],
     raw: { prescriptionDate: null, prescriberName: null, overallConfidence: 0.12, medications: [] },
   },
 
-  // Hostile or broken provider output: out-of-range numbers, control characters,
-  // oversized text, a future date, and far too many rows. Used to prove the gate holds.
   "adversarial-001": {
     documentLines: ["(adversarial synthetic document: malformed provider output)"],
     raw: {

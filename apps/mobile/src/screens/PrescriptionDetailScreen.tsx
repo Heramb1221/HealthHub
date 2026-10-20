@@ -28,7 +28,7 @@ interface MedForm {
   frequency: string;
   duration: string;
   instructions: string;
-  /** BACKEND K3: "I checked this row against the original prescription". */
+
   confirmed: boolean;
 }
 
@@ -77,7 +77,7 @@ export function PrescriptionDetailScreen({ route, navigation }: Props) {
   const { id } = route.params;
   const res = useResource((signal) => prescriptionApi.get(id, signal));
   const versions = useResource((signal) => prescriptionApi.versions(id, signal));
-  // The newest version number (0 when none yet): corrections and schedules must name the version the patient saw.
+
   const latest = useResource((signal) =>
     prescriptionApi.latest(id, signal).then(
       (v) => v.versionNumber,
@@ -103,7 +103,6 @@ export function PrescriptionDetailScreen({ route, navigation }: Props) {
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfMsg, setPdfMsg] = useState<string | null>(null);
 
-  // Poll while the server is still working on the file, with an upper bound.
   const pollCount = useRef(0);
   const status = rx?.processingStatus;
   const poll = res.poll;
@@ -169,7 +168,7 @@ export function PrescriptionDetailScreen({ route, navigation }: Props) {
         prescriberName: blankToNull(prescriber),
         medications: nonEmpty.map(formToInput),
       });
-      // The server answers with the new version; re-read the record so the screen shows what is really stored.
+
       await Promise.all([res.poll(), latest.poll(), versions.poll()]);
       setEditing(false);
       setSaveMsg({ tone: "success", text: "Saved as your correction. The original file and earlier versions are kept." });
@@ -197,11 +196,11 @@ export function PrescriptionDetailScreen({ route, navigation }: Props) {
     } catch {
       setPdfMsg("Couldn't get the PDF. Check your connection and that the prescription has finished reading, then try again.");
     } finally {
-      // The PDF holds health information: don't leave a copy in the app cache.
+
       try {
         file?.delete();
       } catch {
-        // already gone
+
       }
       setPdfBusy(false);
     }

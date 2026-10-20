@@ -15,27 +15,18 @@ import { medicationReviewReasons, REVIEW_REASON_LABEL } from "@/lib/prescription
 import { buildPdf, type PdfLine } from "./pdf";
 import { currentUser, demoPatientsApi, isSeeded, requirePatient } from "./records";
 
-/**
- * DEMO ONLY. Typed stand-in for the /prescriptions endpoints.
- *
- * - The uploaded file is never sent anywhere and is not read. Reading is SIMULATED: after a short delay the record
- *   is filled from a fixed synthetic extraction fixture, so the processing, review and correction flows can be tried.
- *   (A file whose name contains "unreadable" simulates the failed state.)
- * - Seeded sample prescriptions (demo-patient only) are generated relative to now; anything the user creates or
- *   corrects is kept in this browser's localStorage.
- */
 const DAY = 86_400_000;
 const SIMULATED_READING_MS = 3000;
 const SEEDED_PATIENT_RECORD_ID = "demo-patient-record";
 
 interface DemoState {
-  /** Prescriptions created by upload in this browser. */
+
   created: Prescription[];
-  /** Edits to seeded prescriptions (corrections). */
+
   overrides: Record<string, Prescription>;
-  /** Versions added after the first extraction. */
+
   extraVersions: Record<string, PrescriptionVersion[]>;
-  /** Simulated reading jobs for created prescriptions. */
+
   jobs: Record<string, { completesAt: number; fail: boolean }>;
 }
 
@@ -46,7 +37,7 @@ function load(userId: string): DemoState {
     const raw = window.localStorage.getItem(key(userId));
     if (raw) return JSON.parse(raw) as DemoState;
   } catch {
-    /* fall through to empty state */
+
   }
   return { created: [], overrides: {}, extraVersions: {}, jobs: {} };
 }
@@ -63,7 +54,6 @@ function notFound(): never {
   throw new ApiError({ code: "NOT_FOUND", message: "This prescription doesn’t exist or isn’t available to you.", status: 404 });
 }
 
-/** Synthetic extraction fixture: one clearly read medicine and one the "reader" is unsure about. */
 function fixtureMedications(): PrescriptionMedication[] {
   return [
     { name: "Cefixime", strength: "200 mg", dose: "1 tablet", route: "oral", frequency: "Twice a day", duration: "5 days", instructions: "After food", confidence: 0.94, source: "extracted" },
@@ -125,7 +115,6 @@ function seededPrescriptions(): { items: Prescription[]; versions: Record<string
   return { items, versions };
 }
 
-/** Finish any simulated reading jobs whose time has come, and persist the result. */
 function settle(userId: string, state: DemoState): DemoState {
   const now = Date.now();
   let changed = false;
@@ -352,4 +341,3 @@ export const demoPrescriptionsApi: PrescriptionsApi = {
     return { deleted: true };
   },
 };
-

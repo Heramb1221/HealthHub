@@ -13,16 +13,16 @@ describe("Vaccine catalog", () => {
     expect(categories.has("special_travel")).toBe(true);
 
     const uip = VACCINE_CATALOG.filter((v) => v.category === "uip");
-    expect(uip.length).toBe(11); // BCG, OPV, IPV, Hep B, Pentavalent, RVV, PCV, MR, JE, DPT Booster, Td
+    expect(uip.length).toBe(11);
 
     const iap = VACCINE_CATALOG.filter((v) => v.category === "iap_private");
-    expect(iap.length).toBe(6); // MMR, TCV, Hep A, Varicella, Flu, HPV
+    expect(iap.length).toBe(6);
 
     const covid = VACCINE_CATALOG.filter((v) => v.category === "covid19");
-    expect(covid.length).toBe(8); // Covishield, Covaxin, Corbevax, Covovax, iNCOVACC, Sputnik, ZyCoV-D, Gemcovac-OM
+    expect(covid.length).toBe(8);
 
     const travel = VACCINE_CATALOG.filter((v) => v.category === "special_travel");
-    expect(travel.length).toBe(6); // Yellow fever, Meningococcal, Cholera OCV, Rabies, PPSV23, Zoster
+    expect(travel.length).toBe(6);
   });
 
   it("has valid category definitions", () => {

@@ -6,7 +6,6 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "@/components/ui/sonner";
 import { LanguageProvider } from "@/lib/i18n/language-context";
 
-
 export const metadata: Metadata = {
   title: { default: "Sehat Med - Bharat ka apna Sathi", template: "%s · Sehat Med" },
   description: "Sehat Med - Bharat ka apna Sathi. Keep your prescriptions, medication schedule and medical history in one place.",

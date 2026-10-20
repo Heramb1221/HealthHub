@@ -9,18 +9,11 @@ const date = z.string().refine((value) => parseDateOnly(value) !== null, "not a 
 
 const TIME = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
 
-/** Local reminder times: HH:MM (24 hour). Duplicates are removed and the list is sorted. */
 const reminderTimes = z
   .array(z.string().regex(TIME))
   .max(12)
   .transform((times) => [...new Set(times)].sort());
 
-/**
- * A real IANA time zone in `Area/Location` form (for example Asia/Kolkata), or UTC,
- * returned in its canonical spelling. Abbreviations such as IST (India, Israel, and
- * Ireland all use it) and legacy fixed-offset names such as EST are refused: they are
- * ambiguous or ignore daylight saving, and a wrong zone means a wrongly timed reminder.
- */
 const timezone = z
   .string()
   .min(1)
@@ -39,7 +32,7 @@ const timezone = z
 export const createScheduleSchema = z
   .strictObject({
     prescriptionId: z.uuid(),
-    // The version the patient was looking at: guards against scheduling a different row than the one they saw.
+
     versionNumber: z.number().int().min(1).max(1_000_000),
     medicationPosition: z.number().int().min(0).max(29),
     startDate: date,
@@ -54,11 +47,6 @@ export const createScheduleSchema = z
 
 export type CreateScheduleInput = z.infer<typeof createScheduleSchema>;
 
-/**
- * Only reminder preferences, the end date, and active/inactive can change.
- * The medication text (name, strength, dose, frequency, ...) is deliberately
- * not editable here.
- */
 export const updateScheduleSchema = z
   .strictObject({
     reminderTimes: reminderTimes.optional(),

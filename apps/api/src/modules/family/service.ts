@@ -102,7 +102,6 @@ export async function listFamilyMembers(
 
   const members = rows.map(toDto);
 
-  // Group by generation
   const generations = {
     grandparents: members.filter((m) => m.generation === "grandparents"),
     parents: members.filter((m) => m.generation === "parents"),
@@ -111,7 +110,6 @@ export async function listFamilyMembers(
     other: members.filter((m) => m.generation === "other"),
   };
 
-  // Aggregate hereditary risks
   const riskMap = new Map<string, { name: string; relationship: string; relationLabel: string }[]>();
   for (const m of members) {
     for (const cond of m.conditions) {
@@ -126,7 +124,7 @@ export async function listFamilyMembers(
 
   const hereditaryRisks: HereditaryRiskSummary[] = Array.from(riskMap.entries())
     .map(([rawKey, list]) => {
-      // Find original capitalization
+
       const conditionName = list[0]?.name
         ? members.flatMap((m) => m.conditions).find((c) => c.toLowerCase() === rawKey) ?? rawKey
         : rawKey;

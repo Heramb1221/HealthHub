@@ -17,7 +17,7 @@ export const SUPPORTED_LANGUAGES: LanguageInfo[] = [
 
 export const MOBILE_DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
   en: {
-    // Navigation & Global
+
     "home": "Home",
     "dashboard": "Dashboard",
     "Dashboard": "Dashboard",
@@ -113,7 +113,6 @@ export const MOBILE_DICTIONARY: Record<SupportedLanguage, Record<string, string>
     "Govt of India Bhashini Mission": "Govt of India Bhashini Mission",
     "Govt of India Bhashini": "Govt of India Bhashini",
 
-    // Dashboard & Sehat Med
     "Your Sehat Med ID": "Your Sehat Med ID",
     "Next up": "Next up",
     "Next medicine reminder": "Next medicine reminder",
@@ -139,7 +138,6 @@ export const MOBILE_DICTIONARY: Record<SupportedLanguage, Record<string, string>
     "Sharing and access": "Sharing and access",
     "About Sehat Med": "About Sehat Med",
 
-    // Medications & Reminders
     "You record your own doses": "You record your own doses",
     "Taken": "Taken",
     "Mark as Taken": "Mark as Taken",
@@ -175,7 +173,6 @@ export const MOBILE_DICTIONARY: Record<SupportedLanguage, Record<string, string>
     "emergency_title": "Emergency Care (Call 112 / 108)",
     "close": "Close",
 
-    // Profile & Fields
     "Health information (self-reported)": "Health information (self-reported)",
     "Allergies": "Allergies",
     "Existing conditions": "Existing conditions",
@@ -207,7 +204,7 @@ export const MOBILE_DICTIONARY: Record<SupportedLanguage, Record<string, string>
     "Not verified": "Not verified",
   },
   hi: {
-    // Navigation & Global
+
     "home": "मुख्य पृष्ठ",
     "dashboard": "डैशबोर्ड",
     "Dashboard": "डैशबोर्ड",
@@ -303,7 +300,6 @@ export const MOBILE_DICTIONARY: Record<SupportedLanguage, Record<string, string>
     "Govt of India Bhashini Mission": "भारत सरकार भाषिणी मिशन",
     "Govt of India Bhashini": "भारत सरकार भाषिणी",
 
-    // Dashboard & Sehat Med
     "Your Sehat Med ID": "आपकी सेहत मेद आईडी",
     "Next up": "अगला कार्य",
     "Next medicine reminder": "अगली दवा का समय",
@@ -329,7 +325,6 @@ export const MOBILE_DICTIONARY: Record<SupportedLanguage, Record<string, string>
     "Sharing and access": "साझाकरण और पहुंच",
     "About Sehat Med": "सेहत मेद के बारे में",
 
-    // Medications & Reminders
     "You record your own doses": "आप अपनी खुराक स्वयं दर्ज करते हैं",
     "Taken": "दवा ली",
     "Mark as Taken": "दवा ले ली",
@@ -365,7 +360,6 @@ export const MOBILE_DICTIONARY: Record<SupportedLanguage, Record<string, string>
     "emergency_title": "आपातकालीन सहायता (कॉल 112 / 108)",
     "close": "बंद करें",
 
-    // Profile & Fields
     "Health information (self-reported)": "स्वास्थ्य जानकारी (स्व-रिपोर्ट)",
     "Allergies": "एलर्जी",
     "Existing conditions": "वर्तमान बीमारियां",
@@ -397,7 +391,7 @@ export const MOBILE_DICTIONARY: Record<SupportedLanguage, Record<string, string>
     "Not verified": "असत्यापित",
   },
   ta: {
-    // Navigation & Global
+
     "home": "முகப்பு",
     "dashboard": "முகப்பு பலகை",
     "Dashboard": "முகப்பு பலகை",
@@ -493,7 +487,6 @@ export const MOBILE_DICTIONARY: Record<SupportedLanguage, Record<string, string>
     "Govt of India Bhashini Mission": "இந்திய அரசு பாஷிணி திட்டம்",
     "Govt of India Bhashini": "இந்திய அரசு பாஷிணி",
 
-    // Dashboard & Sehat Med
     "Your Sehat Med ID": "உங்கள் சேஹத் மேட் ஐடி",
     "Next up": "அடுத்த நிகழ்வு",
     "Next medicine reminder": "அடுத்த மருந்து நேரம்",
@@ -519,7 +512,6 @@ export const MOBILE_DICTIONARY: Record<SupportedLanguage, Record<string, string>
     "Sharing and access": "பகிர்வு & அணுகல்",
     "About Sehat Med": "சேஹத் மேட் பற்றி",
 
-    // Medications & Reminders
     "You record your own doses": "மருந்துகளை நீங்களே பதிவு செய்கிறீர்கள்",
     "Taken": "எடுத்தாயிற்று",
     "Mark as Taken": "மருந்து எடுத்தாயிற்று",
@@ -555,7 +547,6 @@ export const MOBILE_DICTIONARY: Record<SupportedLanguage, Record<string, string>
     "emergency_title": "அவசர உதவி (அழைக்க 112 / 108)",
     "close": "மூடு",
 
-    // Profile & Fields
     "Health information (self-reported)": "சுகாதார தகவல்கள்",
     "Allergies": "ஒவ்வாமை",
     "Existing conditions": "தற்போதைய நோய்கள்",
@@ -587,7 +578,7 @@ export const MOBILE_DICTIONARY: Record<SupportedLanguage, Record<string, string>
     "Not verified": "சரிபார்க்கப்படவில்லை",
   },
   te: {
-    // Navigation & Global
+
     "home": "హోమ్",
     "dashboard": "డాష్‌బోర్డ్",
     "Dashboard": "డాష్‌బోర్డ్",
@@ -683,7 +674,6 @@ export const MOBILE_DICTIONARY: Record<SupportedLanguage, Record<string, string>
     "Govt of India Bhashini Mission": "భారత ప్రభుత్వం భాషిణి మిషన్",
     "Govt of India Bhashini": "భారత ప్రభుత్వం భాషిణి",
 
-    // Dashboard & Sehat Med
     "Your Sehat Med ID": "మీ సేహత్ మేడ్ ఐడీ",
     "Next up": "తదుపరి కార్యం",
     "Next medicine reminder": "తదుపరి మందు సమయం",
@@ -709,7 +699,6 @@ export const MOBILE_DICTIONARY: Record<SupportedLanguage, Record<string, string>
     "Sharing and access": "భాగస్వామ్యం & యాక్సెస్",
     "About Sehat Med": "సేహత్ మేడ్ గురించి",
 
-    // Medications & Reminders
     "You record your own doses": "మీ మందుల మోతాదులను మీరే నమోదు చేస్తారు",
     "Taken": "తీసుకున్నాను",
     "Mark as Taken": "మందు తీసుకున్నాను",
@@ -745,7 +734,6 @@ export const MOBILE_DICTIONARY: Record<SupportedLanguage, Record<string, string>
     "emergency_title": "అత్యవసర సంరక్షణ (కాల్ 112 / 108)",
     "close": "మూసివేయి",
 
-    // Profile & Fields
     "Health information (self-reported)": "ఆరోగ్య సమాచారం",
     "Allergies": "అలెర్జీలు",
     "Existing conditions": "ప్రస్తుత వ్యాధులు",
@@ -777,7 +765,7 @@ export const MOBILE_DICTIONARY: Record<SupportedLanguage, Record<string, string>
     "Not verified": "ధృవీకరించబడలేదు",
   },
   mr: {
-    // Navigation & Global
+
     "home": "मुख्य",
     "dashboard": "डॅशबोर्ड",
     "Dashboard": "डॅशबोर्ड",
@@ -873,7 +861,6 @@ export const MOBILE_DICTIONARY: Record<SupportedLanguage, Record<string, string>
     "Govt of India Bhashini Mission": "भारत सरकार भाषिणी मिशन",
     "Govt of India Bhashini": "भारत सरकार भाषिणी",
 
-    // Dashboard & Sehat Med
     "Your Sehat Med ID": "तुमची सेहत मेद आयडी",
     "Next up": "पुढील कार्य",
     "Next medicine reminder": "पुढील औषधाची वेळ",
@@ -899,7 +886,6 @@ export const MOBILE_DICTIONARY: Record<SupportedLanguage, Record<string, string>
     "Sharing and access": "सामायिकरण आणि प्रवेश",
     "About Sehat Med": "सेहत मेद बद्दल",
 
-    // Medications & Reminders
     "You record your own doses": "तुम्ही तुमचे डोस स्वतः नोंदवता",
     "Taken": "घेतले",
     "Mark as Taken": "औषध घेतले",
@@ -935,7 +921,6 @@ export const MOBILE_DICTIONARY: Record<SupportedLanguage, Record<string, string>
     "emergency_title": "आपत्कालीन सेवा (कॉल करा 112 / 108)",
     "close": "बंद करा",
 
-    // Profile & Fields
     "Health information (self-reported)": "आरोग्य माहिती",
     "Allergies": "ॲलर्जी",
     "Existing conditions": "सध्याचे आजार",
@@ -967,7 +952,7 @@ export const MOBILE_DICTIONARY: Record<SupportedLanguage, Record<string, string>
     "Not verified": "असत्यापित",
   },
   bn: {
-    // Navigation & Global
+
     "home": "হোম",
     "dashboard": "ড্যাশবোর্ড",
     "Dashboard": "ড্যাশবোর্ড",
@@ -1063,7 +1048,6 @@ export const MOBILE_DICTIONARY: Record<SupportedLanguage, Record<string, string>
     "Govt of India Bhashini Mission": "ভারত সরকার ভাষিণী মিশন",
     "Govt of India Bhashini": "ভারত সরকার ভাষিণী",
 
-    // Dashboard & Sehat Med
     "Your Sehat Med ID": "আপনার सेहत মেদ আইডি",
     "Next up": "পরবর্তী করণীয়",
     "Next medicine reminder": "পরবর্তী ওষুধের সময়",
@@ -1089,7 +1073,6 @@ export const MOBILE_DICTIONARY: Record<SupportedLanguage, Record<string, string>
     "Sharing and access": "শেয়ারিং ও অ্যাক্সেস",
     "About Sehat Med": "সেহত মেদ সম্পর্কে",
 
-    // Medications & Reminders
     "You record your own doses": "আপনি আপনার ওষুধের মাত্রা নিজেই রেকর্ড করেন",
     "Taken": "নিয়েছি",
     "Mark as Taken": "ওষুধ নিয়েছি",
@@ -1125,7 +1108,6 @@ export const MOBILE_DICTIONARY: Record<SupportedLanguage, Record<string, string>
     "emergency_title": "জরুরী সেবা (কল 112 / 108)",
     "close": "বন্ধ করুন",
 
-    // Profile & Fields
     "Health information (self-reported)": "স্বাস্থ্য সম্পর্কিত তথ্য",
     "Allergies": "অ্যালার্জি",
     "Existing conditions": "বর্তমান রোগসমূহ",
@@ -1158,23 +1140,16 @@ export const MOBILE_DICTIONARY: Record<SupportedLanguage, Record<string, string>
   },
 };
 
-/**
- * Looks up translation for any text string in O(1) time.
- * Falls back to case-insensitive and trimmed lookups.
- */
 export function lookupTranslation(lang: SupportedLanguage, text: string): string | null {
   if (lang === "en" || !text) return null;
   const dict = MOBILE_DICTIONARY[lang];
   if (!dict) return null;
 
-  // 1. Exact match
   if (dict[text]) return dict[text];
 
-  // 2. Trimmed match
   const trimmed = text.trim();
   if (dict[trimmed]) return dict[trimmed];
 
-  // 3. Lowercase trimmed match
   const lower = trimmed.toLowerCase();
   if (dict[lower]) return dict[lower];
 

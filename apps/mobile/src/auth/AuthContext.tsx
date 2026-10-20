@@ -18,9 +18,9 @@ export interface AuthContextValue {
   signIn: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string) => Promise<{ needsVerification?: boolean } | void>;
   verifyCode: (code: string) => Promise<void>;
-  /** Demo mode is disabled. */
+
   signInDemo: (account: DemoAccount["id"]) => Promise<void>;
-  /** Resolves with a note to show the user when the server could not confirm the logout. */
+
   signOut: () => Promise<string | null>;
 }
 
@@ -41,7 +41,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState({ status: "signedOut", notice });
   }, []);
 
-  // Configure HTTP client once
   useEffect(() => {
     configureHttp({
       baseUrl: API_CONFIG.baseUrl,
@@ -52,7 +51,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, [endLocally]);
 
-  // Sync Clerk authentication state
   useEffect(() => {
     if (!isClerkLoaded) return;
     let cancelled = false;
@@ -160,7 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await clerk.signOut();
     } catch {
-      // Ignored
+
     }
     await endLocally(null);
     return null;

@@ -22,18 +22,6 @@ interface Ctx {
   resourceId?: string;
 }
 
-/**
- * Server-side authorization for one patient's data. Decided only from the
- * database: the session's role, the patient's own row, and consent rows.
- * Nothing the client sends (role, patient id, consent flags) is trusted.
- *
- * - patient: allowed only for their own patient row.
- * - provider: allowed only with a consent for this patient and this exact
- *   scope that is not revoked and not expired.
- * - admin (and anything else): never.
- *
- * Access by someone other than the patient is audited, allowed or denied.
- */
 export async function authorizePatientData(
   db: Db,
   auth: AuthContext,
@@ -85,12 +73,6 @@ export async function authorizePatientData(
   throw new AppError("FORBIDDEN");
 }
 
-/**
- * Express guard for routes that read one patient's data. `getPatientId`
- * resolves the owning patient from the route (for example by loading the
- * prescription); returning null yields NOT_FOUND. Runs the authorization
- * check before the real handler and exposes the decision as `req.access`.
- */
 export function requirePatientAccess(
   db: Db,
   options: {

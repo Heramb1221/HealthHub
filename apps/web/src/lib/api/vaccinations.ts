@@ -49,6 +49,6 @@ const liveVaccinationsApi: VaccinationsApi = {
 export const vaccinationsApi: VaccinationsApi =
   process.env.NEXT_PUBLIC_API_MODE === "live"
     ? liveVaccinationsApi
-    : // Required only in demo builds, so demo accounts and sample data never ship in a live bundle (see README).
+    :
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       (require("@/lib/demo/vaccinations") as typeof import("@/lib/demo/vaccinations")).demoVaccinationsApi;

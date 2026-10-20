@@ -45,7 +45,7 @@ export function SharingScreen() {
     setNotice(null);
     try {
       const result = await consentApi.revoke(c.id);
-      setUpdated((u) => ({ ...u, [c.id]: result })); // the server's response is what we show
+      setUpdated((u) => ({ ...u, [c.id]: result }));
       setNotice("Access revoked. It applies to future access immediately.");
     } catch (e) {
       const info = describeError(e);

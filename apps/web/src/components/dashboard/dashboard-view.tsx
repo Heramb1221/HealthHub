@@ -123,7 +123,6 @@ export function DashboardView() {
     latestCompletedRx?.id ? `dash-contra:${latestCompletedRx.id}` : "dash-contra:none",
   );
 
-  // An account with no patient profile (e.g. the administrator) gets a clear explanation instead of four errors.
   if (patient.status === "error" && isApiError(patient.error) && patient.error.isNotFound) {
     return (
       <div className="space-y-6">
@@ -310,7 +309,7 @@ export function DashboardView() {
                       {latest.medications.length} {latest.medications.length === 1 ? "medicine" : "medicines"} listed
                     </p>
                     <div className="flex flex-wrap gap-2 pt-1">
-                      {/* Once reading has finished, the status that matters is verification; "reading finished" is just noise. */}
+
                       {latest.processingStatus !== "completed" ? <ProcessingBadge status={latest.processingStatus} /> : null}
                       {latest.processingStatus === "completed" ? <VerificationBadge status={latest.verificationStatus} /> : null}
                     </div>

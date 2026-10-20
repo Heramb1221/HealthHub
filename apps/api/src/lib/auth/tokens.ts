@@ -11,10 +11,6 @@ function key(secret: string): Uint8Array {
   return new TextEncoder().encode(secret);
 }
 
-/**
- * Access token carrying only the user id (sub) and session id (jti). The role
- * is deliberately NOT a claim: it is always read from the database.
- */
 export async function signAccessToken(secret: string, claims: TokenClaims, expiresAt: Date): Promise<string> {
   return new SignJWT({})
     .setProtectedHeader({ alg: ALG })
@@ -25,7 +21,6 @@ export async function signAccessToken(secret: string, claims: TokenClaims, expir
     .sign(key(secret));
 }
 
-/** Returns the claims, or null for any invalid, expired, or malformed token. */
 export async function verifyAccessToken(secret: string, token: string): Promise<TokenClaims | null> {
   try {
     const { payload } = await jwtVerify(token, key(secret), { algorithms: [ALG], requiredClaims: ["sub", "jti", "exp"] });

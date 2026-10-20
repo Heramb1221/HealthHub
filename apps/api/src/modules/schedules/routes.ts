@@ -6,7 +6,6 @@ import { authenticate, requireAuth, requireRole } from "../../middleware/authent
 import { createScheduleSchema, doseEventSchema, listSchedulesQuerySchema, updateScheduleSchema } from "./schemas.js";
 import { createSchedule, listSchedules, recordDoseEvent, updateSchedule } from "./service.js";
 
-/** Schedules belong to one patient. Providers and admins are refused; the patient is always the session's own. */
 export function createScheduleRouter(db: Db, env: Env): Router {
   const router = Router();
   router.use(authenticate(db, env));

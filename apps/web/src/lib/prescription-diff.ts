@@ -22,12 +22,10 @@ export interface Change {
   after?: string | null;
 }
 
-/** Medicines are matched by name (case-insensitive). A renamed medicine shows as removed + added, which is the safe reading. */
 function key(m: PrescriptionMedication) {
   return (m.name ?? "").trim().toLowerCase();
 }
 
-/** What changed between two versions. Previous values are always shown, never overwritten. */
 export function diffVersions(previous: PrescriptionVersion | null, next: PrescriptionVersion): Change[] {
   if (!previous) return [];
   const changes: Change[] = [];

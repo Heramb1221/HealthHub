@@ -23,27 +23,25 @@ const schema = z
   CLERK_SECRET_KEY: z.string().default(""),
   CLERK_PUBLISHABLE_KEY: z.string().default(""),
   ACCESS_TOKEN_TTL_MINUTES: z.coerce.number().int().min(1).max(1440).default(60),
-  // Absolute limit on how long refreshing can keep a login alive, counted from the original login.
+
   SESSION_MAX_HOURS: z.coerce.number().int().min(1).max(720).default(168),
-  // Development-only login shortcut. Refused when NODE_ENV=production.
+
   DEV_AUTH_ENABLED: z
     .enum(["true", "false"])
     .default("false")
     .transform((value) => value === "true"),
   AUTH_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(10),
-  // Private storage for uploaded prescription files. Never served publicly.
+
   STORAGE_DIR: z.string().min(1).default("./storage"),
   UPLOAD_MAX_BYTES: z.coerce.number().int().min(1024).max(26_214_400).default(10_485_760),
   UPLOAD_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(20),
   PATIENT_PRESCRIPTION_LIMIT: z.coerce.number().int().min(1).default(100),
-  // Extraction provider: "disabled" refuses processing, "mock" uses synthetic fixtures,
-  // and "gemini" uses Google Gemini multimodal vision.
+
   EXTRACTION_PROVIDER: z.enum(["disabled", "mock", "gemini"]).default("disabled"),
   GEMINI_API_KEY: z.string().default(""),
   GEMINI_MODEL: z.string().default("gemini-3.5-flash"),
   PROCESS_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(10),
-  // Base for QR payloads, e.g. "healthhub://" or "https://app.example.com/". Payloads are
-  // this base plus a random id; they never contain medical data.
+
   QR_LINK_BASE: z
     .string()
     .default("healthhub://")
@@ -87,7 +85,6 @@ const schema = z
 
 export type Env = z.infer<typeof schema>;
 
-/** Thrown when configuration is invalid. Lists variable names only, never values. */
 export class EnvError extends Error {
   constructor(public readonly variables: string[]) {
     super(`Invalid environment configuration: ${variables.join(", ")}`);

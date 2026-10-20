@@ -7,11 +7,6 @@ import { EmptyState } from "@/components/feedback/states";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/lib/session/session-provider";
 
-/**
- * Courtesy gate for the admin portal: anyone who isn't an administrator sees an explanation instead of
- * screens that would only fail. This is NOT the security boundary. The API checks the role on every admin
- * request (AGENTS.md) and refuses everyone else, whatever this component shows.
- */
 export function AdminGuard({ children }: { children: React.ReactNode }) {
   const { user } = useSession();
   if (user.role !== "admin") {

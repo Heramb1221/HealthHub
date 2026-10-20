@@ -1,4 +1,4 @@
-/** Design tokens mirrored from docs/DESIGN_SYSTEM.md and the web app's globals.css. Light theme only. */
+
 export const colors = {
   background: "#f6f5f2",
   surface: "#ffffff",
@@ -25,7 +25,6 @@ export const colors = {
   neutralSurface: "#eeece7",
 } as const;
 
-/** Spacing scale from the design system: 4, 8, 12, 16, 24, 32. */
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;
 
 export const radius = { sm: 4, md: 8 } as const;
@@ -39,7 +38,6 @@ export const type = {
   caption: { fontSize: 12, lineHeight: 16, fontWeight: "400" as const },
 };
 
-/** Minimum touch target (iOS HIG 44pt, Android 48dp). */
 export const MIN_TOUCH = 48;
 
 export type Tone = "neutral" | "info" | "success" | "warning" | "danger" | "demo";

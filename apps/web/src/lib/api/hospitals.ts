@@ -3,15 +3,12 @@ import { asList, request } from "./http";
 import type { AvailabilitySlot, Hospital, HospitalReview, HospitalReviewsResult } from "./types";
 
 export interface HospitalsApi {
-  /** Hospitals a patient can book with, A to Z. */
+
   list(): Promise<Hospital[]>;
   get(id: string): Promise<Hospital>;
-  /**
-   * Every hospital including deactivated ones. For the admin portal only: the server must return the full list
-   * to administrators and must refuse or filter it for everyone else.
-   */
+
   listAll(): Promise<Hospital[]>;
-  /** Open, future slots for one hospital, earliest first. The server decides what is open. */
+
   availability(hospitalId: string): Promise<AvailabilitySlot[]>;
   holdSlot(hospitalId: string, slotId: string): Promise<{ held: boolean; expiresAt: string; secondsRemaining: number }>;
   releaseSlot(hospitalId: string, slotId: string): Promise<{ released: boolean }>;
@@ -34,7 +31,7 @@ const liveHospitalsApi: HospitalsApi = {
   async list() {
     const raw = asList(await request<Hospital[] | { items: Hospital[] }>("/hospitals"));
     const items = raw.map(normalizeHospital);
-    // Never offer a deactivated hospital for booking, even if the server returned it.
+
     return items.filter((h) => h.active !== false).sort((a, b) => a.name.localeCompare(b.name));
   },
   async get(id) {
@@ -82,6 +79,6 @@ const liveHospitalsApi: HospitalsApi = {
 export const hospitalsApi: HospitalsApi =
   process.env.NEXT_PUBLIC_API_MODE === "live"
     ? liveHospitalsApi
-    : // Required only in demo builds, so demo accounts and sample data never ship in a live bundle (see README).
+    :
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       (require("@/lib/demo/hospitals") as typeof import("@/lib/demo/hospitals")).demoHospitalsApi;

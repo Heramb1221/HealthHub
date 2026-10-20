@@ -9,7 +9,7 @@ import { addCondition, listHistory } from "./service.js";
 export function createHistoryRouter(db: Db, env: Env): Router {
   const router = Router();
   router.use(authenticate(db, env));
-  // Owner, or a provider with a live consent: the service decides.
+
   router.get("/", async (req, res) => {
     const query = parse(listHistoryQuerySchema, req.query);
     res.setHeader("Cache-Control", "private, no-store");

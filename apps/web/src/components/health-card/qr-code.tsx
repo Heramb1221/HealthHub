@@ -5,10 +5,6 @@ import QRCode from "qrcode";
 
 const QUIET_ZONE = 4;
 
-/**
- * Draws a QR code as inline SVG from the text it is given (no images, no innerHTML, nothing sent anywhere).
- * Dark modules on a white tile with a quiet zone, so it scans from a screen or a printout.
- */
 export function QrCode({ value, label, className }: { value: string; label: string; className?: string }) {
   const { size, path } = React.useMemo(() => {
     const qr = QRCode.create(value, { errorCorrectionLevel: "M" });

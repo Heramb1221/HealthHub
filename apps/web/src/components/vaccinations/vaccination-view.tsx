@@ -138,7 +138,6 @@ function VaccineRow({
 
             {item.notes ? <span className="text-muted-foreground truncate italic">“{item.notes}”</span> : null}
 
-            {/* Toggle extra details */}
             <button
               type="button"
               onClick={() => setExpanded(!expanded)}
@@ -171,7 +170,6 @@ function VaccineRow({
           </div>
         </div>
 
-        {/* Primary Action Buttons: Taken vs Not Taken */}
         <div className="flex items-center gap-2 shrink-0 pt-1 sm:pt-0" role="group" aria-label={`Status for ${item.vaccineName}`}>
           <Button
             type="button"
@@ -217,7 +215,6 @@ function VaccineRow({
         </div>
       </div>
 
-      {/* Expandable Date & Notes Form */}
       {expanded ? (
         <form onSubmit={handleSaveDetails} className="mt-4 border-t pt-3 space-y-3">
           <div className="grid gap-3 sm:grid-cols-2">
@@ -428,12 +425,11 @@ export function VaccinationView() {
         notes,
       });
 
-      // Update in-memory state
       if (resource.status === "ready" && updated) {
         const nextList = resource.data.data.map((item) =>
           item.vaccineName.toLowerCase() === updated.vaccineName.toLowerCase() ? updated : item,
         );
-        // If not in list, add it
+
         if (!nextList.some((item) => item.vaccineName.toLowerCase() === updated.vaccineName.toLowerCase())) {
           nextList.push(updated);
         }
@@ -523,19 +519,17 @@ export function VaccinationView() {
   const items = resource.data.data;
   const summary = resource.data.summary;
 
-  // Filter items
   const filtered = items.filter((item) => {
-    // Category match
+
     if (selectedCategory !== "all") {
       if (selectedCategory === "custom" && !item.isCustom && item.category !== "custom") return false;
       if (selectedCategory !== "custom" && item.category !== selectedCategory) return false;
     }
-    // Status match
+
     if (selectedStatus === "taken" && item.status !== "taken") return false;
     if (selectedStatus === "not_taken" && item.status !== "not_taken") return false;
     if (selectedStatus === "unrecorded" && item.status !== null) return false;
 
-    // Search query
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       const matchName = item.vaccineName.toLowerCase().includes(q);
@@ -555,7 +549,6 @@ export function VaccinationView() {
         actions={addCustomButton}
       />
 
-      {/* Summary KPI Cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-lg border bg-card p-4 space-y-1">
           <p className="text-muted-foreground text-xs font-medium">Total Tracked</p>
@@ -611,9 +604,8 @@ export function VaccinationView() {
         />
       ) : null}
 
-      {/* Filters & Search Bar */}
       <div className="space-y-3">
-        {/* Category Tabs */}
+
         <div role="tablist" aria-label="Vaccine category" className="flex flex-wrap gap-1.5 border-b pb-2">
           {CATEGORY_TABS.map((tab) => (
             <Button
@@ -629,7 +621,6 @@ export function VaccinationView() {
           ))}
         </div>
 
-        {/* Status Pills and Search */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter by status">
             <Button
@@ -685,7 +676,6 @@ export function VaccinationView() {
         </div>
       </div>
 
-      {/* Vaccine List */}
       {filtered.length === 0 ? (
         <EmptyState
           icon={Syringe}

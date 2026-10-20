@@ -35,13 +35,6 @@ const toDto = (row: Row): AppointmentDto => ({
 
 const isUniqueViolation = (err: unknown): boolean => typeof err === "object" && err !== null && (err as { code?: unknown }).code === "P2002";
 
-/**
- * Books a slot for the signed-in patient. Whether the slot is free is NOT
- * checked first and then acted on (which two requests could race past): the
- * insert itself claims the slot through a unique constraint, and a violation
- * means someone else got it. A per-patient lock serialises one patient's own
- * limit and overlap checks.
- */
 export async function bookAppointment(db: Db, auth: AuthContext, slotId: string, ctx: Ctx): Promise<AppointmentDto> {
   const patientId = await ownPatientId(db, auth);
   const slot = await db.availabilitySlot.findUnique({ where: { id: slotId }, select: { id: true, startsAt: true, endsAt: true, hospital: { select: { id: true, isActive: true } } } });
@@ -100,7 +93,6 @@ export async function listAppointments(
   return { data: items.map(toDto), page: { limit: query.limit, nextCursor: hasMore ? (items[items.length - 1]?.id ?? null) : null } };
 }
 
-/** Frees the slot. Repeating it is a no-op; someone else's appointment looks like it does not exist. */
 export async function cancelAppointment(db: Db, auth: AuthContext, appointmentId: string, ctx: Ctx): Promise<AppointmentDto> {
   const patientId = await ownPatientId(db, auth);
   const current = await db.appointment.findFirst({ where: { id: appointmentId, patientId }, select: SELECT });
@@ -109,7 +101,7 @@ export async function cancelAppointment(db: Db, auth: AuthContext, appointmentId
   if (current.slot.startsAt.getTime() <= Date.now()) throw new AppError("CONFLICT", "This appointment has already started or passed");
 
   const row = await db.$transaction(async (tx) => {
-    // Conditional on still being confirmed, so two cancels cannot both act.
+
     const result = await tx.appointment.updateMany({
       where: { id: appointmentId, patientId, status: "confirmed" },
       data: { status: "cancelled", activeSlotId: null, cancelledAt: new Date() },
