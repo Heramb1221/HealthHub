@@ -205,8 +205,7 @@ export async function deletePrescription(
   }
 
   await deps.db.$transaction(async (tx) => {
-
-    await tx.$executeRawUnsafe("SET LOCAL session_replication_role = 'replica'");
+    await tx.$executeRawUnsafe("SET LOCAL healthhub.allow_prescription_deletion = 'on'");
 
     const versions = await tx.prescriptionVersion.findMany({
       where: { prescriptionId: target.prescriptionId },

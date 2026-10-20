@@ -48,6 +48,7 @@ export interface AppDeps {
 
 export function createApp(env: Env, register?: (router: Router) => void, deps: AppDeps = {}): Express {
   const app = express();
+  app.set("trust proxy", 1);
   app.disable("x-powered-by");
 
   app.use(requestId);
