@@ -1,0 +1,32 @@
+{
+  "cli": {
+    "version": ">= 15.0.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_APP_MODE": "live",
+        "EXPO_PUBLIC_API_URL": "https://healthhub-api-jecm.onrender.com/api/v1",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_d2lubmluZy10dXJ0bGUtMzI3MS5jbGVyay5hY2NvdW50cy5kZXYk"
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_APP_MODE": "live",
+        "EXPO_PUBLIC_API_URL": "https://healthhub-api-jecm.onrender.com/api/v1",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_d2lubmluZy10dXJ0bGUtMzI3MS5jbGVyay5hY2NvdW50cy5kZXYk"
+      }
+    }
+  }
+}
