@@ -15,7 +15,7 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
         <EmptyState
           icon={ShieldOff}
           title="You don’t have access to the admin portal"
-          description="This area is for HealthHub administrators. Your account can use the patient screens."
+          description="This area is for Sehat Meds administrators. Your account can use the patient screens."
           action={
             <Button asChild variant="outline">
               <Link href="/dashboard">Back to my dashboard</Link>

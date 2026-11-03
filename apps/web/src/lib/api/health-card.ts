@@ -24,7 +24,7 @@ function normalizeCard(raw: unknown): HealthCard {
     phone: card.phone ? String(card.phone) : null,
     emergencyContactName: card.emergencyContactName ? String(card.emergencyContactName) : null,
     emergencyContactPhone: card.emergencyContactPhone ? String(card.emergencyContactPhone) : null,
-    issuer: String(card.issuer ?? "HealthHub Digital Health Network"),
+    issuer: String(card.issuer ?? "Sehat Meds Digital Health Network"),
     notice: String(card.notice ?? "Authorized Digital Health Identity Card"),
     issuedAt: String(card.issuedAt ?? card.generatedAt ?? new Date().toISOString()),
     qr,

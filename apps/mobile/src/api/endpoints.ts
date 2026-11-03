@@ -1,3 +1,5 @@
+import { Platform } from "react-native";
+
 import { apiUrl, authHeaders, request, requestList, type Page } from "./http.ts";
 import type {
   AccessEvent,
@@ -29,6 +31,7 @@ import type {
   PatientInsurancePolicy,
   PatientUpdate,
   PatientVaccination,
+  PaymentConfig,
   PaymentHistoryItem,
   PaymentOrder,
   PaymentVerificationResult,
@@ -45,6 +48,8 @@ import type {
   VaccinationListResult,
   VerifyPaymentBody,
 } from "./types.ts";
+
+
 
 export const authApi = {
   register: (email: string, password: string) =>
@@ -72,8 +77,30 @@ export const prescriptionApi = {
   upload: (file: UploadFile) => {
     const form = new FormData();
 
-    form.append("file", { uri: file.uri, name: file.name, type: file.mimeType } as unknown as Blob);
-    return request<Prescription>("/prescriptions", { method: "POST", formData: form, timeoutMs: 90_000 });
+    if (Platform.OS === "web") {
+      if (!file.file) {
+        throw new Error(
+          "The selected file is unavailable. Please select the prescription again."
+        );
+      }
+
+      form.append("file", file.file, file.name);
+    } else {
+      form.append(
+        "file",
+        {
+          uri: file.uri,
+          name: file.name,
+          type: file.mimeType,
+        } as unknown as Blob
+      );
+    }
+
+    return request<Prescription>("/prescriptions", {
+      method: "POST",
+      formData: form,
+      timeoutMs: 90_000,
+    });
   },
 
   process: (id: string) => request<Prescription>(`/prescriptions/${enc(id)}/process`, { method: "POST", timeoutMs: 45_000 }),
@@ -86,7 +113,8 @@ export const prescriptionApi = {
   contraindications: (id: string, signal?: AbortSignal) =>
     request<ContraindicationReport>(`/prescriptions/${enc(id)}/contraindications`, opts(signal)),
 
-  pdfRequest: (id: string) => ({ url: apiUrl(`/prescriptions/${enc(id)}/pdf`), headers: authHeaders() }),
+  fileRequest: async (id: string) => ({ url: apiUrl(`/prescriptions/${enc(id)}/file`), headers: await authHeaders() }),
+  pdfRequest: async (id: string) => ({ url: apiUrl(`/prescriptions/${enc(id)}/pdf`), headers: await authHeaders() }),
 };
 
 export const consentApi = {
@@ -171,6 +199,7 @@ export const insuranceApi = {
 };
 
 export const paymentApi = {
+  getConfig: (signal?: AbortSignal) => request<PaymentConfig>("/payments/config", opts(signal)),
   createOrder: (body: CreatePaymentOrderBody) =>
     request<PaymentOrder>("/payments/orders", { method: "POST", json: body }),
   verifyPayment: (body: VerifyPaymentBody) =>

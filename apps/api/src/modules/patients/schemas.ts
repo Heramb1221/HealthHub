@@ -44,7 +44,8 @@ const emergencyContact = z
 
 export const updateProfileSchema = z
   .strictObject({
-    fullName: emptyToNull(text(120).nullable().optional()),
+    // null clears the name; an empty or blank string is invalid (it used to be silently turned into a clear).
+    fullName: text(120).nullable().optional(),
     dateOfBirth: emptyToNull(dateOfBirth.nullable().optional()),
     gender: emptyToNull(z.enum(GENDERS).nullable().optional()),
     bloodGroup: emptyToNull(z.enum(BLOOD_GROUPS).nullable().optional()),

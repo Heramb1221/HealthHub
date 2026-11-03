@@ -11,15 +11,16 @@ import { appointmentHospitalName, appointmentStart } from "../lib/appointments";
 import { filterHospitals, groupAppointments } from "../lib/filter";
 import { formatDateTime } from "../lib/format";
 import type { RootStackParamList } from "../navigation/types";
-import { AppText, Badge, Banner, Button, Card, Chip, DemoTag, ListRow, Row, Screen, Stack, TextField } from "../ui/components";
+import { AppText, Badge, Banner, Button, Card, Chip, DemoTag, ListRow, Row, Screen, SectionTitle, Stack, TextField } from "../ui/components";
 import { EmptyState, ErrorState, LoadingState } from "../ui/states";
+import { space } from "../ui/theme";
 
 export function CareScreen() {
   const [tab, setTab] = useState<"hospitals" | "appointments">("hospitals");
   return (
     <Screen>
       <Stack>
-        <Row>
+        <Row style={{ flexWrap: "wrap" }}>
           <Chip label="Hospitals" selected={tab === "hospitals"} onPress={() => setTab("hospitals")} />
           <Chip label="My appointments" selected={tab === "appointments"} onPress={() => setTab("appointments")} />
         </Row>
@@ -44,8 +45,9 @@ function HospitalList() {
       <TextField label="Search hospitals" value={query} onChangeText={setQuery} hint="Search by name, city or specialty" autoCapitalize="none" autoCorrect={false} returnKeyType="search" clearButtonMode="while-editing" />
       {shown.length === 0 ? <EmptyState icon="search" title="No matches" body={`No hospitals match "${query.trim()}". Try a different name, city or specialty.`} action={{ label: "Clear search", onPress: () => setQuery("") }} /> : null}
       {shown.map((h) => (
-        <Card key={h.id} style={{ marginTop: 12 }}>
+        <Card key={h.id} style={{ marginTop: 12, gap: 0, padding: space.sm }}>
           <ListRow
+            icon="map-pin"
             title={h.name}
             subtitle={[h.city, h.timings, h.specialties?.join(", ")].filter(Boolean).join(" · ") || undefined}
             onPress={() => nav.navigate("Hospital", { id: h.id })}
@@ -122,9 +124,9 @@ function AppointmentList() {
   return (
     <Stack>
       {error ? <Banner tone="danger" title={error} icon="alert-circle" /> : null}
-      <AppText variant="heading" accessibilityRole="header">Upcoming</AppText>
+      <SectionTitle>Upcoming</SectionTitle>
       {upcoming.length === 0 ? <AppText muted>No upcoming appointments. Choose a hospital to book one.</AppText> : upcoming.map(renderAppt)}
-      {past.length > 0 ? <AppText variant="heading" accessibilityRole="header">Past and cancelled</AppText> : null}
+      {past.length > 0 ? <SectionTitle>Past and cancelled</SectionTitle> : null}
       {past.map(renderAppt)}
     </Stack>
   );

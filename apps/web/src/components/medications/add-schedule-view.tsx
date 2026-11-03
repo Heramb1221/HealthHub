@@ -209,7 +209,7 @@ export function AddScheduleView() {
                   view
                 </Link>
               </p>
-              <ul className="divide-y rounded-md border bg-card">
+              <ul className="divide-y rounded-xl border bg-card shadow-[var(--shadow-soft)]">
                 {all
                   .filter((o) => o.rx.id === rx.id)
                   .map((o) => {

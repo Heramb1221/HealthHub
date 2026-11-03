@@ -1,4 +1,6 @@
 import type { Db } from "../../db/client.js";
+import { loadScheduleDtos } from "../schedules/service.js";
+import { nextDose } from "../schedules/nextDose.js";
 import { AppError } from "../../lib/errors.js";
 import type { AuthContext } from "../../middleware/authenticate.js";
 import { ownPatientId } from "../patients/ownPatient.js";
@@ -127,16 +129,17 @@ export async function getDashboardSummary(db: Db, auth: AuthContext): Promise<Da
   if (patient.allergies.length > 0 || patient.existingConditions.length > 0) completedPoints++;
   const profileCompletionPercentage = Math.round((completedPoints / totalPoints) * 100);
 
+  // The genuinely next dose in each schedule's own time zone; nothing is invented when no reminder applies.
   let nextReminder: DashboardSummaryDto["nextMedicationReminder"] = null;
-  const firstActive = schedules[0];
-  if (firstActive) {
-    const time = firstActive.reminderTimes[0] || "09:00";
+  const upcoming = nextDose(await loadScheduleDtos(db, { patientId, isActive: true }), new Date());
+  const upcomingSchedule = upcoming ? schedules.find((s) => s.id === upcoming.scheduleId) : undefined;
+  if (upcoming && upcomingSchedule) {
     nextReminder = {
-      scheduleId: firstActive.id,
-      medicationName: firstActive.medicationName,
-      dose: firstActive.dose,
-      frequency: firstActive.frequency,
-      reminderTime: time,
+      scheduleId: upcomingSchedule.id,
+      medicationName: upcomingSchedule.medicationName,
+      dose: upcomingSchedule.dose,
+      frequency: upcomingSchedule.frequency,
+      reminderTime: upcoming.time,
     };
   }
 

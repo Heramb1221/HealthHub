@@ -29,6 +29,8 @@ export const PRESCRIPTION_SELECT = {
   processingStatus: true,
   createdAt: true,
   updatedAt: true,
+  originalMimeType: true,
+  originalSizeBytes: true,
 
   versions: {
     orderBy: { versionNumber: "desc" },
@@ -50,6 +52,8 @@ type PrescriptionRow = {
   patientId: string;
   sourceType: string;
   processingStatus: string;
+  originalMimeType: string;
+  originalSizeBytes: number;
   createdAt: Date;
   updatedAt: Date;
   versions: Array<{
@@ -78,6 +82,11 @@ export interface PrescriptionDto {
   prescriptionDate: string | null;
   prescriberName: string | null;
   medications: PrescriptionRow["versions"][number]["medications"];
+  /**
+   * Describes the original upload so clients know how to show it. Deliberately has no file name (names
+   * often contain personal details) and never includes storage keys or hashes.
+   */
+  sourceFile: { mimeType: string; sizeBytes: number };
   createdAt: string;
   updatedAt: string;
 }
@@ -92,11 +101,15 @@ export function toPrescriptionDto(row: PrescriptionRow): PrescriptionDto {
     verificationStatus: latest?.verificationStatus ?? "unverified",
     prescriptionDate: latest?.prescriptionDate ? latest.prescriptionDate.toISOString().slice(0, 10) : null,
     prescriberName: latest?.prescriberName ?? null,
+    sourceFile: { mimeType: row.originalMimeType, sizeBytes: row.originalSizeBytes },
     medications: latest?.medications ?? [],
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
 }
+
+/** Identical uploads from the same patient inside this window are treated as one (retry/double-tap). */
+const DUPLICATE_UPLOAD_WINDOW_MS = 2 * 60 * 1000;
 
 export async function createPrescription(
   deps: { db: Db; store: PrivateFileStore; env: Env },
@@ -113,6 +126,17 @@ export async function createPrescription(
 
   const mime = sniffMime(buffer);
   if (!mime || normalizeDeclaredMime(upload.file.declaredMime) !== mime) throw new AppError("UNSUPPORTED_MEDIA_TYPE");
+
+  // A double-tap or a retry after a dropped connection re-sends the same photo. Replaying the same bytes for
+  // the same patient within a short window returns the record that already exists instead of creating a
+  // duplicate (and a second stored copy / second extraction).
+  const sha256 = createHash("sha256").update(buffer).digest("hex");
+  const replay = await db.prescriptionRecord.findFirst({
+    where: { patientId, originalSha256: sha256, createdAt: { gte: new Date(Date.now() - DUPLICATE_UPLOAD_WINDOW_MS) } },
+    orderBy: { createdAt: "desc" },
+    select: { id: true },
+  });
+  if (replay) return getPrescription(db, replay.id);
 
   const existing = await db.prescriptionRecord.count({ where: { patientId } });
   if (existing >= env.PATIENT_PRESCRIPTION_LIMIT) throw new AppError("CONFLICT", "Prescription limit reached");
@@ -131,7 +155,7 @@ export async function createPrescription(
           originalFileName: sanitizeFileName(upload.file.filename),
           originalMimeType: mime,
           originalSizeBytes: buffer.length,
-          originalSha256: createHash("sha256").update(buffer).digest("hex"),
+          originalSha256: sha256,
         },
         select: PRESCRIPTION_SELECT,
       });

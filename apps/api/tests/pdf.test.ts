@@ -124,7 +124,7 @@ describe("buildPrescriptionPdf", () => {
   it("carries the identifiers, source, status, and QR reference", () => {
     const text = visibleText(buildPrescriptionPdf(input()));
     for (const expected of [
-      "HealthHub patient ID: HH-7K2M9QXD", `Prescription record ID: ${ID}`, "Source: Uploaded physical prescription",
+      "Sehat Meds patient ID: HH-7K2M9QXD", `Prescription record ID: ${ID}`, "Source: Uploaded physical prescription",
       "Verification status: unverified", "Record version: 1 (automatic extraction)", `healthhub://prescription/${ID}`,
       "Generated 2026-10-11T08:00:00.000Z", "not an official national health ID",
     ]) expect(text, expected).toContain(expected);
@@ -237,8 +237,49 @@ describe("QR settings", () => {
     }
   });
 
+  it("refuses to start in production unless QR links are a public https address", () => {
+    const prod = { ...base, NODE_ENV: "production" };
+    for (const bad of [undefined, "healthhub://", "http://app.example.com/", "https://localhost/", "https://x/"]) {
+      expect(() => loadEnv({ ...prod, ...(bad ? { QR_LINK_BASE: bad } : {}) }), String(bad)).toThrow(EnvError);
+    }
+    expect(loadEnv({ ...prod, QR_LINK_BASE: "https://health-hub-rose.vercel.app/" }).QR_LINK_BASE).toBe("https://health-hub-rose.vercel.app/");
+  });
+
   it("keeps sessions short-lived", () => {
     for (const bad of ["0", "61", "-5", "1.5", "abc"]) expect(() => loadEnv({ ...base, QR_SESSION_TTL_MINUTES: bad }), bad).toThrow(EnvError);
     expect(loadEnv({ ...base, QR_SESSION_TTL_MINUTES: "60" }).QR_SESSION_TTL_MINUTES).toBe(60);
+  });
+});
+
+describe("digitized-copy honesty (Part 4)", () => {
+  it("never prints a made-up doctor or hospital when none is known", () => {
+    const text = visibleText(buildPrescriptionPdf(input({ prescriberName: null })));
+    expect(text).not.toMatch(/Kulkarni|Apollo/);
+    expect(text).toContain("Not stated on the document");
+    expect(text).not.toMatch(/Dr\. Not stated/);
+  });
+
+  it("prints the prescriber exactly as stored, adding Dr. only when missing", () => {
+    expect(visibleText(buildPrescriptionPdf(input({ prescriberName: "Anjali Deshmukh" })))).toContain("Dr. Anjali Deshmukh");
+    expect(visibleText(buildPrescriptionPdf(input({ prescriberName: "Dr. Anjali Deshmukh" })))).not.toContain("Dr. Dr.");
+  });
+
+  it("presents an uploaded paper prescription as a digitized COPY, without signature or diagnosis boxes", () => {
+    const text = visibleText(buildPrescriptionPdf(input()));
+    expect(text).toContain("PRESCRIPTION COPY");
+    expect(text).toContain("not issued, signed or");
+    expect(text).toContain("Digitized prescription copy - not a newly issued prescription");
+    expect(text).not.toMatch(/Clinical prescription|Prescriber signature|Diagnosis \/ Indication/);
+  });
+
+  it("keeps the issued-prescription layout only for clinician-issued prescriptions", () => {
+    const text = visibleText(buildPrescriptionPdf(input({}, { sourceType: "clinician_issued" })));
+    expect(text).toContain("Prescriber signature");
+    expect(text).not.toContain("PRESCRIPTION COPY");
+  });
+
+  it("still states plainly that OCR/patient correction is not clinical verification", () => {
+    expect(visibleText(buildPrescriptionPdf(input({ verificationStatus: "patient_corrected" })))).toContain("NOT verification by a doctor or pharmacist");
+    expect(visibleText(buildPrescriptionPdf(input({ verificationStatus: "needs_review" })))).toContain("NEEDS REVIEW");
   });
 });

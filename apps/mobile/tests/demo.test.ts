@@ -6,6 +6,7 @@ import { isApiError } from "../src/api/errors.ts";
 import { configureHttp, request } from "../src/api/http.ts";
 import { DEMO_ACCOUNTS } from "../src/demo/accounts.ts";
 import { DEMO_BASE_URL, demoFetch, resetDemo } from "../src/demo/demoFetch.ts";
+import { addDays, dateInZone, zonedInstant } from "../src/lib/zonedTime.ts";
 
 let token: string | null = null;
 
@@ -211,17 +212,22 @@ describe("demo medication schedules (backend K gate)", () => {
       baseVersionNumber: 1,
       medications: rx.medications.map(({ confidence: _c, ...m }, i) => (i === 1 ? { ...m, dose: "1 tablet", frequency: "once a day", confirmed: true } : m)),
     });
-    const s = await medicationApi.create({ prescriptionId: "demo-rx-1", versionNumber: 2, medicationPosition: 1, ...base });
+    const startedEarlier = new Date(Date.now() - 3 * 86_400_000).toISOString().slice(0, 10);
+    const s = await medicationApi.create({ prescriptionId: "demo-rx-1", versionNumber: 2, medicationPosition: 1, ...base, startDate: startedEarlier });
     await rejectsWith(medicationApi.update(s.id, { remindersEnabled: true }), "VALIDATION_ERROR");
     const edited = await medicationApi.update(s.id, { reminderTimes: ["21:00", "09:30", "21:00"], remindersEnabled: true });
     assert.deepEqual(edited.reminderTimes, ["09:30", "21:00"]);
     assert.equal(edited.remindersActive, true);
     await rejectsWith(medicationApi.update(s.id, { reminderTimes: ["9:30"] }), "VALIDATION_ERROR");
     await rejectsWith(request(`/medication-schedules/${s.id}`, { method: "PATCH", json: { dose: "2" } }), "VALIDATION_ERROR");
-    const at = new Date().toISOString();
+    // A dose is one of the schedule's reminder slots in the schedule's own zone (yesterday 09:30 India time here).
+    const at = (zonedInstant(addDays(dateInZone(new Date(), base.timezone), -1), "09:30", base.timezone) as Date).toISOString();
     const dose = await medicationApi.reportDose(s.id, { scheduledFor: at, status: "taken" });
     assert.equal(dose.selfReported, true);
-    await rejectsWith(medicationApi.reportDose(s.id, { scheduledFor: at, status: "skipped" }), "CONFLICT");
+    const retry = await medicationApi.reportDose(s.id, { scheduledFor: at, status: "taken" }); // same answer: harmless retry
+    assert.equal(retry.id, dose.id);
+    await rejectsWith(medicationApi.reportDose(s.id, { scheduledFor: at, status: "skipped" }), "CONFLICT"); // different answer: refused
+    await rejectsWith(medicationApi.reportDose(s.id, { scheduledFor: new Date(Date.parse(at) + 7 * 60_000).toISOString(), status: "taken" }), "VALIDATION_ERROR"); // not a slot
     await rejectsWith(medicationApi.reportDose(s.id, { scheduledFor: "not a date", status: "taken" }), "VALIDATION_ERROR");
     await rejectsWith(medicationApi.reportDose(s.id, { scheduledFor: new Date(Date.now() + 5 * 3_600_000).toISOString(), status: "taken" }), "VALIDATION_ERROR");
     const listed = (await medicationApi.list()).items.find((x) => x.id === s.id);

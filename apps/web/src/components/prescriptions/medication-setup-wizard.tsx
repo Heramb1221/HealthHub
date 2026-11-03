@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { calendarApi } from "@/lib/api/calendar";
+import { describeCalendarSync } from "@/lib/calendar-sync-message";
 import { describeError } from "@/lib/api/errors";
 import { medicationSchedulesApi } from "@/lib/api/medication-schedules";
 import { prescriptionsApi } from "@/lib/api/prescriptions";
@@ -120,19 +121,22 @@ export function MedicationSetupWizard({
   prescription,
   existingSchedules = [],
   onCompleted,
+  onRequestReview,
 }: {
   open: boolean;
   onClose: () => void;
   prescription: Prescription;
   existingSchedules?: MedicationSchedule[];
   onCompleted?: () => void;
+  /** Close the wizard and open the review/correction form. */
+  onRequestReview?: () => void;
 }) {
   const medications = prescription.medications;
   const [currentStep, setCurrentStep] = React.useState(0);
   const [configs, setConfigs] = React.useState<MedicationConfig[]>(() =>
     buildInitialConfigs(prescription, existingSchedules),
   );
-  const [verified, setVerified] = React.useState(
+  const [verified] = React.useState(
     prescription.verificationStatus === "patient_corrected" ||
       prescription.verificationStatus === "verified_by_authorized_clinician",
   );
@@ -140,6 +144,7 @@ export function MedicationSetupWizard({
   const [calendarStatus, setCalendarStatus] = React.useState<CalendarStatus | null>(null);
   const [syncingCalendar, setSyncingCalendar] = React.useState(false);
   const [calendarSyncedCount, setCalendarSyncedCount] = React.useState<number | null>(null);
+  const [calendarShowNames, setCalendarShowNames] = React.useState(false);
 
   React.useEffect(() => {
     if (!open) return;
@@ -234,25 +239,12 @@ export function MedicationSetupWizard({
         updateCurrentConfig({ existingScheduleId: scheduleId, saved: true });
       } else {
 
+        // Never "verify" on the patient's behalf: schedules are only created from details the patient
+        // reviewed and confirmed (the button is disabled until then, and the API enforces it too).
         if (!verified) {
-          try {
-            await prescriptionsApi.correct(prescription.id, {
-              prescriptionDate: prescription.prescriptionDate,
-              prescriberName: prescription.prescriberName,
-              medications: prescription.medications.map((m) => ({
-                name: m.name,
-                strength: m.strength,
-                dose: m.dose,
-                route: m.route,
-                frequency: m.frequency,
-                duration: m.duration,
-                instructions: m.instructions,
-              })),
-            });
-            setVerified(true);
-          } catch {
-
-          }
+          toast.error("Review the details first", { description: "Check the medicines against your paper prescription before setting up reminders." });
+          setSaving(false);
+          return;
         }
 
         let currentVersion = 1;
@@ -311,9 +303,10 @@ export function MedicationSetupWizard({
   async function handleSyncToGoogleCalendar() {
     setSyncingCalendar(true);
     try {
-      const res = await calendarApi.syncSchedules({ prescriptionId: prescription.id });
+      const res = await calendarApi.syncSchedules({ prescriptionId: prescription.id, showMedicineNames: calendarShowNames });
       setCalendarSyncedCount(res.syncedCount);
-      toast.success(`Synced ${res.syncedCount} medication reminders to Google Calendar!`);
+      const m = describeCalendarSync(res);
+      toast[m.tone === "info" ? "info" : m.tone](m.title, m.description ? { description: m.description } : undefined);
     } catch (err) {
       const { title, detail } = describeError(err);
       toast.error("Google Calendar sync failed", { description: `${title}. ${detail}` });
@@ -350,7 +343,7 @@ export function MedicationSetupWizard({
       aria-labelledby="wizard-title"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
     >
-      <div className="bg-card flex max-h-[92vh] w-full max-w-2xl flex-col rounded-xl border shadow-2xl">
+      <div className="bg-card flex max-h-[92dvh] w-full max-w-2xl flex-col rounded-xl border shadow-2xl">
 
         <div className="flex items-center justify-between border-b px-6 py-4">
           <div className="space-y-1">
@@ -364,7 +357,7 @@ export function MedicationSetupWizard({
             </div>
             <p className="text-muted-foreground text-xs">
               {isCalendarStep
-                ? "Step 3 of 3: Sync reminder alerts with Google Calendar"
+                ? `Step ${totalSteps} of ${totalSteps}: Sync reminder alerts with Google Calendar`
                 : `Step ${currentStep + 1} of ${totalSteps}: Review times for ${currentConfig?.name}`}
             </p>
           </div>
@@ -381,7 +374,21 @@ export function MedicationSetupWizard({
           />
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+          {!verified ? (
+            <div role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-100">
+              <p className="font-semibold">Review these details before setting reminders</p>
+              <p className="mt-1">
+                The medicines below were read automatically from your photo and may contain mistakes. Reminders are only created from details
+                you have checked against your paper prescription.
+              </p>
+              {onRequestReview ? (
+                <Button type="button" size="sm" className="mt-3" onClick={onRequestReview}>
+                  Review and correct details
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
           {!isCalendarStep && currentConfig ? (
             <div className="space-y-6">
 
@@ -530,7 +537,7 @@ export function MedicationSetupWizard({
                 <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   Configured Medicines ({configs.length})
                 </span>
-                <div className="divide-y rounded-lg border bg-card">
+                <div className="divide-y rounded-xl border bg-card shadow-[var(--shadow-soft)]">
                   {configs.map((cfg) => {
 
                     const firstTime = cfg.times[0] || "08:00";
@@ -603,6 +610,18 @@ export function MedicationSetupWizard({
 
                 {calendarStatus?.connected ? (
                   <div className="space-y-3">
+                    <label className="text-muted-foreground flex items-start gap-2 text-xs">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5"
+                        checked={calendarShowNames}
+                        onChange={(e) => setCalendarShowNames(e.target.checked)}
+                      />
+                      <span>
+                        Include medicine names in the calendar events. Calendar pop-ups can show on your lock screen, so leave this off if others may see
+                        your phone.
+                      </span>
+                    </label>
                     <Button
                       onClick={handleSyncToGoogleCalendar}
                       disabled={syncingCalendar}
@@ -624,9 +643,9 @@ export function MedicationSetupWizard({
                     {calendarSyncedCount !== null ? (
                       <Alert tone="success" className="py-2 text-xs">
                         <CheckCircle2 className="size-4" aria-hidden="true" />
-                        <AlertTitle>Synchronization Complete</AlertTitle>
+                        <AlertTitle>Google Calendar is up to date</AlertTitle>
                         <AlertDescription>
-                          {calendarSyncedCount} reminder events added to your Google Calendar until your set end dates.
+                          {calendarSyncedCount} reminder{calendarSyncedCount === 1 ? "" : "s"} on your Google Calendar, up to your set end dates. Syncing again updates them; it never duplicates.
                         </AlertDescription>
                       </Alert>
                     ) : null}
@@ -674,7 +693,7 @@ export function MedicationSetupWizard({
           )}
         </div>
 
-        <div className="flex items-center justify-between border-t bg-card px-6 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t bg-card px-4 py-4 sm:px-6">
           <Button
             type="button"
             variant="outline"
@@ -689,7 +708,7 @@ export function MedicationSetupWizard({
             <Button
               type="button"
               size="sm"
-              disabled={saving}
+              disabled={saving || (!verified && !currentConfig?.existingScheduleId)}
               onClick={saveCurrentMedicationAndProceed}
             >
               {saving ? (

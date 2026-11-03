@@ -53,7 +53,7 @@ export function PrescriptionsList() {
         <EmptyState
           icon={FileText}
           title="No prescriptions yet"
-          description="Upload a photo or PDF of a paper prescription. Sehat Med reads it and automatically adds medications to your schedule."
+          description="Upload a photo or PDF of a paper prescription. Sehat Meds reads it and automatically adds medications to your schedule."
           action={<UploadButton />}
         />
       ) : (
@@ -115,7 +115,7 @@ export function PrescriptionsList() {
             </Table>
           </div>
 
-          <ul className="divide-y rounded-md border md:hidden">
+          <ul className="divide-y rounded-md border break-words md:hidden">
             {list.data.map((rx) => {
               const m = medicinesSummary(rx);
               return (

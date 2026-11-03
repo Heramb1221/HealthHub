@@ -19,3 +19,11 @@ export const API_CONFIG: { mode: ApiMode; baseUrl: string | null; problem: strin
 })();
 
 export const IS_DEMO = API_CONFIG.mode === "demo";
+
+const DEFAULT_WEB_URL = "https://health-hub-rose.vercel.app";
+
+/** Public web address that QR codes should open. Override with EXPO_PUBLIC_WEB_URL (no secrets here). */
+export const WEB_APP_URL: string = (() => {
+  const raw = (process.env.EXPO_PUBLIC_WEB_URL ?? "").trim().replace(/\/+$/, "");
+  return /^https?:\/\/[^\s]+$/i.test(raw) ? raw : DEFAULT_WEB_URL;
+})();

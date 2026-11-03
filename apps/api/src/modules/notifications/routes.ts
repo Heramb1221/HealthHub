@@ -43,9 +43,9 @@ export function createNotificationRouter(db: Db, env: Env): Router {
     const auth = requireAuth(req);
     const { sendTelegramNotification } = await import("./telegram.js");
     const result = await sendTelegramNotification(env, {
-      text: `🏥 *HealthHub Alert Test*\n\nYour profile is configured to receive automated clinical medication reminders and appointment alerts.\n\n*User ID:* \`${auth.userId}\``,
+      text: `🏥 *Sehat Meds Alert Test*\n\nYour profile is configured to receive automated clinical medication reminders and appointment alerts.\n\n*User ID:* \`${auth.userId}\``,
       buttons: [
-        { text: "Open HealthHub Dashboard", url: "http://localhost:3000/dashboard" },
+        { text: "Open Sehat Meds Dashboard", url: "http://localhost:3000/dashboard" },
       ],
     });
     res.json({ data: result });
@@ -60,7 +60,7 @@ export function createNotificationRouter(db: Db, env: Env): Router {
     });
     const parsed = schema.parse(req.body);
     const cleanPhone = parsed.phone ? parsed.phone.replace(/[^0-9]/g, "") : "";
-    const text = `🏥 *HealthHub Medication Reminder*\n\n` +
+    const text = `🏥 *Sehat Meds Medication Reminder*\n\n` +
       `Medicine: *${parsed.medicationName}*\n` +
       `Dosage: *${parsed.dosage}*\n` +
       (parsed.instructions ? `Instructions: ${parsed.instructions}\n` : "") +

@@ -23,6 +23,7 @@ import {
 import { toast } from "sonner";
 
 import { Brand } from "@/components/layout/brand";
+import { PageTransition } from "@/components/motion/reveal";
 import { UserButton } from "@clerk/nextjs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -65,7 +66,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const navItems = isAdmin ? ADMIN_NAV : PATIENT_NAV;
 
   React.useEffect(() => {
-    document.querySelector<HTMLElement>('nav[aria-label="Main"] [aria-current="page"]')?.scrollIntoView({ inline: "center", block: "nearest" });
+    document.querySelector<HTMLElement>('nav[aria-label="Main (compact)"] [aria-current="page"]')?.scrollIntoView({ inline: "center", block: "nearest" });
   }, [pathname]);
 
   async function handleSignOut() {
@@ -77,50 +78,66 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const renderLinks = (orientation: "side" | "pills") =>
+    navItems.map(({ href, label, key, icon: Icon }) => {
+      const active = pathname === href || pathname.startsWith(`${href}/`);
+      return (
+        <li key={href} className={orientation === "pills" ? "shrink-0" : undefined}>
+          <Link
+            href={href}
+            aria-current={active ? "page" : undefined}
+            className={cn(
+              "flex items-center gap-2.5 text-sm font-medium whitespace-nowrap transition-colors",
+              orientation === "side" ? "rounded-lg px-3 py-2" : "rounded-full border px-3.5 py-2",
+              active
+                ? "bg-primary text-primary-foreground shadow-[0_6px_14px_rgb(10_107_96/0.25)] border-transparent"
+                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground bg-card/70 border-border/70",
+              orientation === "side" && !active ? "border-transparent bg-transparent" : "",
+            )}
+          >
+            <Icon aria-hidden="true" className="size-4" />
+            {t(key, label)}
+          </Link>
+        </li>
+      );
+    });
+
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="bg-card border-b print:hidden">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-3">
+      <header className="glass sticky top-0 z-40 border-x-0 border-t-0 print:hidden">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-x-6 gap-y-2 px-4 py-2.5">
           <Brand href={isAdmin ? "/admin/hospitals" : "/dashboard"} />
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <LanguageSelector />
-            <p className="text-muted-foreground hidden items-center gap-2 text-sm sm:flex">
+            <p className="text-muted-foreground hidden items-center gap-2 text-sm md:flex">
               {user.displayName ?? user.email}
               {isAdmin ? <Badge tone="info">Administrator</Badge> : null}
             </p>
             <UserButton />
             <Button variant="outline" size="sm" onClick={handleSignOut}>
-              <LogOut aria-hidden="true" /> {t("sign_out", "Sign out")}
+              <LogOut aria-hidden="true" /> <span className="hidden sm:inline">{t("sign_out", "Sign out")}</span>
+              <span className="sr-only sm:hidden">{t("sign_out", "Sign out")}</span>
             </Button>
           </div>
         </div>
-        <nav aria-label="Main" className="mx-auto max-w-6xl overflow-x-auto px-4">
-          <ul className="flex gap-1">
-            {navItems.map(({ href, label, key, icon: Icon }) => {
-              const active = pathname === href || pathname.startsWith(`${href}/`);
-              return (
-                <li key={href}>
-                  <Link
-                    href={href}
-                    aria-current={active ? "page" : undefined}
-                    className={cn(
-                      "flex items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-medium whitespace-nowrap",
-                      active ? "border-primary text-primary" : "text-muted-foreground hover:text-foreground border-transparent",
-                    )}
-                  >
-                    <Icon aria-hidden="true" className="size-4" />
-                    {t(key, label)}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
       </header>
 
-      <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 print:p-0 print:m-0 print:max-w-none">
-        {children}
-      </main>
+      <div className="mx-auto flex w-full max-w-7xl flex-1 gap-8 px-4 print:block print:max-w-none print:p-0">
+        <aside className="hidden w-56 shrink-0 lg:block print:hidden">
+          <nav aria-label="Main" className="sticky top-24 py-8">
+            <ul className="space-y-1">{renderLinks("side")}</ul>
+          </nav>
+        </aside>
+
+        <div className="min-w-0 flex-1">
+          <nav aria-label="Main (compact)" className="-mx-4 overflow-x-auto px-4 pt-4 lg:hidden print:hidden">
+            <ul className="flex gap-2 pb-1">{renderLinks("pills")}</ul>
+          </nav>
+          <main id="main" className="w-full py-6 lg:py-8 print:p-0 print:m-0 print:max-w-none">
+            <PageTransition routeKey={pathname}>{children}</PageTransition>
+          </main>
+        </div>
+      </div>
     </div>
   );
 }

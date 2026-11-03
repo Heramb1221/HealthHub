@@ -335,7 +335,7 @@ export function AppointmentsView({ justBookedId }: { justBookedId?: string }) {
                           <span className="font-semibold text-slate-900 dark:text-slate-100">{selectedHospital.name}</span>
                           <span className="bg-primary/10 text-primary rounded px-2 py-0.5 text-xs font-semibold">15m Consultation</span>
                         </div>
-                        <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                        <p className="text-sm font-medium break-words text-slate-700 dark:text-slate-300">
                           {formatDayLong(new Date(chosenSlot.startsAt))} · {formatTime(new Date(chosenSlot.startsAt))} – {formatTime(new Date(chosenSlot.endsAt))}
                         </p>
                         <p className="text-muted-foreground text-xs">
@@ -395,7 +395,7 @@ export function AppointmentsView({ justBookedId }: { justBookedId?: string }) {
                 {upcoming.length === 0 ? (
                   <p className="text-muted-foreground text-sm">No upcoming appointments.</p>
                 ) : (
-                  <ul className="bg-card divide-y rounded-md border">
+                  <ul className="bg-card min-w-0 divide-y rounded-xl border shadow-[var(--shadow-soft)]">
                     {upcoming.map((a) => (
                       <Row
                         key={a.id}
@@ -417,7 +417,7 @@ export function AppointmentsView({ justBookedId }: { justBookedId?: string }) {
                   <h2 id="earlier" className="text-lg font-semibold">
                     Past and Cancelled
                   </h2>
-                  <ul className="bg-card divide-y rounded-md border">
+                  <ul className="bg-card min-w-0 divide-y rounded-xl border shadow-[var(--shadow-soft)]">
                     {earlier.map((a) => (
                       <Row key={a.id} a={a} />
                     ))}

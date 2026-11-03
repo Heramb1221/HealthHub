@@ -55,6 +55,18 @@ export function CorrectionForm({ prescription, onCancel, onSaved }: { prescripti
   const addRef = React.useRef<HTMLButtonElement>(null);
   const focusKey = React.useRef<string | null>(null);
   const today = React.useMemo(() => new Date().toISOString().slice(0, 10), []);
+  // The version being edited. The API refuses a save based on an older one, so edits never overwrite silently.
+  const [baseVersion, setBaseVersion] = React.useState<number | null>(null);
+  React.useEffect(() => {
+    let cancelled = false;
+    prescriptionsApi
+      .latestVersion(prescription.id)
+      .then((v) => !cancelled && setBaseVersion(v.versionNumber))
+      .catch(() => undefined); // the wrapper falls back to asking again when saving
+    return () => {
+      cancelled = true;
+    };
+  }, [prescription.id]);
 
   React.useEffect(() => {
     if (focusKey.current) {
@@ -98,7 +110,13 @@ export function CorrectionForm({ prescription, onCancel, onSaved }: { prescripti
     setPending(true);
     try {
       const { prescriptionDate, prescriberName, medications } = result.data;
-      const updated = await prescriptionsApi.correct(prescription.id, { prescriptionDate, prescriberName, medications });
+      const updated = await prescriptionsApi.correct(prescription.id, {
+        ...(baseVersion !== null ? { baseVersionNumber: baseVersion } : {}),
+        confirmedByPatient: true,
+        prescriptionDate,
+        prescriberName,
+        medications,
+      });
       toast.success("Correction saved", { description: "Marked as corrected by you. It isn’t verified by a clinician." });
       onSaved(updated);
     } catch (error) {
@@ -138,7 +156,7 @@ export function CorrectionForm({ prescription, onCancel, onSaved }: { prescripti
         ) : null}
         <ul className="space-y-4">
           {rows.map((row, i) => (
-            <li key={row.key} data-row={row.key} className="bg-card rounded-md border p-4">
+            <li key={row.key} data-row={row.key} className="bg-card rounded-xl border p-4 shadow-[var(--shadow-soft)]">
               <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <h3 className="text-base">Medicine {i + 1}</h3>

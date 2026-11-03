@@ -35,7 +35,7 @@ export function createPatientRouter(db: Db, env: Env): Router {
   });
 
   router.get("/me/health-card", async (req, res) => {
-    res.json({ data: await getHealthCard(db, requireAuth(req)) });
+    res.json({ data: await getHealthCard(db, env, requireAuth(req)) });
   });
 
   router.get("/me/access-history", async (req, res) => {

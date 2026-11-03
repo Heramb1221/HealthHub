@@ -35,8 +35,14 @@ export function parseUpload(req: Request, maxBytes: number): Promise<ParsedUploa
     const fields: Record<string, string> = {};
     let file: ParsedUpload["file"] | undefined;
     let failure: AppError | undefined;
+    let settled = false;
     const fail = (error: AppError) => {
       failure ??= error;
+    };
+    const rejectOnce = (error: AppError) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
     };
 
     busboy.on("field", (name, value, info) => {
@@ -45,12 +51,20 @@ export function parseUpload(req: Request, maxBytes: number): Promise<ParsedUploa
     });
 
     busboy.on("file", (name, stream, info) => {
+      const chunks: Buffer[] = [];
+      // busboy destroys this per-file stream with an error when the form ends mid-file
+      // ("Unexpected end of form" / "Unexpected end of file"). An 'error' event without a
+      // listener is an uncaught exception that terminates the process, so every file stream
+      // must have an error listener, including streams that are only being discarded.
+      stream.on("error", () => {
+        chunks.length = 0;
+        fail(new AppError("VALIDATION_ERROR"));
+      });
       if (name !== "file" || file) {
         fail(new AppError("VALIDATION_ERROR"));
         stream.resume();
         return;
       }
-      const chunks: Buffer[] = [];
       stream.on("data", (chunk: Buffer) => chunks.push(chunk));
       stream.on("limit", () => fail(new AppError("PAYLOAD_TOO_LARGE")));
       stream.on("end", () => {
@@ -61,14 +75,22 @@ export function parseUpload(req: Request, maxBytes: number): Promise<ParsedUploa
     busboy.on("filesLimit", () => fail(new AppError("VALIDATION_ERROR")));
     busboy.on("fieldsLimit", () => fail(new AppError("VALIDATION_ERROR")));
     busboy.on("partsLimit", () => fail(new AppError("VALIDATION_ERROR")));
-    busboy.on("error", () => reject(new AppError("VALIDATION_ERROR")));
+    busboy.on("error", () => rejectOnce(failure ?? new AppError("VALIDATION_ERROR")));
     busboy.on("close", () => {
-      if (failure) reject(failure);
-      else if (!file) reject(new AppError("VALIDATION_ERROR"));
-      else resolve({ file, fields });
+      if (failure) rejectOnce(failure);
+      else if (!file) rejectOnce(new AppError("VALIDATION_ERROR"));
+      else if (!settled) {
+        settled = true;
+        resolve({ file, fields });
+      }
     });
 
-    req.on("error", () => reject(new AppError("VALIDATION_ERROR")));
+    req.on("error", () => {
+      rejectOnce(failure ?? new AppError("VALIDATION_ERROR"));
+      // Client aborted mid-upload: stop feeding busboy and let it release its buffers.
+      req.unpipe(busboy);
+      busboy.destroy();
+    });
     req.pipe(busboy);
   });
 }

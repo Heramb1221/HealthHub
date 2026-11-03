@@ -1,12 +1,37 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useAuth as useClerkAuth, useUser as useClerkUser, useClerk } from "@clerk/expo";
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+
+import {
+  useAuth as useClerkAuth,
+  useUser as useClerkUser,
+  useClerk,
+} from "@clerk/expo";
 
 import { configureHttp } from "../api/http";
 import type { AuthUser } from "../api/types";
 import { API_CONFIG } from "../config";
 import { cancelLocalReminders } from "../lib/reminders";
+import { setRemindersEnabled } from "../lib/reminderSettings";
 import type { DemoAccount } from "../demo/accounts";
+
 import { clearSession, saveSession } from "./storage";
+import * as flows from "./clerkFlows.ts";
+
+import type {
+  ClerkClientLike,
+  FlowOutcome,
+  PendingVerification,
+  RegisterInput,
+} from "./clerkFlows.ts";
 
 type AuthState =
   | { status: "loading" }
@@ -15,9 +40,24 @@ type AuthState =
 
 export interface AuthContextValue {
   state: AuthState;
-  signIn: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string) => Promise<{ needsVerification?: boolean } | void>;
-  verifyCode: (code: string) => Promise<void>;
+  pending: PendingVerification | null;
+
+  signIn: (
+    identifier: string,
+    password: string
+  ) => Promise<FlowOutcome>;
+
+  startPhoneSignIn: (
+    phoneE164: string
+  ) => Promise<FlowOutcome>;
+
+  register: (input: RegisterInput) => Promise<FlowOutcome>;
+
+  verifyCode: (code: string) => Promise<FlowOutcome>;
+
+  resendCode: () => Promise<void>;
+
+  cancelVerification: () => void;
 
   signInDemo: (account: DemoAccount["id"]) => Promise<void>;
 
@@ -26,161 +66,389 @@ export interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({
+  children,
+}: {
+  children: ReactNode;
+}) {
   const clerk = useClerk();
-  const { isLoaded: isClerkLoaded, isSignedIn: isClerkSignedIn, getToken } = useClerkAuth();
-  const { user: clerkUser } = useClerkUser();
 
-  const [state, setState] = useState<AuthState>({ status: "loading" });
+  const {
+    isLoaded: isClerkLoaded,
+    isSignedIn: isClerkSignedIn,
+    getToken,
+  } = useClerkAuth();
+
+  const { user: clerkUser, isLoaded: isUserLoaded } = useClerkUser();
+
+  const clerkUserId = clerkUser?.id;
+  const clerkEmail =
+    clerkUser?.primaryEmailAddress?.emailAddress ?? "";
+
+  const [state, setState] = useState<AuthState>({
+    status: "loading",
+  });
+
+  const [pending, setPending] =
+    useState<PendingVerification | null>(null);
+
   const tokenRef = useRef<string | null>(null);
 
+  const getTokenRef = useRef(getToken);
+
+  const pendingRef = useRef<PendingVerification | null>(null);
+
+  // Always use the latest Clerk token getter.
+  useEffect(() => {
+    getTokenRef.current = getToken;
+  }, [getToken]);
+
+  // Clear the application's local session and reminders.
   const endLocally = useCallback(async (notice: string | null) => {
     tokenRef.current = null;
+
     await clearSession();
     await cancelLocalReminders();
-    setState({ status: "signedOut", notice });
+    await setRemindersEnabled(false);
+
+    setState({
+      status: "signedOut",
+      notice,
+    });
   }, []);
 
+  // Configure the API client.
   useEffect(() => {
     configureHttp({
       baseUrl: API_CONFIG.baseUrl,
-      getToken: () => tokenRef.current,
+
+      getToken: async () => {
+        try {
+          const freshToken = await getTokenRef.current();
+
+          tokenRef.current = freshToken ?? null;
+
+          return freshToken ?? null;
+        } catch {
+          return tokenRef.current;
+        }
+      },
+
       onUnauthorized: () => {
-        if (tokenRef.current) void endLocally("Your session has ended. Sign in again to continue.");
+        if (tokenRef.current) {
+          void endLocally(
+            "Your session has ended. Sign in again to continue."
+          );
+        }
       },
     });
   }, [endLocally]);
 
+  // Synchronize Clerk's authentication state with our application state.
   useEffect(() => {
     if (!isClerkLoaded) return;
+
     let cancelled = false;
 
     if (!isClerkSignedIn) {
       tokenRef.current = null;
+
       void Promise.resolve().then(() => {
-        if (!cancelled) {
-          setState((prev) => (prev.status === "signedOut" && !prev.notice ? prev : { status: "signedOut", notice: null }));
-        }
+        if (cancelled) return;
+
+        setState((previous) => {
+          if (
+            previous.status === "signedOut" &&
+            previous.notice === null
+          ) {
+            return previous;
+          }
+
+          return {
+            status: "signedOut",
+            notice: null,
+          };
+        });
       });
+
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    // Wait until Clerk has loaded the authenticated user.
+    if (!isUserLoaded || !clerkUserId) {
       return;
     }
 
     void (async () => {
       try {
-        const token = await getToken();
+        const token = await getTokenRef.current();
+
         if (cancelled) return;
+
+        if (!token) {
+          throw new Error(
+            "Clerk did not provide an authentication token."
+          );
+        }
+
         tokenRef.current = token;
 
-        const email = clerkUser?.primaryEmailAddress?.emailAddress ?? "";
-
         const user: AuthUser = {
-          id: clerkUser?.id ?? "clerk-user",
-          email,
+          id: clerkUserId,
+          email: clerkEmail,
           role: "patient",
         };
 
-        const expiresAt = new Date(Date.now() + 3600_000).toISOString();
-        if (token) {
-          await saveSession({ accessToken: token, expiresAt, user });
-        }
-        setState({ status: "signedIn", user, expiresAt });
-      } catch {
-        if (!cancelled) {
-          setState({ status: "signedOut", notice: "Failed to establish session." });
-        }
+        const expiresAt = new Date(
+          Date.now() + 3600_000
+        ).toISOString();
+
+        await saveSession({
+          accessToken: token,
+          expiresAt,
+          user,
+        });
+
+        if (cancelled) return;
+
+        setState({
+          status: "signedIn",
+          user,
+          expiresAt,
+        });
+
+        console.log("[AUTH] Application session synchronized.");
+      } catch (error) {
+        if (cancelled) return;
+
+        console.error(
+          "[AUTH] Session synchronization failed:",
+          error
+        );
+
+        tokenRef.current = null;
+
+        setState({
+          status: "signedOut",
+          notice:
+            "Unable to establish your session. Please try signing in again.",
+        });
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [isClerkLoaded, isClerkSignedIn, clerkUser, getToken]);
+  }, [
+    isClerkLoaded,
+    isClerkSignedIn,
+    isUserLoaded,
+    clerkUserId,
+    clerkEmail,
+  ]);
+
+  // Activate a completed Clerk authentication flow.
+  const activate = useCallback(
+    async (outcome: FlowOutcome): Promise<FlowOutcome> => {
+      if (outcome.status === "complete") {
+        try {
+          console.log("[AUTH] Authentication completed.");
+          console.log("[AUTH] Activating Clerk session.");
+
+          await clerk.setActive({
+            session: outcome.sessionId,
+          });
+
+          console.log("[AUTH] Clerk session activated.");
+
+          pendingRef.current = null;
+          setPending(null);
+
+          // The synchronization effect above will obtain the
+          // authenticated user and token and update application state.
+        } catch (error) {
+          console.error(
+            "[AUTH] Clerk session activation failed:",
+            error
+          );
+
+          throw error;
+        }
+      } else {
+        pendingRef.current = outcome.pending;
+        setPending(outcome.pending);
+      }
+
+      return outcome;
+    },
+    [clerk]
+  );
+
+  // Ensure Clerk is ready before starting authentication flows.
+  const requireClerk = useCallback((): ClerkClientLike => {
+    if (!clerk.loaded) {
+      throw new flows.AuthFlowError(
+        "not_ready",
+        "Sign-in isn't ready yet. Wait a moment and try again."
+      );
+    }
+
+    return clerk as unknown as ClerkClientLike;
+  }, [clerk]);
 
   const signIn = useCallback(
-    async (email: string, password: string) => {
-      if (!clerk.loaded) throw new Error("Authentication is not ready");
-      const result = await clerk.client.signIn.create({
-        identifier: email.trim(),
-        password,
-      });
-      if (result.status === "complete" && result.createdSessionId) {
-        await clerk.setActive({ session: result.createdSessionId });
-        const token = await getToken();
-        tokenRef.current = token;
-      } else {
-        throw new Error(`Sign in incomplete: ${result.status}`);
-      }
+    async (identifier: string, password: string) => {
+      return activate(
+        await flows.signInWithPassword(
+          requireClerk(),
+          identifier,
+          password
+        )
+      );
     },
-    [clerk, getToken],
+    [activate, requireClerk]
+  );
+
+  const startPhoneSignIn = useCallback(
+    async (phoneE164: string) => {
+      return activate(
+        await flows.startPhoneCodeSignIn(
+          requireClerk(),
+          phoneE164
+        )
+      );
+    },
+    [activate, requireClerk]
   );
 
   const register = useCallback(
-    async (email: string, password: string) => {
-      if (!clerk.loaded) throw new Error("Authentication is not ready");
-      const result = await clerk.client.signUp.create({
-        emailAddress: email.trim(),
-        password,
-      });
-      if (result.status === "complete" && result.createdSessionId) {
-        await clerk.setActive({ session: result.createdSessionId });
-        const token = await getToken();
-        tokenRef.current = token;
-        return { needsVerification: false };
-      } else if (result.status === "missing_requirements") {
-        await clerk.client.signUp.prepareEmailAddressVerification({ strategy: "email_code" });
-        return { needsVerification: true };
-      } else {
-        throw new Error(`Sign up incomplete: ${result.status}`);
-      }
+    async (input: RegisterInput) => {
+      return activate(
+        await flows.register(
+          requireClerk(),
+          input
+        )
+      );
     },
-    [clerk, getToken],
+    [activate, requireClerk]
   );
 
   const verifyCode = useCallback(
     async (code: string) => {
-      if (!clerk.loaded) throw new Error("Authentication is not ready");
-      const result = await clerk.client.signUp.attemptEmailAddressVerification({ code: code.trim() });
-      if (result.status === "complete" && result.createdSessionId) {
-        await clerk.setActive({ session: result.createdSessionId });
-        const token = await getToken();
-        tokenRef.current = token;
-      } else {
-        throw new Error("Invalid verification code. Please check and try again.");
+      const current = pendingRef.current;
+
+      if (!current) {
+        throw new flows.AuthFlowError(
+          "nothing_pending",
+          "There is no verification in progress. Start again."
+        );
       }
+
+      return activate(
+        await flows.verifyCode(
+          requireClerk(),
+          current,
+          code
+        )
+      );
     },
-    [clerk, getToken],
+    [activate, requireClerk]
   );
 
+  const resendCode = useCallback(async () => {
+    const current = pendingRef.current;
+
+    if (!current) {
+      throw new flows.AuthFlowError(
+        "nothing_pending",
+        "There is no verification in progress. Start again."
+      );
+    }
+
+    await flows.resendCode(
+      requireClerk(),
+      current
+    );
+  }, [requireClerk]);
+
+  const cancelVerification = useCallback(() => {
+    pendingRef.current = null;
+    setPending(null);
+  }, []);
+
+  // Sign out from Clerk and clear local application data.
   const signOut = useCallback(async () => {
     tokenRef.current = null;
+
+    pendingRef.current = null;
+    setPending(null);
+
     await cancelLocalReminders();
+    await setRemindersEnabled(false);
     await clearSession();
+
     try {
       await clerk.signOut();
-    } catch {
-
+    } catch (error) {
+      console.error("[AUTH] Clerk sign-out error:", error);
     }
+
     await endLocally(null);
+
     return null;
   }, [clerk, endLocally]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
       state,
+      pending,
+
       signIn,
+      startPhoneSignIn,
       register,
       verifyCode,
-      signInDemo: () => Promise.reject(new Error("Demo accounts have been disabled. Please use real sign in.")),
+      resendCode,
+      cancelVerification,
+
+      signInDemo: () =>
+        Promise.reject(
+          new Error(
+            "Demo accounts have been disabled. Please use real sign in."
+          )
+        ),
+
       signOut,
     }),
-    [state, signIn, register, verifyCode, signOut],
+    [
+      state,
+      pending,
+      signIn,
+      startPhoneSignIn,
+      register,
+      verifyCode,
+      resendCode,
+      cancelVerification,
+      signOut,
+    ]
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth(): AuthContextValue {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used inside AuthProvider");
-  return ctx;
+  const context = useContext(AuthContext);
+
+  if (!context) {
+    throw new Error(
+      "useAuth must be used inside AuthProvider"
+    );
+  }
+
+  return context;
 }

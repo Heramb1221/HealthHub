@@ -78,7 +78,7 @@ export function ProfileForm({
     <form ref={firstRef} onSubmit={onSubmit} noValidate className="max-w-3xl space-y-10">
       {isOnboarding ? (
         <Alert tone="info">
-          <AlertTitle>Welcome to HealthHub! Complete your profile</AlertTitle>
+          <AlertTitle>Welcome to Sehat Meds! Complete your profile</AlertTitle>
           <AlertDescription>
             Please fill in your legal name, date of birth, blood group, and emergency contact to activate your patient account and unlock appointments, prescriptions, and health records.
           </AlertDescription>

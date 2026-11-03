@@ -28,7 +28,7 @@ describe.skipIf(!TEST_DATABASE_URL)("health history", () => {
       const p = await registerPatient(app, h.db);
       const res = await add(p.token, { title: "Synthetic Condition A", notes: "Private synthetic note", diagnosedOn: "2024-05-01" });
       expect(res.status).toBe(201);
-      expect(Object.keys(res.body.data).sort()).toEqual(["createdAt", "diagnosedOn", "id", "kind", "notes", "source", "title", "verificationStatus"]);
+      expect(Object.keys(res.body.data).sort()).toEqual(["createdAt", "description", "diagnosedOn", "id", "kind", "notes", "occurredOn", "source", "title", "verificationStatus"]);
       expect(res.body.data).toMatchObject({ kind: "condition", title: "Synthetic Condition A", diagnosedOn: "2024-05-01", source: "patient_reported", verificationStatus: "unverified" });
       const events = await h.db.auditEvent.findMany({ where: { action: "health_history.condition_added", resourceId: res.body.data.id } });
       expect(events).toHaveLength(1);

@@ -1,4 +1,4 @@
-import { CheckCircle2, UserPen } from "lucide-react";
+import { CircleHelp, UserPen } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -13,20 +13,19 @@ function ReadingState({ med }: { med: PrescriptionMedication }) {
     return (
       <div className="space-y-1">
         <Badge tone="info">
-          <UserPen aria-hidden="true" /> Entered by you
+          <UserPen aria-hidden="true" /> Checked by you
         </Badge>
-        <p className="text-muted-foreground text-xs">Scheduled in reminders</p>
+        <p className="text-muted-foreground text-xs">You reviewed or entered this</p>
       </div>
     );
   }
+  // Read automatically from the photo: never presented as confirmed, and not claimed to be in any reminder schedule.
   return (
     <div className="space-y-1">
-      <Badge tone="success">
-        <CheckCircle2 aria-hidden="true" /> In Schedule
+      <Badge tone="warning">
+        <CircleHelp aria-hidden="true" /> Read automatically
       </Badge>
-      <p className="text-muted-foreground text-xs">
-        {Math.round(med.confidence * 100)}% match
-      </p>
+      <p className="text-muted-foreground text-xs">{Math.round(med.confidence * 100)}% sure. Check against your paper prescription</p>
     </div>
   );
 }
@@ -82,7 +81,7 @@ export function MedicationList({ medications }: { medications: PrescriptionMedic
         {medications.map((med, index) => (
           <li key={`${med.name}-${index}`} className="space-y-3 px-4 py-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
-              <p className="font-medium">
+              <p className="font-medium break-words">
                 <Value value={med.name} />
               </p>
               <ReadingState med={med} />
@@ -98,14 +97,14 @@ export function MedicationList({ medications }: { medications: PrescriptionMedic
               ).map(([label, value]) => (
                 <div key={label}>
                   <dt className="text-muted-foreground text-xs">{label}</dt>
-                  <dd>
+                  <dd className="break-words">
                     <Value value={value} />
                   </dd>
                 </div>
               ))}
               <div className="col-span-2">
                 <dt className="text-muted-foreground text-xs">Instructions</dt>
-                <dd>
+                <dd className="break-words">
                   <Value value={med.instructions} />
                 </dd>
               </div>

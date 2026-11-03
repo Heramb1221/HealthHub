@@ -33,7 +33,7 @@ export function HealthCardView() {
 
       <div className="print:hidden">
         <PageHeader
-          title="Sehat Med Digital Card"
+          title="Sehat Meds Digital Card"
           description="Your official digital health card modeled after standard CR80 wallet cards (85.6mm × 54.0mm). Printable with wallet cutting guidelines and center fold line."
           actions={
             card.status === "ready" ? (
@@ -140,7 +140,7 @@ export function HealthCardView() {
               <PrintableCardSheet card={card.data} />
             )}
 
-            <details className="max-w-2xl rounded-md border border-border bg-card p-4 text-sm">
+            <details className="max-w-2xl rounded-xl border border-border bg-card p-4 text-sm shadow-[var(--shadow-soft)]">
               <summary className="cursor-pointer font-medium text-foreground hover:text-primary flex items-center gap-2">
                 <Info className="size-4 text-info" />
                 <span>Verify what the Emergency QR code points to</span>

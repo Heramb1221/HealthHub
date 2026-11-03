@@ -13,7 +13,7 @@ export interface MobileWhatsAppReminderOptions {
 export async function sendWhatsAppReminder(options: MobileWhatsAppReminderOptions): Promise<void> {
   const cleanPhone = options.phone ? options.phone.replace(/[^0-9]/g, "") : "";
   const lines = [
-    "🏥 *HealthHub (Sehat Med) Medication Reminder*",
+    "🏥 *Sehat Meds (Sehat Meds) Medication Reminder*",
     "",
     `Patient: ${options.patientName || "Patient"} (${options.healthId || "ID: Record"})`,
     `Medicine: *${options.medicationName}*`,
@@ -21,9 +21,9 @@ export async function sendWhatsAppReminder(options: MobileWhatsAppReminderOption
     options.timeStr ? `Time: ${options.timeStr}` : null,
     options.instructions ? `Instructions: ${options.instructions}` : null,
     "",
-    "⏰ *Action:* Please take your dose on time and mark it taken in HealthHub.",
+    "⏰ *Action:* Please take your dose on time and mark it taken in Sehat Meds.",
     "",
-    "_Bharat ka apna Health Sathi_",
+    "_Bharat ka apna Health Saathi_",
   ].filter(Boolean);
 
   const text = encodeURIComponent(lines.join("\n"));

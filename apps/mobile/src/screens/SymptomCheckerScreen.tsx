@@ -6,6 +6,7 @@ import { symptomApi } from "../api/endpoints";
 import { describeError } from "../api/errors";
 import type { PossibleExplanation, SymptomAssessmentResult, TriageUrgency } from "../api/types";
 import { AppText, Badge, Banner, Button, Card, Chip, Heading, Row, Screen, Stack, TextField } from "../ui/components";
+import { integerRangeProblem } from "../lib/validation";
 import { colors, space, type Tone } from "../ui/theme";
 
 const COMMON_SYMPTOMS = [
@@ -33,6 +34,10 @@ export function SymptomCheckerScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<SymptomAssessmentResult | null>(null);
+  const [touched, setTouched] = useState(false);
+
+  const durationError = touched ? integerRangeProblem(durationDays, "Duration", 0, 365) : null;
+  const ageError = touched ? integerRangeProblem(patientAge, "Age", 0, 120) : null;
 
   function toggleSymptom(name: string) {
     if (symptoms.includes(name)) {
@@ -58,6 +63,9 @@ export function SymptomCheckerScreen() {
   }
 
   async function handleAssess() {
+    if (loading) return;
+    setTouched(true);
+    if (integerRangeProblem(durationDays, "Duration", 0, 365) || integerRangeProblem(patientAge, "Age", 0, 120)) return;
     if (symptoms.length === 0) {
       Alert.alert("Add Symptoms", "Please choose or type at least one symptom to check.");
       return;
@@ -89,6 +97,8 @@ export function SymptomCheckerScreen() {
     setCustomSymptom("");
     setSeverity("moderate");
     setDurationDays("3");
+    setPatientAge("30");
+    setTouched(false);
     setDescription("");
     setError(null);
     setResult(null);
@@ -124,14 +134,14 @@ export function SymptomCheckerScreen() {
                 variant="danger"
                 icon="phone"
                 onPress={() => void Linking.openURL("tel:112")}
-                style={{ minHeight: 40, paddingVertical: 8, paddingHorizontal: 12 }}
+                style={{ paddingHorizontal: space.md }}
               />
               <Button
                 label="Call 108"
                 variant="secondary"
                 icon="phone"
                 onPress={() => void Linking.openURL("tel:108")}
-                style={{ minHeight: 40, paddingVertical: 8, paddingHorizontal: 12 }}
+                style={{ paddingHorizontal: space.md }}
               />
             </Row>
           </Row>
@@ -203,6 +213,7 @@ export function SymptomCheckerScreen() {
                     label="Duration (days)"
                     value={durationDays}
                     onChangeText={setDurationDays}
+                    error={durationError}
                     keyboardType="number-pad"
                     placeholder="3"
                   />
@@ -212,6 +223,7 @@ export function SymptomCheckerScreen() {
                     label="Patient age"
                     value={patientAge}
                     onChangeText={setPatientAge}
+                    error={ageError}
                     keyboardType="number-pad"
                     placeholder="30"
                   />

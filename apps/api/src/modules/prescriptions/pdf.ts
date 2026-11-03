@@ -43,7 +43,8 @@ export async function generatePrescriptionPdf(
     patientGender: record.patient.gender,
     patientDob: record.patient.dateOfBirth ? record.patient.dateOfBirth.toISOString().slice(0, 10) : null,
     patientPhone: record.patient.phone,
-    hospitalName: "Apollo Multi-Specialty Hospital & Diagnostics",
+    // The facility is only printed when a real value is known; there is no placeholder hospital.
+    hospitalName: null,
     version,
     qrPayload: prescriptionReference(env, prescriptionId),
     generatedAt: now,
@@ -60,5 +61,5 @@ export async function generatePrescriptionPdf(
     metadata: { versionNumber: version.versionNumber },
   });
 
-  return { bytes, filename: `sehatmed-prescription-${prescriptionId.slice(0, 8)}.pdf` };
+  return { bytes, filename: `sehatmeds-prescription-${prescriptionId.slice(0, 8)}.pdf` };
 }

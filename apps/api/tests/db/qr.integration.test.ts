@@ -316,3 +316,57 @@ describe.skipIf(!TEST_DATABASE_URL)("QR access sessions", () => {
     });
   });
 });
+
+describe.skipIf(!TEST_DATABASE_URL)("QR shows the current record, never a stale copy", () => {
+  let h: Harness;
+  let root: string;
+  let app: ReturnType<typeof buildApp>;
+  let kit: ReturnType<typeof rxKit>;
+  const url = TEST_DATABASE_URL as string;
+
+  beforeAll(async () => {
+    h = await openHarness(url);
+    root = await mkdtemp(join(tmpdir(), "hh-qr-fresh-"));
+    app = buildApp(h.db, testEnv(url), undefined, new LocalFileStore(root), new MockExtractionProvider());
+    kit = rxKit(app, h);
+  });
+  afterAll(async () => {
+    await closeHarness(h);
+    await rm(root, { recursive: true, force: true });
+  });
+
+  it("returns the corrected values and status after the patient corrects the prescription", async () => {
+    const owner = await registerPatient(app, h.db);
+    const rx = await kit.processed(owner.token, "clear-001");
+    const created = await request(app).post("/api/v1/qr/access-sessions").set(bearer(owner.token)).send({ prescriptionId: rx });
+    const sessionId = created.body.data.id as string;
+
+    const before = await request(app).get(`/api/v1/qr/access-sessions/${sessionId}`).set(bearer(owner.token));
+    expect(before.status).toBe(200);
+    const original = before.body.data.prescription.medications[0];
+    expect(before.body.data.prescription.verificationStatus).not.toBe("patient_corrected");
+
+    const patch = await request(app)
+      .patch(`/api/v1/prescriptions/${rx}/extracted-fields`)
+      .set(bearer(owner.token))
+      .send({ baseVersionNumber: 1, medications: [{ name: original.name, strength: "999 mg", dose: "1 tablet", frequency: "1-0-1", duration: "3 days", confirmed: true }] });
+    expect(patch.status).toBe(201);
+
+    const after = await request(app).get(`/api/v1/qr/access-sessions/${sessionId}`).set(bearer(owner.token));
+    expect(after.body.data.prescription.id).toBe(rx); // same prescription, not a different one
+    expect(after.body.data.prescription.verificationStatus).toBe("patient_corrected");
+    expect(after.body.data.prescription.medications).toHaveLength(1);
+    expect(after.body.data.prescription.medications[0]).toMatchObject({ strength: "999 mg", duration: "3 days" });
+  });
+
+  it("is bound to one patient's prescription: another patient's QR never resolves to it", async () => {
+    const a = await registerPatient(app, h.db);
+    const b = await registerPatient(app, h.db);
+    const rxA = await kit.processed(a.token, "clear-001");
+    const sessionA = (await request(app).post("/api/v1/qr/access-sessions").set(bearer(a.token)).send({ prescriptionId: rxA })).body.data.id as string;
+    expect((await request(app).get(`/api/v1/qr/access-sessions/${sessionA}`).set(bearer(b.token))).status).toBe(403);
+    const forged = await request(app).post("/api/v1/qr/access-sessions").set(bearer(b.token)).send({ prescriptionId: rxA });
+    expect(forged.status).toBeGreaterThanOrEqual(403); // cannot mint a QR for someone else's prescription
+    expect(forged.status).toBeLessThanOrEqual(404);
+  });
+});

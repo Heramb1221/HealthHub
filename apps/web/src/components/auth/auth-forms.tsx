@@ -101,7 +101,7 @@ export function SignInForm({ next }: { next?: string }) {
         Sign in
       </SubmitButton>
       <p className="text-muted-foreground text-sm">
-        New to HealthHub?{" "}
+        New to Sehat Meds?{" "}
         <Link href={next ? `/sign-up?next=${encodeURIComponent(next)}` : "/sign-up"} className="text-info font-medium underline underline-offset-4">
           Create an account
         </Link>

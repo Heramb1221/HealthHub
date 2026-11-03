@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Sehat Med",
+    "name": "Sehat Meds",
     "slug": "sehat-med",
     "version": "0.1.0",
     "scheme": "healthhub",
@@ -31,15 +31,15 @@
           "image": "./assets/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#f6f5f2"
+          "backgroundColor": "#f2f7f6"
         }
       ],
       "expo-secure-store",
       [
         "expo-image-picker",
         {
-          "cameraPermission": "Sehat Med uses the camera only when you choose to photograph a prescription to upload.",
-          "photosPermission": "Sehat Med reads a photo from your library only when you choose one to upload as a prescription."
+          "cameraPermission": "Sehat Meds uses the camera only when you choose to photograph a prescription to upload.",
+          "photosPermission": "Sehat Meds reads a photo from your library only when you choose one to upload as a prescription."
         }
       ],
       "expo-document-picker",

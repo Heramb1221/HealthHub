@@ -28,7 +28,7 @@ export function EmptyState({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="border-border bg-card flex flex-col items-start gap-3 rounded-md border border-dashed px-6 py-8">
+    <div className="border-border bg-card flex flex-col items-start gap-3 rounded-xl border border-dashed px-6 py-8 shadow-[var(--shadow-soft)]">
       <Icon aria-hidden="true" className="text-muted-foreground size-6" />
       <div className="max-w-prose space-y-1">
         <h2 className="text-base">{title}</h2>

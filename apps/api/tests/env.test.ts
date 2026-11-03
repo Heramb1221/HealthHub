@@ -3,6 +3,9 @@ import { EnvError, loadEnv } from "../src/config/env.js";
 
 const DB = { DATABASE_URL: "postgresql://u:p@localhost:5432/x", JWT_SECRET: "j".repeat(40) };
 
+// Production now also requires QR links to be a public https address (see tests/pdf.test.ts).
+const PROD_QR = { QR_LINK_BASE: "https://app.example.com/" };
+
 describe("loadEnv", () => {
   it("applies defaults", () => {
     const env = loadEnv({ ...DB });
@@ -66,12 +69,12 @@ describe("loadEnv", () => {
 
   it("refuses the development-only login in production", () => {
     try {
-      loadEnv({ ...DB, NODE_ENV: "production", DEV_AUTH_ENABLED: "true" });
+      loadEnv({ ...DB, ...PROD_QR, NODE_ENV: "production", DEV_AUTH_ENABLED: "true" });
       expect.unreachable();
     } catch (err) {
       expect((err as EnvError).variables).toEqual(["DEV_AUTH_ENABLED"]);
     }
-    expect(loadEnv({ ...DB, NODE_ENV: "production" }).NODE_ENV).toBe("production");
+    expect(loadEnv({ ...DB, ...PROD_QR, NODE_ENV: "production" }).NODE_ENV).toBe("production");
   });
 
   it("bounds the absolute session age", () => {

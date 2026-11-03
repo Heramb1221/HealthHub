@@ -6,23 +6,26 @@ import { medicationApi } from "../api/endpoints";
 import { describeError } from "../api/errors";
 import type { DoseStatus, MedicationSchedule } from "../api/types";
 import { useResource } from "../hooks/useResource";
-import { formatDateOnly, formatDateTime, formatTimeOnly, localTimeToIso } from "../lib/format";
+import { formatDateOnly, formatDateTime } from "../lib/format";
 import {
   cancelLocalReminders,
-  countLocalReminders,
   getReminderPermission,
   requestReminderPermission,
-  scheduleLocalReminders,
+  syncLocalReminders,
   type ReminderPermission,
 } from "../lib/reminders";
-import { enabledReminderTimes } from "../lib/schedule";
+import { loadReminderSettings, setRemindersEnabled, setShowMedicineNames } from "../lib/reminderSettings";
+import { doseSlots, planReminders, scheduleZone, type DoseSlot } from "../lib/schedule";
 import { isValidDateOnly, isValidTimeOfDay, listToText, parseList } from "../lib/validation";
 import { sendWhatsAppReminder } from "../lib/whatsapp";
 import { useLanguage } from "../i18n/LanguageContext";
 import type { RootStackParamList } from "../navigation/types";
-import { AppText, Badge, Banner, Button, Card, Divider, Row, Screen, Stack, TextField } from "../ui/components";
+import { Feather } from "@expo/vector-icons";
+import { View } from "react-native";
+
+import { AppText, Badge, Banner, Button, Card, Divider, Row, Screen, SectionTitle, Stack, TextField } from "../ui/components";
 import { EmptyState, ErrorState, LoadingState, PermissionDenied } from "../ui/states";
-import { colors, space } from "../ui/theme";
+import { colors, radius, space } from "../ui/theme";
 
 export function MedicationScreen() {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -38,7 +41,7 @@ export function MedicationScreen() {
     <Screen refreshing={res.refreshing} onRefresh={() => { setUpdated({}); res.refresh(); }}>
       <Stack>
         <Banner tone="info" title="You record your own doses" icon="info">
-          "Taken" and "Skipped" are self-reported. HealthHub does not check them and does not give medical advice.
+          "Taken" and "Skipped" are self-reported. Sehat Meds does not check them and does not give medical advice.
         </Banner>
         <Button
           label="Add a medicine to schedule"
@@ -77,11 +80,11 @@ function ScheduleCard({ schedule, onUpdated }: { schedule: MedicationSchedule; o
   const [toggleError, setToggleError] = useState<string | null>(null);
 
   const med = schedule.medication;
-  const doseStatusFor = (time: string): DoseStatus | undefined => {
-    if (reported[time]) return reported[time];
-    const at = localTimeToIso(time);
-    return at ? schedule.recentDoseEvents.find((e) => Date.parse(e.scheduledFor) === Date.parse(at))?.status : undefined;
-  };
+  const zone = scheduleZone(schedule);
+  const deviceZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  // Slots are computed in the schedule's own time zone (daylight-saving aware), not the phone's.
+  const slots = doseSlots(schedule).filter((slot) => slot.day === "today" || slot.missed || slot.status);
+  const doseStatusFor = (slot: DoseSlot): DoseStatus | undefined => reported[slot.iso] ?? slot.status;
 
   async function toggleActive() {
     setToggling(true);
@@ -103,14 +106,14 @@ function ScheduleCard({ schedule, onUpdated }: { schedule: MedicationSchedule; o
       ? "End date must be on or after start date (YYYY-MM-DD)"
       : null;
 
-  async function report(time: string, status: DoseStatus) {
-    const scheduledFor = localTimeToIso(time);
-    if (!scheduledFor) return;
-    setBusyTime(`${time}:${status}`);
+  async function report(slot: DoseSlot, status: DoseStatus) {
+    if (busyTime) return;
+    setBusyTime(`${slot.iso}:${status}`);
     setDoseError(null);
     try {
-      const event = await medicationApi.reportDose(schedule.id, { scheduledFor, status });
-      setReported((r) => ({ ...r, [time]: event?.status ?? status }));
+      const event = await medicationApi.reportDose(schedule.id, { scheduledFor: slot.iso, status });
+      // Show what the record really says (a repeat of an earlier answer returns that answer).
+      setReported((r) => ({ ...r, [slot.iso]: event?.status ?? status }));
     } catch (error) {
       const info = describeError(error);
       setDoseError(`${info.title}. ${info.detail}`);
@@ -141,8 +144,15 @@ function ScheduleCard({ schedule, onUpdated }: { schedule: MedicationSchedule; o
 
   return (
     <Card>
-      <AppText variant="heading" accessibilityRole="header">{med.name ?? "Medicine"}</AppText>
-      <AppText>{[med.strength, med.dose, med.frequency].filter(Boolean).join(" · ")}</AppText>
+      <Row style={{ alignItems: "flex-start" }}>
+        <View style={{ width: 40, height: 40, borderRadius: radius.md, backgroundColor: colors.iconTile, alignItems: "center", justifyContent: "center" }} importantForAccessibility="no">
+          <Feather name="package" size={20} color={colors.primary} />
+        </View>
+        <View style={{ flex: 1, gap: 2 }}>
+          <AppText variant="heading" accessibilityRole="header">{med.name ?? "Medicine"}</AppText>
+          <AppText>{[med.strength, med.dose, med.frequency].filter(Boolean).join(" · ")}</AppText>
+        </View>
+      </Row>
       <AppText variant="caption" muted>Copied from your prescription record (version {schedule.sourceVersionNumber}). It can't be edited here.</AppText>
       {schedule.sourceStatus !== "current" ? (
         <Banner tone="warning" title={schedule.sourceStatus === "removed" ? "This medicine was removed from the prescription" : "The prescription now says something different"} icon="alert-triangle">
@@ -178,17 +188,21 @@ function ScheduleCard({ schedule, onUpdated }: { schedule: MedicationSchedule; o
             <AppText variant="small" muted>No reminder times set.</AppText>
           ) : (
             <Stack gap={space.sm}>
-              <AppText variant="label">Today's doses (self-report)</AppText>
-              {schedule.reminderTimes.map((time) => {
-                const done = doseStatusFor(time);
-                const label = formatTimeOnly(localTimeToIso(time));
+              <AppText variant="label">Doses (self-report)</AppText>
+              {zone !== deviceZone ? <AppText variant="caption" muted>Times are in {zone}, the zone this reminder was set up in.</AppText> : null}
+              {slots.map((slot) => {
+                const done = doseStatusFor(slot);
+                const label = `${slot.day === "yesterday" ? "Yesterday " : ""}${slot.time}`;
                 return (
-                  <Row key={time} style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
-                    <AppText>{label || time}</AppText>
+                  <Row key={slot.iso} style={{ justifyContent: "space-between", flexWrap: "wrap", paddingVertical: space.xs }}>
+                    <AppText variant="label">{label}</AppText>
                     {done ? (
                       <Badge label={`You marked ${done}`} tone={done === "taken" ? "success" : "neutral"} icon={done === "taken" ? "check" : "skip-forward"} />
-                    ) : !schedule.isActive ? null : (
-                      <Row>
+                    ) : !slot.canRecord ? (
+                      <Badge label="Not due yet" tone="neutral" icon="clock" />
+                    ) : (
+                      <Row style={{ flexWrap: "wrap", justifyContent: "flex-end" }}>
+                        {slot.missed ? <Badge label="Not recorded" tone="warning" icon="alert-circle" /> : null}
                         <Button
                           label="WhatsApp"
                           variant="ghost"
@@ -196,13 +210,13 @@ function ScheduleCard({ schedule, onUpdated }: { schedule: MedicationSchedule; o
                           onPress={() => void sendWhatsAppReminder({
                             medicationName: med.name || "Medicine",
                             dosage: med.dose || med.strength || "1 dose",
-                            timeStr: label || time,
+                            timeStr: slot.time,
                             instructions: med.frequency || undefined,
                           })}
                           accessibilityHint={`Share ${med.name || "medicine"} reminder via WhatsApp`}
                         />
-                        <Button label={t("take_dose", "Taken")} variant="secondary" onPress={() => void report(time, "taken")} loading={busyTime === `${time}:taken`} disabled={busyTime !== null} accessibilityHint={`Record that you took the ${label} dose`} />
-                        <Button label={t("skip_dose", "Skipped")} variant="ghost" onPress={() => void report(time, "skipped")} loading={busyTime === `${time}:skipped`} disabled={busyTime !== null} accessibilityHint={`Record that you skipped the ${label} dose`} />
+                        <Button label={t("take_dose", "Taken")} variant="secondary" onPress={() => void report(slot, "taken")} loading={busyTime === `${slot.iso}:taken`} disabled={busyTime !== null} accessibilityHint={`Record that you took the ${label} dose`} />
+                        <Button label={t("skip_dose", "Skipped")} variant="ghost" onPress={() => void report(slot, "skipped")} loading={busyTime === `${slot.iso}:skipped`} disabled={busyTime !== null} accessibilityHint={`Record that you skipped the ${label} dose`} />
                       </Row>
                     )}
                   </Row>
@@ -232,28 +246,42 @@ function ScheduleCard({ schedule, onUpdated }: { schedule: MedicationSchedule; o
 
 function LocalReminders({ schedules }: { schedules: MedicationSchedule[] }) {
   const [permission, setPermission] = useState<ReminderPermission | null>(null);
-  const [count, setCount] = useState(0);
+  const [enabled, setEnabled] = useState(false);
+  const [showNames, setShowNames] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [scheduled, setScheduled] = useState<{ count: number; next: Date | null } | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const times = enabledReminderTimes(schedules);
+  const eligible = planReminders(schedules).length;
 
+  // Load what the patient chose last time, and the current permission.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      try {
-        const [perm, scheduled] = [await getReminderPermission(), await countLocalReminders()];
-        if (!cancelled) {
-          setPermission(perm);
-          setCount(scheduled);
-        }
-      } catch {
-        if (!cancelled) setPermission(null);
-      }
+      const [settings, perm] = [await loadReminderSettings(), await getReminderPermission()];
+      if (cancelled) return;
+      setEnabled(settings.enabled);
+      setShowNames(settings.showMedicineNames);
+      setPermission(perm);
+      setLoaded(true);
     })();
     return () => {
       cancelled = true;
     };
   }, []);
+
+  // Keep the phone in step with the schedules whenever they change (edit, pause, end date, new medicine): the
+  // phone's pending reminders are made to match exactly, so nothing stale keeps firing and nothing is duplicated.
+  useEffect(() => {
+    if (!loaded || !enabled || permission !== "granted") return;
+    let cancelled = false;
+    syncLocalReminders(schedules, { showMedicineNames: showNames })
+      .then((r) => !cancelled && setScheduled({ count: r.scheduled, next: r.next }))
+      .catch(() => !cancelled && setMessage("Couldn't update the reminders on this phone. Try turning them off and on again."));
+    return () => {
+      cancelled = true;
+    };
+  }, [loaded, enabled, permission, schedules, showNames]);
 
   async function turnOn() {
     setBusy(true);
@@ -263,11 +291,8 @@ function LocalReminders({ schedules }: { schedules: MedicationSchedule[] }) {
       if (perm !== "granted") perm = await requestReminderPermission();
       setPermission(perm);
       if (perm !== "granted") return;
-      const n = await scheduleLocalReminders(times);
-      setCount(n);
-      setMessage(n === 0 ? "No reminder times to schedule." : `Scheduled ${n} daily reminder${n > 1 ? "s" : ""} on this phone.`);
-    } catch {
-      setMessage("Couldn't set local reminders on this device.");
+      await setRemindersEnabled(true);
+      setEnabled(true);
     } finally {
       setBusy(false);
     }
@@ -275,31 +300,65 @@ function LocalReminders({ schedules }: { schedules: MedicationSchedule[] }) {
 
   async function turnOff() {
     setBusy(true);
+    await setRemindersEnabled(false);
     await cancelLocalReminders();
-    setCount(0);
-    setMessage("Local reminders turned off.");
+    setEnabled(false);
+    setScheduled(null);
+    setMessage("Reminders on this phone are turned off.");
     setBusy(false);
   }
 
+  async function toggleNames() {
+    const next = !showNames;
+    setShowNames(next);
+    await setShowMedicineNames(next);
+    if (enabled && permission === "granted") {
+      try {
+        await syncLocalReminders(schedules, { showMedicineNames: next, force: true });
+      } catch {
+        setMessage("Couldn't update the reminders on this phone.");
+      }
+    }
+  }
+
+  const permissionBlocked = permission === "denied" || permission === "unavailable";
   return (
     <Card>
-      <Row>
-        <AppText variant="heading" accessibilityRole="header">Local reminders</AppText>
-        <Badge label="Prototype" tone="demo" icon="info" />
+      <Row style={{ flexWrap: "wrap", justifyContent: "space-between" }}>
+        <SectionTitle>Reminders on this phone</SectionTitle>
+        <Badge label="This phone only" tone="demo" icon="info" />
       </Row>
       <AppText variant="small" muted>
-        These reminders are set on this phone only. They are not sent by HealthHub's server, so they may not arrive if notifications are off, the app is reinstalled, or your phone limits background activity. Don't rely on them for essential doses. They never show medicine names.
+        These are set on this phone only; the Sehat Meds server doesn't send them. They cover about the next two weeks and refresh whenever you open the app, so they can stop if you don't open it for a long time, if notifications are off, or if your phone limits background activity. Don't rely on them alone for essential doses.
       </AppText>
-      {permission === "denied" ? (
-        <PermissionDenied what="Notification" why="Turn notifications on in Settings to use local reminders." />
+      {permission === "denied" ? <PermissionDenied what="Notification" why="Turn notifications on in Settings to use reminders on this phone." /> : null}
+      {permission === "unavailable" ? <Banner tone="warning" title="This device can't show reminders" icon="alert-triangle">Notifications aren't available here. Use your calendar or the website instead.</Banner> : null}
+      {eligible === 0 && !enabled ? (
+        <AppText variant="small" color={colors.textMuted}>Add reminder times to a medicine and turn its reminders on first.</AppText>
+      ) : enabled && !permissionBlocked ? (
+        <>
+          <AppText variant="small" accessibilityLiveRegion="polite">
+            {scheduled
+              ? scheduled.count === 0
+                ? "On, but there are no upcoming doses to remind you about."
+                : `On: ${scheduled.count} upcoming dose${scheduled.count > 1 ? "s" : ""} scheduled${scheduled.next ? `, next ${formatDateTime(scheduled.next.toISOString())}` : ""}.`
+              : "Setting up…"}
+          </AppText>
+          <Button label="Turn off reminders on this phone" variant="secondary" icon="bell-off" onPress={() => void turnOff()} loading={busy} />
+        </>
+      ) : !permissionBlocked ? (
+        <Button label="Turn on reminders on this phone" variant="secondary" icon="bell" onPress={() => void turnOn()} loading={busy || !loaded} />
       ) : null}
-      {times.length === 0 ? (
-        <AppText variant="small" color={colors.textMuted}>Turn on reminders and add times to a schedule first.</AppText>
-      ) : count > 0 ? (
-        <Button label="Turn off local reminders" variant="secondary" icon="bell-off" onPress={() => void turnOff()} loading={busy} />
-      ) : (
-        <Button label="Turn on local reminders" variant="secondary" icon="bell" onPress={() => void turnOn()} loading={busy} />
-      )}
+      <Button
+        label={showNames ? "Hide medicine names in notifications" : "Show medicine names in notifications"}
+        variant="ghost"
+        icon={showNames ? "eye-off" : "eye"}
+        onPress={() => void toggleNames()}
+        accessibilityHint="Medicine names would be visible on your lock screen"
+      />
+      <AppText variant="caption" muted>
+        {showNames ? "Notifications now show the medicine name, which anyone near your phone can read on the lock screen." : "Notifications don't show medicine names, so they stay private on your lock screen."}
+      </AppText>
       {message ? <AppText variant="small" accessibilityLiveRegion="polite">{message}</AppText> : null}
     </Card>
   );

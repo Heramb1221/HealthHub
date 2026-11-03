@@ -33,7 +33,7 @@ export async function sendResendEmail(env: Env, payload: SendEmailPayload): Prom
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: `HealthHub <${from}>`,
+        from: `Sehat Meds <${from}>`,
         to: [payload.to],
         subject: payload.subject,
         html: payload.html,

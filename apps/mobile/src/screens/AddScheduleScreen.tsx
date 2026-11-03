@@ -11,7 +11,7 @@ import { formatDateOnly } from "../lib/format";
 import { medicationReviewReasons, REVIEW_REASON_LABEL, SCHEDULE_BLOCK_LABEL, scheduleBlock } from "../lib/safety";
 import { isValidDateOnly, isValidTimeOfDay, parseList } from "../lib/validation";
 import type { RootStackParamList } from "../navigation/types";
-import { AppText, Badge, Banner, Button, Card, Chip, Divider, Row, Screen, Stack, TextField } from "../ui/components";
+import { AppText, Badge, Banner, Button, Card, Chip, Divider, Row, Screen, SectionTitle, Stack, TextField } from "../ui/components";
 import { EmptyState, ErrorState, LoadingState } from "../ui/states";
 import { colors, space } from "../ui/theme";
 
@@ -157,7 +157,7 @@ export function AddScheduleScreen({ route, navigation }: Props) {
           />
         ) : (
           <Stack gap={space.md}>
-            <AppText variant="heading" accessibilityRole="header">Available medicines</AppText>
+            <SectionTitle>Available medicines</SectionTitle>
             {options.map((opt) => {
               const key = `${opt.rx.id}:${opt.index}`;
               const isSelected = selectedKey === key;
@@ -205,7 +205,7 @@ export function AddScheduleScreen({ route, navigation }: Props) {
 
         {selectedOption && !selectedOption.already && !selectedOption.block ? (
           <Card>
-            <AppText variant="heading" accessibilityRole="header">Set schedule details</AppText>
+            <SectionTitle>Set schedule details</SectionTitle>
             <AppText variant="small">
               Scheduling: <AppText variant="label">{selectedOption.med.name} {selectedOption.med.strength ?? ""}</AppText>
             </AppText>

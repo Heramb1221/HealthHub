@@ -38,7 +38,7 @@ const listField = (label: string) =>
 
 export const profileSchema = z
   .object({
-    fullName: z.string().trim().min(2, "Enter your full name.").max(100, "Use 100 characters or fewer."),
+    fullName: z.string().trim().min(2, "Enter your full name.").max(120, "Use 120 characters or fewer."),
     dateOfBirth: z
       .string()
       .trim()

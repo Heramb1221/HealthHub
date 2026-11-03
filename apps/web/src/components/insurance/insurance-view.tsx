@@ -1,5 +1,6 @@
 "use client";
 
+import { validatePolicy, type PolicyErrors } from "@/lib/validation/insurance";
 import * as React from "react";
 import {
   Building2,
@@ -47,12 +48,17 @@ export function InsuranceView() {
   const [tpaContact, setTpaContact] = React.useState("");
   const [notes, setNotes] = React.useState("");
   const [saving, setSaving] = React.useState(false);
+  const [errors, setErrors] = React.useState<PolicyErrors>({});
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
 
   async function handleAddPolicy(e: React.FormEvent) {
     e.preventDefault();
-    if (!providerName.trim() || !policyNumber.trim()) {
-      toast.error("Provider Name and Policy Number are required.");
+    if (saving) return;
+    const found = validatePolicy({ providerName, policyNumber, policyHolderName, sumInsured, validFrom, validTill, tpaContact, notes });
+    setErrors(found);
+    const firstField = Object.keys(found)[0];
+    if (firstField) {
+      document.getElementById(firstField === "policyHolderName" ? "policyHolder" : firstField)?.focus();
       return;
     }
 
@@ -166,13 +172,13 @@ export function InsuranceView() {
             <Info className="size-4" />
             <AlertTitle>Informational Record Notice</AlertTitle>
             <AlertDescription className="text-xs">
-              Policy information stored in HealthHub is patient-managed for personal medical record access and emergency claim convenience.
+              Policy information stored in Sehat Meds is patient-managed for personal medical record access and emergency claim convenience.
               It does not constitute an authoritative guarantee of coverage or active policy verification from the insurance provider.
             </AlertDescription>
           </Alert>
 
           {showAddForm && (
-            <form onSubmit={handleAddPolicy} className="bg-card border-border space-y-4 rounded-lg border p-6 shadow-xs">
+            <form onSubmit={handleAddPolicy} noValidate className="bg-card border-border space-y-4 rounded-lg border p-6 shadow-xs">
               <div className="flex items-center justify-between border-b pb-3">
                 <h2 className="text-base font-semibold">Add New Insurance Policy</h2>
                 <Button type="button" variant="ghost" size="sm" onClick={() => setShowAddForm(false)}>
@@ -192,7 +198,14 @@ export function InsuranceView() {
                     value={providerName}
                     onChange={(e) => setProviderName(e.target.value)}
                     required
+                    aria-invalid={errors.providerName ? true : undefined}
+                    aria-describedby={errors.providerName ? "providerName-error" : undefined}
                   />
+                  {errors.providerName ? (
+                    <p id="providerName-error" role="alert" className="text-destructive text-xs font-medium">
+                      {errors.providerName}
+                    </p>
+                  ) : null}
                   <datalist id="provider-suggestions">
                     {providers.map((p) => (
                       <option key={p.id} value={p.name} />
@@ -210,7 +223,14 @@ export function InsuranceView() {
                     value={policyNumber}
                     onChange={(e) => setPolicyNumber(e.target.value)}
                     required
+                    aria-invalid={errors.policyNumber ? true : undefined}
+                    aria-describedby={errors.policyNumber ? "policyNumber-error" : undefined}
                   />
+                  {errors.policyNumber ? (
+                    <p id="policyNumber-error" role="alert" className="text-destructive text-xs font-medium">
+                      {errors.policyNumber}
+                    </p>
+                  ) : null}
                   <span className="text-muted-foreground text-[11px]">Will be masked for privacy in dashboard views.</span>
                 </div>
 
@@ -223,7 +243,14 @@ export function InsuranceView() {
                     placeholder="Primary insured person's full name"
                     value={policyHolderName}
                     onChange={(e) => setPolicyHolderName(e.target.value)}
+                    aria-invalid={errors.policyHolderName ? true : undefined}
+                    aria-describedby={errors.policyHolderName ? "policyHolder-error" : undefined}
                   />
+                  {errors.policyHolderName ? (
+                    <p id="policyHolder-error" role="alert" className="text-destructive text-xs font-medium">
+                      {errors.policyHolderName}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="space-y-1.5">
@@ -235,7 +262,14 @@ export function InsuranceView() {
                     placeholder="e.g. ₹5,00,000 or ₹10 Lakhs"
                     value={sumInsured}
                     onChange={(e) => setSumInsured(e.target.value)}
+                    aria-invalid={errors.sumInsured ? true : undefined}
+                    aria-describedby={errors.sumInsured ? "sumInsured-error" : undefined}
                   />
+                  {errors.sumInsured ? (
+                    <p id="sumInsured-error" role="alert" className="text-destructive text-xs font-medium">
+                      {errors.sumInsured}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="space-y-1.5">
@@ -247,7 +281,14 @@ export function InsuranceView() {
                     type="date"
                     value={validFrom}
                     onChange={(e) => setValidFrom(e.target.value)}
+                    aria-invalid={errors.validFrom ? true : undefined}
+                    aria-describedby={errors.validFrom ? "validFrom-error" : undefined}
                   />
+                  {errors.validFrom ? (
+                    <p id="validFrom-error" role="alert" className="text-destructive text-xs font-medium">
+                      {errors.validFrom}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="space-y-1.5">
@@ -259,7 +300,14 @@ export function InsuranceView() {
                     type="date"
                     value={validTill}
                     onChange={(e) => setValidTill(e.target.value)}
+                    aria-invalid={errors.validTill ? true : undefined}
+                    aria-describedby={errors.validTill ? "validTill-error" : undefined}
                   />
+                  {errors.validTill ? (
+                    <p id="validTill-error" role="alert" className="text-destructive text-xs font-medium">
+                      {errors.validTill}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="space-y-1.5">
@@ -271,7 +319,14 @@ export function InsuranceView() {
                     placeholder="e.g. 1800 425 2255"
                     value={tpaContact}
                     onChange={(e) => setTpaContact(e.target.value)}
+                    aria-invalid={errors.tpaContact ? true : undefined}
+                    aria-describedby={errors.tpaContact ? "tpaContact-error" : undefined}
                   />
+                  {errors.tpaContact ? (
+                    <p id="tpaContact-error" role="alert" className="text-destructive text-xs font-medium">
+                      {errors.tpaContact}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="space-y-1.5">
@@ -283,7 +338,14 @@ export function InsuranceView() {
                     placeholder="e.g. 10% co-pay on day-care, includes room rent cap"
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
+                    aria-invalid={errors.notes ? true : undefined}
+                    aria-describedby={errors.notes ? "notes-error" : undefined}
                   />
+                  {errors.notes ? (
+                    <p id="notes-error" role="alert" className="text-destructive text-xs font-medium">
+                      {errors.notes}
+                    </p>
+                  ) : null}
                 </div>
               </div>
 

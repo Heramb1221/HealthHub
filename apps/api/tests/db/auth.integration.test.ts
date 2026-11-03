@@ -55,7 +55,8 @@ describe.skipIf(!TEST_DATABASE_URL)("authentication", () => {
     it("rejects weak input", async () => {
       expect((await register({ email: "not-an-email", password: PASSWORD })).status).toBe(400);
       expect((await register({ email: email(), password: "short" })).status).toBe(400);
-      expect((await register({ email: email(), password: "x".repeat(129) })).status).toBe(400);
+      expect((await register({ email: email(), password: "x".repeat(257) })).status).toBe(400); // limit raised from 128 to 256 (Part 2)
+      expect((await register({ email: email(), password: "x ".repeat(100) })).status).toBe(201); // long, with spaces: accepted
       expect((await register({})).status).toBe(400);
     });
 
@@ -380,23 +381,7 @@ describe.skipIf(!TEST_DATABASE_URL)("authentication", () => {
       expect(res.status).toBe(404);
     });
 
-    it("works only for demo accounts, and labels every response", async () => {
-      const devApp = buildApp(h.db, testEnv(TEST_DATABASE_URL as string, { DEV_AUTH_ENABLED: "true" }));
-      const demo = await h.db.user.create({
-        data: { email: `dev-${process.pid}@demo.healthhub.test`, passwordHash: "unused", role: "provider" },
-      });
-
-      const ok = await request(devApp).post("/api/v1/auth/dev-login").send({ email: demo.email });
-      expect(ok.status).toBe(200);
-      expect(ok.headers["x-healthhub-dev-only"]).toBe("true");
-      expect(ok.body.data.devOnly).toBe(true);
-      expect(ok.body.data.user.role).toBe("provider");
-      expect((await request(devApp).get("/api/v1/consents").set(bearer(ok.body.data.accessToken))).status).toBe(200);
-      expect(await h.db.auditEvent.count({ where: { actorUserId: demo.id, action: "auth.dev_login" } })).toBe(1);
-
-      const real = await seedUser(h.db, "patient");
-      const refused = await request(devApp).post("/api/v1/auth/dev-login").send({ email: real.email });
-      expect(refused.status).toBe(401);
-    });
+    // Removed deliberately: the product signs in through Clerk and a password-less "dev login" endpoint no longer exists.
+    // A login bypass adds risk without value, so the only behaviour kept (and tested above) is that the route is absent.
   });
 });

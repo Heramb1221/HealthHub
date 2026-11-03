@@ -25,16 +25,25 @@ describe.skipIf(!TEST_DATABASE_URL)("database schema integrity", () => {
     const tables = await h.pg.query(
       "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY 1",
     );
-    expect(tables.rows.map((r) => r.table_name)).toEqual([
+    // Every table comes from an additive migration; this list grows as features are added (family, insurance, payments,
+    // vaccinations, reviews, notifications, Google calendar tokens, QR sessions were added after the first version of this test).
+    expect(tables.rows.map((r) => r.table_name).filter((t) => t !== "_prisma_migrations")).toEqual([
       "Appointment",
       "AuditEvent",
       "AvailabilitySlot",
       "Consent",
       "DoseEvent",
+      "FamilyMember",
+      "GoogleOAuthToken",
       "HealthHistoryEntry",
       "Hospital",
+      "HospitalReview",
       "MedicationSchedule",
+      "NotificationPreference",
       "Patient",
+      "PatientInsurancePolicy",
+      "PatientVaccination",
+      "PaymentOrder",
       "PrescriptionMedication",
       "PrescriptionRecord",
       "PrescriptionVersion",

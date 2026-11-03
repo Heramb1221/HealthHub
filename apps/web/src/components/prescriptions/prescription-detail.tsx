@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { EmptyState, ErrorState, LoadingState } from "@/components/feedback/states";
 import { PageHeader } from "@/components/layout/page-header";
 import { CorrectionForm } from "@/components/prescriptions/correction-form";
+import { OriginalDocument } from "@/components/prescriptions/original-document";
 import { MedicationList } from "@/components/prescriptions/medication-list";
 import { MedicationSetupWizard } from "@/components/prescriptions/medication-setup-wizard";
 import { VersionHistory } from "@/components/prescriptions/version-history";
@@ -121,7 +122,7 @@ function RecordDetails({ rx, onViewFile }: { rx: Prescription; onViewFile: () =>
       "Original file",
       (
         <div key="original-file-details" className="space-y-1">
-          <span className="break-all font-medium text-xs">{rx.sourceFile ? rx.sourceFile.fileName : "Uploaded document"}</span>
+          <span className="break-all font-medium text-xs">{rx.sourceFile?.fileName ?? "Uploaded document"}</span>
           <button
             type="button"
             onClick={onViewFile}
@@ -137,11 +138,11 @@ function RecordDetails({ rx, onViewFile }: { rx: Prescription; onViewFile: () =>
     ["Record ID", <code key="id" className="bg-muted rounded-sm px-1.5 py-0.5 font-mono text-xs break-all">{rx.id}</code>],
   ];
   return (
-    <dl className="divide-y text-sm">
+    <dl className="grid gap-x-6 text-sm sm:grid-cols-2 sm:divide-y-0">
       {rows.map(([label, value]) => (
-        <div key={label} className="space-y-0.5 py-3 first:pt-0">
-          <dt className="text-muted-foreground text-xs">{label}</dt>
-          <dd>{value}</dd>
+        <div key={label} className="min-w-0 space-y-0.5 border-b py-3 first:pt-0 last:border-b-0 sm:[&:nth-last-child(-n+1)]:border-b-0">
+          <dt className="text-muted-foreground text-xs font-medium">{label}</dt>
+          <dd className="min-w-0 break-words">{value}</dd>
         </div>
       ))}
     </dl>
@@ -154,7 +155,6 @@ export function PrescriptionDetail({ id }: { id: string }) {
   const [editing, setEditing] = React.useState(false);
   const [wizardOpen, setWizardOpen] = React.useState(false);
   const [downloading, setDownloading] = React.useState(false);
-  const [openingFile, setOpeningFile] = React.useState(false);
   const [retrying, setRetrying] = React.useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
@@ -197,18 +197,25 @@ export function PrescriptionDetail({ id }: { id: string }) {
   }, [status, id, tick, setData]);
 
   React.useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
     if (
       status === "completed" &&
       rx.status === "ready" &&
       rx.data.medications.length > 0 &&
-      !autoPromptedRef.current
+      !autoPromptedRef.current &&
+      (prevStatusRef.current === "pending" || prevStatusRef.current === "processing")
     ) {
-      if (prevStatusRef.current === "pending" || prevStatusRef.current === "processing") {
+      const data = rx.data;
+      timer = setTimeout(() => {
         autoPromptedRef.current = true;
-        setWizardOpen(true);
-      }
+        // Freshly read details are unverified: send the patient to review them, not straight to reminders.
+        const reviewed = data.verificationStatus === "patient_corrected" || data.verificationStatus === "verified_by_authorized_clinician";
+        if (reviewed) setWizardOpen(true);
+        else setEditing(true);
+      }, 0);
     }
     prevStatusRef.current = status;
+    return () => clearTimeout(timer);
   }, [status, rx]);
 
   const schedules = useResource(() => medicationSchedulesApi.list(), `schedules:${id}:${status}`);
@@ -222,7 +229,7 @@ export function PrescriptionDetail({ id }: { id: string }) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = filename ?? `healthhub-prescription-${id}.pdf`;
+      a.download = filename ?? `sehatmeds-prescription-${id}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -235,19 +242,9 @@ export function PrescriptionDetail({ id }: { id: string }) {
     }
   }
 
-  async function viewOriginalFile() {
-    setOpeningFile(true);
-    try {
-      const { blob } = await prescriptionsApi.downloadFile(id);
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch (error) {
-      const { title, detail } = describeError(error);
-      toast.error("Original prescription file could not be opened", { description: `${title}. ${detail}` });
-    } finally {
-      setOpeningFile(false);
-    }
+  function viewOriginalFile() {
+    // The original is shown inline on this page; scroll to it (window.open after an await gets blocked by popup blockers).
+    document.getElementById("original-document-heading")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   async function retry() {
@@ -322,8 +319,8 @@ export function PrescriptionDetail({ id }: { id: string }) {
         title={title}
         actions={
           <>
-            <Button variant="outline" onClick={viewOriginalFile} disabled={openingFile}>
-              {openingFile ? <LoaderCircle className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <Eye aria-hidden="true" />} View Original
+            <Button variant="outline" onClick={viewOriginalFile}>
+              <Eye aria-hidden="true" /> View Original
             </Button>
             {canCorrect ? (
               <Button variant="outline" onClick={download} disabled={downloading}>
@@ -357,6 +354,8 @@ export function PrescriptionDetail({ id }: { id: string }) {
       </div>
 
       <StatusBanner rx={p} onRetry={retry} retrying={retrying} slow={slow} onOpenWizard={() => setWizardOpen(true)} />
+
+      <OriginalDocument prescriptionId={p.id} />
 
       <div className="grid gap-10 lg:grid-cols-[2fr_1fr]">
         <div className="min-w-0 space-y-10">
@@ -414,6 +413,10 @@ export function PrescriptionDetail({ id }: { id: string }) {
           onClose={() => setWizardOpen(false)}
           prescription={p}
           existingSchedules={schedules.status === "ready" ? schedules.data : []}
+          onRequestReview={() => {
+            setWizardOpen(false);
+            setEditing(true);
+          }}
           onCompleted={() => {
             rx.reload();
             schedules.reload();

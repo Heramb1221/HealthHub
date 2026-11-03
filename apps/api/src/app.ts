@@ -16,6 +16,7 @@ import { createAppointmentRouter } from "./modules/appointments/routes.js";
 import { createHistoryRouter } from "./modules/history/routes.js";
 import { createAdminHospitalRouter, createHospitalRouter } from "./modules/hospitals/routes.js";
 import { createPatientRouter } from "./modules/patients/routes.js";
+import { createEmergencyRouter } from "./modules/qr/emergency.js";
 import { createQrRouter } from "./modules/qr/routes.js";
 import { createScheduleRouter } from "./modules/schedules/routes.js";
 import { createPrescriptionRouter } from "./modules/prescriptions/routes.js";
@@ -76,7 +77,8 @@ export function createApp(env: Env, register?: (router: Router) => void, deps: A
     next();
   });
 
-  app.use(express.json({ limit: "100kb" }));
+  // The raw bytes are kept for webhook signature checks (the signature covers the exact body Razorpay sent).
+  app.use(express.json({ limit: "100kb", verify: (req, _res, buf) => { (req as unknown as { rawBody?: Buffer }).rawBody = buf; } }));
 
   const api = Router();
   api.use(createHealthRouter(deps.checkDatabase));
@@ -94,6 +96,7 @@ export function createApp(env: Env, register?: (router: Router) => void, deps: A
     api.use("/consents", createConsentRouter(deps.db, env));
     api.use("/patients", createPatientRouter(deps.db, env));
     api.use("/qr/access-sessions", createQrRouter(deps.db, env));
+    api.use("/qr/emergency", createEmergencyRouter(deps.db, env));
     api.use("/medication-schedules", createScheduleRouter(deps.db, env));
     api.use("/hospitals", createHospitalRouter(deps.db, env));
     api.use("/admin/hospitals", createAdminHospitalRouter(deps.db, env));

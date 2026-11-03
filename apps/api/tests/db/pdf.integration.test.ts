@@ -56,7 +56,7 @@ describe.skipIf(!TEST_DATABASE_URL)("prescription PDF download", () => {
     const res = await download(p.token, id);
     expect(res.status).toBe(200);
     expect(res.headers["content-type"]).toBe("application/pdf");
-    expect(res.headers["content-disposition"]).toBe(`attachment; filename="healthhub-prescription-${id.slice(0, 8)}.pdf"`);
+    expect(res.headers["content-disposition"]).toBe(`attachment; filename="sehatmeds-prescription-${id.slice(0, 8)}.pdf"`);
     expect(res.headers["cache-control"]).toBe("private, no-store");
     expect(res.headers["x-content-type-options"]).toBe("nosniff");
     const body = res.body as Buffer;
@@ -70,7 +70,7 @@ describe.skipIf(!TEST_DATABASE_URL)("prescription PDF download", () => {
     const health = (await kit.get(p.token, "/patients/me")).body.data.healthId as string;
     const text = visibleText((await download(p.token, id)).body as Buffer);
     for (const expected of [
-      `HealthHub patient ID: ${health}`, `Prescription record ID: ${id}`, "Source: Uploaded physical prescription",
+      `Sehat Meds patient ID: ${health}`, `Prescription record ID: ${id}`, "Source: Uploaded physical prescription",
       "Verification status: unverified", "UNVERIFIED", "Examplecillin 250 mg", `healthhub://prescription/${id}`, "not an official national health ID",
     ]) expect(text, expected).toContain(expected);
   });

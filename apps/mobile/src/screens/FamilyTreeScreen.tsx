@@ -290,7 +290,7 @@ export function FamilyTreeScreen() {
                       <View style={styles.flex}>
                         <Row style={{ alignItems: "center", gap: space.xs }}>
                           <Feather name="user" size={15} color={colors.primary} />
-                          <AppText variant="heading" style={{ fontSize: 15 }}>
+                          <AppText variant="heading" style={{ fontSize: 17 }}>
                             {member.fullName}
                           </AppText>
                         </Row>
@@ -589,7 +589,7 @@ const styles = StyleSheet.create({
   pill: {
     backgroundColor: colors.background,
     paddingHorizontal: space.sm,
-    paddingVertical: 2,
+    paddingVertical: space.xs,
     borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: colors.border,

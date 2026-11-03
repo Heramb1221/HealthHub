@@ -1,8 +1,10 @@
 import { Feather } from "@expo/vector-icons";
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import type { ComponentProps, ReactNode } from "react";
 import {
   ActivityIndicator,
+  AccessibilityInfo,
+  Animated,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -20,7 +22,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { IS_DEMO } from "../config";
 
-import { colors, MIN_TOUCH, radius, space, toneStyles, type, type Tone } from "./theme";
+import { colors, elevation, MIN_TOUCH, radius, space, toneStyles, type, type Tone } from "./theme";
 import { useLanguage } from "../i18n/LanguageContext";
 import { lookupTranslation } from "../i18n/languages";
 
@@ -122,29 +124,70 @@ interface ButtonProps {
   style?: StyleProp<ViewStyle>;
 }
 
+/**
+ * Tracks the OS "reduce motion" setting so decorative animation can be skipped.
+ * Defaults to true (no motion) until the platform answers.
+ */
+export function useReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(true);
+  useEffect(() => {
+    let active = true;
+    void AccessibilityInfo.isReduceMotionEnabled().then((value) => {
+      if (active) setReduced(value);
+    });
+    const sub = AccessibilityInfo.addEventListener("reduceMotionChanged", (value) => setReduced(value));
+    return () => {
+      active = false;
+      sub.remove();
+    };
+  }, []);
+  return reduced;
+}
+
 export function Button({ label, onPress, variant = "primary", icon, leading, loading, disabled, accessibilityHint, style }: ButtonProps) {
   const { language } = useLanguage();
   const inactive = Boolean(disabled || loading);
   const palette = buttonPalette[variant];
   const translatedLabel = lookupTranslation(language, label) || label;
+  const reduceMotion = useReducedMotion();
+  const [scale] = useState(() => new Animated.Value(1));
+
+  function pressTo(value: number) {
+    if (reduceMotion) return;
+    Animated.spring(scale, { toValue: value, useNativeDriver: true, speed: 40, bounciness: 0 }).start();
+  }
 
   return (
-    <Pressable
-      onPress={onPress}
-      disabled={inactive}
-      accessibilityRole="button"
-      accessibilityLabel={translatedLabel}
-      accessibilityHint={accessibilityHint}
-      accessibilityState={{ disabled: inactive, busy: Boolean(loading) }}
-      style={({ pressed }) => [
-        styles.button,
-        { backgroundColor: palette.bg, borderColor: palette.border, opacity: inactive ? 0.5 : pressed ? 0.85 : 1 },
-        style,
-      ]}
-    >
-      {loading ? <ActivityIndicator color={palette.fg} /> : leading ? leading : icon ? <Feather name={icon} size={18} color={palette.fg} /> : null}
-      <Text style={[type.label, { color: palette.fg, fontSize: 16 }]}>{translatedLabel}</Text>
-    </Pressable>
+    <Animated.View style={[{ transform: [{ scale }] }, style]}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={() => pressTo(0.97)}
+        onPressOut={() => pressTo(1)}
+        disabled={inactive}
+        accessibilityRole="button"
+        accessibilityLabel={translatedLabel}
+        accessibilityHint={accessibilityHint}
+        accessibilityState={{ disabled: inactive, busy: Boolean(loading) }}
+        style={({ pressed }) => [
+          styles.button,
+          { backgroundColor: palette.bg, borderColor: palette.border, opacity: inactive ? 0.5 : pressed ? 0.9 : 1 },
+        ]}
+      >
+        {loading ? <ActivityIndicator color={palette.fg} /> : leading ? leading : icon ? <Feather name={icon} size={18} color={palette.fg} /> : null}
+        <Text style={[type.label, { color: palette.fg, fontSize: 16 }]}>{translatedLabel}</Text>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+export function SectionTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
+  return (
+    <View style={styles.sectionTitle}>
+      <AppText variant="heading" accessibilityRole="header" style={styles.flex}>
+        {children}
+      </AppText>
+      {action}
+    </View>
   );
 }
 
@@ -160,12 +203,15 @@ export function ListRow({
   subtitle,
   onPress,
   right,
+  icon,
   accessibilityLabel,
 }: {
   title: string;
   subtitle?: string;
   onPress?: () => void;
   right?: ReactNode;
+  /** Optional leading icon shown in a tinted tile. */
+  icon?: IconName;
   accessibilityLabel?: string;
 }) {
   const { language } = useLanguage();
@@ -174,6 +220,11 @@ export function ListRow({
 
   const content = (
     <View style={styles.listRow}>
+      {icon ? (
+        <View style={styles.iconTile} importantForAccessibility="no">
+          <Feather name={icon} size={20} color={colors.primary} />
+        </View>
+      ) : null}
       <View style={styles.flex}>
         <AppText variant="label">{translatedTitle}</AppText>
         {translatedSubtitle ? (
@@ -183,12 +234,17 @@ export function ListRow({
         ) : null}
       </View>
       {right}
-      {onPress ? <Feather name="chevron-right" size={20} color={colors.textMuted} /> : null}
+      {onPress ? <Feather name="chevron-right" size={20} color={colors.textMuted} importantForAccessibility="no" /> : null}
     </View>
   );
   if (!onPress) return content;
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={accessibilityLabel ?? translatedTitle} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? translatedTitle}
+      style={({ pressed }) => [styles.listRowPressable, pressed && { backgroundColor: colors.surfaceMuted }]}
+    >
       {content}
     </Pressable>
   );
@@ -244,14 +300,18 @@ export function TextField({ label, error, hint, ...input }: TextFieldProps) {
 }
 
 export function Chip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+  const { language } = useLanguage();
+  const translatedLabel = lookupTranslation(language, label) || label;
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
+      accessibilityLabel={translatedLabel}
       accessibilityState={{ selected }}
-      style={[styles.chip, selected && { backgroundColor: colors.primary, borderColor: colors.primary }]}
+      hitSlop={6}
+      style={({ pressed }) => [styles.chip, selected && { backgroundColor: colors.primary, borderColor: colors.primary }, pressed && { opacity: 0.8 }]}
     >
-      <Text style={[type.label, { color: selected ? colors.onPrimary : colors.primary }]}>{label}</Text>
+      <Text style={[type.label, { color: selected ? colors.onPrimary : colors.primary }]}>{translatedLabel}</Text>
     </Pressable>
   );
 }
@@ -328,10 +388,21 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderWidth: 1,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     padding: space.lg,
     gap: space.md,
+    ...elevation,
   },
+  sectionTitle: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: space.sm, minHeight: MIN_TOUCH - 12 },
+  iconTile: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: colors.iconTile,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  listRowPressable: { borderRadius: radius.sm },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
   button: {
     minHeight: MIN_TOUCH,
@@ -356,7 +427,7 @@ const styles = StyleSheet.create({
   },
   inputMultiline: { minHeight: 96, textAlignVertical: "top" },
   chip: {
-    minHeight: 40,
+    minHeight: 44,
     paddingHorizontal: space.md,
     justifyContent: "center",
     borderRadius: radius.md,

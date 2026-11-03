@@ -36,10 +36,10 @@ export function HospitalsView() {
       ) : hospitals.status === "error" ? (
         <ErrorState error={hospitals.error} onRetry={hospitals.reload} />
       ) : hospitals.data.length === 0 ? (
-        <EmptyState icon={HospitalIcon} title="No hospitals are listed yet" description="Hospitals are added by HealthHub administrators. Check back later." />
+        <EmptyState icon={HospitalIcon} title="No hospitals are listed yet" description="Hospitals are added by Sehat Meds administrators. Check back later." />
       ) : (
         <>
-          <div className="max-w-md space-y-2">
+          <div className="w-full max-w-md space-y-2">
             <Label htmlFor={searchId}>Search hospitals</Label>
             <div className="relative">
               <Search aria-hidden="true" className="text-muted-foreground pointer-events-none absolute top-3 left-3 size-4" />
@@ -63,12 +63,12 @@ export function HospitalsView() {
               }
             />
           ) : (
-            <ul className="bg-card divide-y rounded-md border">
+            <ul className="bg-card divide-y rounded-xl border shadow-[var(--shadow-soft)]">
               {shown.map((h) => (
                 <li key={h.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0 space-y-1">
-                    <p className="flex flex-wrap items-center gap-2">
-                      <Link href={`/hospitals/${encodeURIComponent(h.id)}`} className="text-primary text-lg font-semibold underline-offset-4 hover:underline">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <Link href={`/hospitals/${encodeURIComponent(h.id)}`} className="text-primary text-lg font-semibold break-words underline-offset-4 hover:underline">
                         {h.name}
                       </Link>
                       {h.isDemo ? <DemoTag /> : null}
@@ -79,13 +79,13 @@ export function HospitalsView() {
                           <span className="text-muted-foreground font-normal">({h.reviewCount})</span>
                         </span>
                       ) : null}
-                    </p>
-                    <p className="text-muted-foreground text-sm">{[h.city, h.address].filter(Boolean).join(" · ") || "Address not provided"}</p>
+                    </span>
+                    <p className="text-muted-foreground text-sm break-words">{[h.city, h.address].filter(Boolean).join(" · ") || "Address not provided"}</p>
                     <div className="text-muted-foreground flex flex-wrap items-center gap-3 text-xs">
                       {h.timings ? <span>🕒 {h.timings}</span> : null}
                       {h.phone ? <span>📞 {h.phone}</span> : null}
                     </div>
-                    {h.specialties.length > 0 ? <p className="text-sm">{h.specialties.join(" · ")}</p> : null}
+                    {h.specialties.length > 0 ? <p className="text-sm break-words">{h.specialties.join(" · ")}</p> : null}
                   </div>
                   <Button asChild variant="outline" size="sm" className="self-start sm:self-center">
                     <Link href={`/hospitals/${encodeURIComponent(h.id)}`} aria-label={`See available times at ${h.name}`}>

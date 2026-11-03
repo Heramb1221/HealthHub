@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { contentDisposition } from "../../lib/contentDisposition.js";
 import { rateLimit } from "express-rate-limit";
 import { z } from "zod";
 import type { Env } from "../../config/env.js";
@@ -144,7 +145,7 @@ export function createPrescriptionRouter(
       { requestId: req.requestId },
     );
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Disposition", contentDisposition("attachment", filename));
     res.setHeader("Cache-Control", "private, no-store");
     res.setHeader("Content-Length", String(bytes.length));
     res.end(bytes);
@@ -159,7 +160,7 @@ export function createPrescriptionRouter(
     const bytes = await store.read(record.originalStorageKey);
     if (!bytes) throw new AppError("NOT_FOUND", "Original prescription file not found");
     res.setHeader("Content-Type", record.originalMimeType);
-    res.setHeader("Content-Disposition", `inline; filename="${record.originalFileName}"`);
+    res.setHeader("Content-Disposition", contentDisposition("inline", record.originalFileName));
     res.setHeader("Cache-Control", "private, no-cache");
     res.setHeader("Content-Length", String(bytes.length));
     res.end(bytes);

@@ -28,8 +28,10 @@ import { cn } from "@/lib/utils";
 function Row({ icon: Icon, title, demo, children }: { icon: typeof FileText; title: string; demo?: boolean; children: React.ReactNode }) {
   const id = React.useId();
   return (
-    <section aria-labelledby={id} className="flex gap-4 py-5 first:pt-0 last:pb-0">
-      <Icon aria-hidden="true" className="text-accent-foreground mt-0.5 size-5 shrink-0" />
+    <section aria-labelledby={id} className="surface surface-hover flex gap-4 p-5">
+      <span className="bg-accent text-accent-foreground flex size-10 shrink-0 items-center justify-center rounded-xl">
+        <Icon aria-hidden="true" className="size-5" />
+      </span>
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex flex-wrap items-center gap-2">
           <h2 id={id} className="text-muted-foreground text-sm font-medium">
@@ -149,7 +151,7 @@ export function DashboardView() {
     <div className="space-y-8">
       <PageHeader title="Dashboard" description="What’s coming up and what needs your attention." />
 
-      <section aria-labelledby="identity" className="bg-card flex flex-col gap-3 rounded-md border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <section aria-labelledby="identity" className="bg-card flex flex-col gap-3 rounded-xl border px-5 py-4 sm:flex-row sm:items-center sm:justify-between shadow-[var(--shadow-soft)]">
         <h2 id="identity" className="sr-only">
           Your identity
         </h2>
@@ -161,7 +163,7 @@ export function DashboardView() {
                 {patient.data.isDemo ? <DemoTag /> : null}
               </p>
               <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 text-sm">
-                HealthHub ID <HealthId value={patient.data.healthId} />
+                Sehat Meds ID <HealthId value={patient.data.healthId} />
               </p>
             </div>
             <div className="flex flex-wrap gap-2 self-start sm:self-center">
@@ -240,7 +242,7 @@ export function DashboardView() {
       ) : null}
 
       <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
-        <div className="bg-card divide-y rounded-md border px-5 py-5">
+        <div className="grid gap-4 lg:grid-cols-3">
           <Section resource={schedules} title="Next medication reminder" icon={CalendarClock} loadingLabel="Loading reminders">
             {(data) => {
               const next = nextReminder(data, now);

@@ -1,111 +1,145 @@
-import { createHmac, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import type { Env } from "../../config/env.js";
 import type { Db } from "../../db/client.js";
 import { AppError } from "../../lib/errors.js";
 import { log } from "../../lib/logger.js";
 import type { AuthContext } from "../../middleware/authenticate.js";
 import { recordAudit } from "../audit/audit.js";
+import {
+  checkoutSignature,
+  createRazorpayOrder,
+  fetchRazorpayPayment,
+  isSimulatedOrder,
+  paymentMode,
+  signaturesMatch,
+  SIMULATED_ORDER_PREFIX,
+  webhookSignature,
+  type PaymentMode,
+} from "./razorpay.js";
 
 export interface CreateOrderInput {
   appointmentId: string;
-  amountPaise?: number;
-  currency?: string;
 }
 
 export interface VerifyPaymentInput {
   orderRef: string;
   paymentRef?: string;
   signature?: string;
-  simulateFailure?: boolean;
+  /** Simulated (no-gateway) orders only; refused for real orders and in production. */
+  simulate?: "success" | "failure";
 }
 
-export async function createPaymentOrder(
-  db: Db,
-  env: Env,
-  auth: AuthContext,
-  input: CreateOrderInput,
-  ctx: { requestId: string },
-) {
-  const patient = await db.patient.findUnique({
-    where: { userId: auth.userId },
-    select: { id: true, fullName: true, phone: true },
-  });
+const PENDING_ORDER_REUSE_MS = 30 * 60_000;
+const CURRENCY = "INR";
+
+export function paymentConfig(env: Env) {
+  const mode: PaymentMode = paymentMode(env);
+  return {
+    mode,
+    // The public key id is meant for the browser; the secret never leaves the server.
+    keyId: mode === "razorpay_test" || mode === "razorpay_live" ? env.RAZORPAY_KEY_ID : null,
+    isLiveRazorpay: mode === "razorpay_live",
+    currency: CURRENCY,
+    appointmentFeePaise: env.APPOINTMENT_FEE_PAISE,
+    appointmentFeeRupees: (env.APPOINTMENT_FEE_PAISE / 100).toFixed(2),
+  };
+}
+
+type OrderRow = {
+  id: string;
+  orderRef: string;
+  amountPaise: number;
+  currency: string;
+  status: "pending" | "completed" | "failed" | "refunded";
+  isSandbox: boolean;
+  paymentRef: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+const receiptFor = (orderRef: string) => `RCP-${orderRef.slice(-8).toUpperCase()}`;
+
+function resultDto(o: OrderRow) {
+  const simulated = isSimulatedOrder(o.orderRef);
+  return {
+    id: o.id,
+    orderRef: o.orderRef,
+    paymentRef: o.paymentRef,
+    status: o.status,
+    receiptNumber: o.status === "completed" ? receiptFor(o.orderRef) : null,
+    amountRupees: (o.amountPaise / 100).toFixed(2),
+    currency: o.currency,
+    isSandbox: o.isSandbox,
+    simulated,
+    verifiedAt: o.updatedAt.toISOString(),
+  };
+}
+
+async function ownPatient(db: Db, auth: AuthContext) {
+  const patient = await db.patient.findUnique({ where: { userId: auth.userId }, select: { id: true, fullName: true, phone: true } });
   if (!patient) throw new AppError("NOT_FOUND");
+  return patient;
+}
+
+export async function createPaymentOrder(db: Db, env: Env, auth: AuthContext, input: CreateOrderInput, ctx: { requestId: string }) {
+  const patient = await ownPatient(db, auth);
+  const mode = paymentMode(env);
+  if (mode === "unavailable") throw new AppError("PROVIDER_DISABLED", "Online payments are not set up yet. Please pay at the hospital");
 
   const appointment = await db.appointment.findFirst({
     where: { id: input.appointmentId, patientId: patient.id },
-    include: {
-      slot: {
-        include: {
-          hospital: { select: { id: true, name: true } },
-        },
-      },
-    },
+    include: { slot: { include: { hospital: { select: { id: true, name: true } } } } },
   });
   if (!appointment) throw new AppError("NOT_FOUND", "Appointment not found for this patient");
-  if (appointment.status !== "confirmed") {
-    throw new AppError("CONFLICT", "Cannot initiate payment for cancelled appointment");
-  }
-
-  const existingCompleted = await db.paymentOrder.findFirst({
-    where: { appointmentId: appointment.id, status: "completed" },
-  });
-  if (existingCompleted) {
+  if (appointment.status !== "confirmed") throw new AppError("CONFLICT", "Cannot start a payment for a cancelled appointment");
+  if (await db.paymentOrder.findFirst({ where: { appointmentId: appointment.id, status: "completed" } })) {
     throw new AppError("CONFLICT", "Payment has already been completed for this appointment");
   }
 
-  const amountPaise = input.amountPaise ?? 50000;
-  const currency = input.currency ?? "INR";
-  let orderRef = `order_demo_${randomUUID().replace(/-/g, "").slice(0, 16)}`;
-  let isSandbox = true;
+  const amountPaise = env.APPOINTMENT_FEE_PAISE; // decided here, never by the client
+  const shape = (o: { id: string; orderRef: string; amountPaise: number; currency: string; status: string; isSandbox: boolean; createdAt: Date }) => ({
+    id: o.id,
+    orderRef: o.orderRef,
+    amountPaise: o.amountPaise,
+    amountRupees: (o.amountPaise / 100).toFixed(2),
+    currency: o.currency,
+    status: o.status,
+    isSandbox: o.isSandbox,
+    simulated: isSimulatedOrder(o.orderRef),
+    mode,
+    keyId: mode === "razorpay_test" || mode === "razorpay_live" ? env.RAZORPAY_KEY_ID : null,
+    hospitalName: appointment.slot.hospital.name,
+    slotTime: appointment.slot.startsAt.toISOString(),
+    patientName: patient.fullName || "",
+    patientPhone: patient.phone || "",
+    createdAt: o.createdAt.toISOString(),
+  });
 
-  if (env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET) {
-    try {
-      const basicAuth = Buffer.from(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`).toString("base64");
-      const rzpRes = await fetch("https://api.razorpay.com/v1/orders", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Basic ${basicAuth}`,
-        },
-        body: JSON.stringify({
-          amount: amountPaise,
-          currency,
-          receipt: `rcpt_${appointment.id.replace(/-/g, "").slice(0, 14)}`,
-          notes: {
-            appointmentId: appointment.id,
-            hospitalName: appointment.slot.hospital.name,
-            patientId: patient.id,
-          },
-        }),
-      });
+  // A double click or a retry must not create a second order (and a second charge opportunity): reuse a recent pending one.
+  const recent = await db.paymentOrder.findFirst({
+    where: { appointmentId: appointment.id, status: "pending", amountPaise, createdAt: { gte: new Date(Date.now() - PENDING_ORDER_REUSE_MS) } },
+    orderBy: { createdAt: "desc" },
+  });
+  if (recent && (mode === "simulated") === isSimulatedOrder(recent.orderRef)) return shape(recent);
 
-      if (rzpRes.ok) {
-        const rzpData = (await rzpRes.json()) as { id: string };
-        orderRef = rzpData.id;
-        isSandbox = env.RAZORPAY_KEY_ID.startsWith("rzp_test_");
-        log("info", "Razorpay order created successfully", { orderId: orderRef, appointmentId: appointment.id });
-      } else {
-        const errorText = await rzpRes.text();
-        log("warn", "Razorpay API order creation failed, falling back to simulated order", { error: errorText });
-      }
-    } catch (err) {
-      log("warn", "Failed to reach Razorpay API", { error: String(err) });
-    }
+  let orderRef: string;
+  if (mode === "simulated") {
+    orderRef = `${SIMULATED_ORDER_PREFIX}${randomUUID().replace(/-/g, "").slice(0, 16)}`;
+  } else {
+    // No silent fallback: if the gateway fails, the patient is told, and no fake order is created.
+    orderRef = (
+      await createRazorpayOrder(env, {
+        amount: amountPaise,
+        currency: CURRENCY,
+        receipt: `rcpt_${appointment.id.replace(/-/g, "").slice(0, 14)}`,
+        notes: { appointmentId: appointment.id },
+      })
+    ).id;
   }
 
   const order = await db.paymentOrder.create({
-    data: {
-      patientId: patient.id,
-      appointmentId: appointment.id,
-      amountPaise,
-      currency,
-      status: "pending",
-      orderRef,
-      isSandbox,
-    },
+    data: { patientId: patient.id, appointmentId: appointment.id, amountPaise, currency: CURRENCY, status: "pending", orderRef, isSandbox: mode !== "razorpay_live" },
   });
-
   await recordAudit(db, {
     action: "payment.order_created",
     outcome: "success",
@@ -114,135 +148,107 @@ export async function createPaymentOrder(
     resourceType: "payment_order",
     resourceId: order.id,
     requestId: ctx.requestId,
-    metadata: { orderRef, amountPaise, currency, appointmentId: appointment.id },
+    metadata: { orderRef, amountPaise, currency: CURRENCY, appointmentId: appointment.id, mode },
   });
-
-  return {
-    id: order.id,
-    orderRef: order.orderRef,
-    amountPaise: order.amountPaise,
-    amountRupees: (order.amountPaise / 100).toFixed(2),
-    currency: order.currency,
-    status: order.status,
-    isSandbox: order.isSandbox,
-    keyId: env.RAZORPAY_KEY_ID || null,
-    hospitalName: appointment.slot.hospital.name,
-    slotTime: appointment.slot.startsAt.toISOString(),
-    patientName: patient.fullName || "Valued Patient",
-    patientPhone: patient.phone || "",
-    createdAt: order.createdAt.toISOString(),
-  };
+  return shape(order);
 }
 
-export async function verifyPayment(
-  db: Db,
-  env: Env,
-  auth: AuthContext,
-  input: VerifyPaymentInput,
-  ctx: { requestId: string },
-) {
-  const patient = await db.patient.findUnique({
-    where: { userId: auth.userId },
-    select: { id: true },
+async function settle(db: Db, orderId: string, to: "completed" | "failed", paymentRef: string | null): Promise<OrderRow> {
+  // Only a pending order (or a failed one being retried) can change; a completed order is final.
+  await db.paymentOrder.updateMany({
+    where: { id: orderId, status: to === "completed" ? { in: ["pending", "failed"] } : "pending" },
+    data: { status: to, paymentRef: to === "completed" ? paymentRef : null },
   });
-  if (!patient) throw new AppError("NOT_FOUND");
+  return db.paymentOrder.findUniqueOrThrow({ where: { id: orderId } });
+}
 
-  const order = await db.paymentOrder.findFirst({
-    where: { orderRef: input.orderRef, patientId: patient.id },
-  });
+export async function verifyPayment(db: Db, env: Env, auth: AuthContext, input: VerifyPaymentInput, ctx: { requestId: string }) {
+  const patient = await ownPatient(db, auth);
+  const order = await db.paymentOrder.findFirst({ where: { orderRef: input.orderRef, patientId: patient.id } });
   if (!order) throw new AppError("NOT_FOUND", "Payment order not found");
+  if (order.status === "completed") return resultDto(order); // idempotent: verifying twice changes nothing
 
-  if (order.status === "completed") {
-    return {
-      id: order.id,
-      orderRef: order.orderRef,
-      paymentRef: order.paymentRef,
-      status: order.status,
-      receiptNumber: `RCP-${order.orderRef.slice(-8).toUpperCase()}`,
-      amountRupees: (order.amountPaise / 100).toFixed(2),
-      isSandbox: order.isSandbox,
-      verifiedAt: order.updatedAt.toISOString(),
-    };
-  }
+  const audit = (action: string, outcome: "success" | "failure" | "denied", metadata: Record<string, string>) =>
+    recordAudit(db, { action, outcome, actorUserId: auth.userId, patientId: patient.id, resourceType: "payment_order", resourceId: order.id, requestId: ctx.requestId, metadata });
 
-  let isSuccess = !input.simulateFailure;
-
-  if (input.signature && input.paymentRef && env.RAZORPAY_KEY_SECRET) {
-    const textToSign = `${input.orderRef}|${input.paymentRef}`;
-    const expectedSignature = createHmac("sha256", env.RAZORPAY_KEY_SECRET)
-      .update(textToSign)
-      .digest("hex");
-
-    if (input.signature !== expectedSignature) {
-      log("warn", "Razorpay signature mismatch", {
-        orderRef: input.orderRef,
-        provided: input.signature,
-        expected: expectedSignature,
-      });
-      throw new AppError("FORBIDDEN", "Cryptographic signature verification failed");
+  let finalOrder: OrderRow;
+  if (isSimulatedOrder(order.orderRef)) {
+    if (paymentMode(env) !== "simulated") throw new AppError("FORBIDDEN", "Simulated payments are not allowed here");
+    if (!input.simulate) throw new AppError("VALIDATION_ERROR", "Choose a simulated outcome for this test order");
+    finalOrder = await settle(db, order.id, input.simulate === "success" ? "completed" : "failed", input.simulate === "success" ? `pay_sim_${randomUUID().replace(/-/g, "").slice(0, 14)}` : null);
+  } else {
+    // A real order is only ever settled on proof: the checkout signature AND Razorpay's own record of the payment.
+    if (!input.paymentRef || !input.signature) throw new AppError("VALIDATION_ERROR", "Payment proof is required to confirm this payment");
+    if (!signaturesMatch(checkoutSignature(env.RAZORPAY_KEY_SECRET, order.orderRef, input.paymentRef), input.signature)) {
+      await audit("payment.signature_rejected", "denied", { orderRef: order.orderRef });
+      throw new AppError("FORBIDDEN", "The payment could not be verified");
     }
-    isSuccess = true;
-    log("info", "Razorpay payment signature cryptographically verified", { orderRef: input.orderRef, paymentId: input.paymentRef });
+    const other = await db.paymentOrder.findFirst({ where: { paymentRef: input.paymentRef, id: { not: order.id } }, select: { id: true } });
+    if (other) throw new AppError("CONFLICT", "This payment is already linked to another order");
+
+    const payment = await fetchRazorpayPayment(env, input.paymentRef);
+    if (payment.order_id !== order.orderRef || payment.amount !== order.amountPaise || payment.currency !== order.currency) {
+      await audit("payment.mismatch", "denied", { orderRef: order.orderRef });
+      throw new AppError("FORBIDDEN", "The payment does not match this order");
+    }
+    if (payment.status === "captured") finalOrder = await settle(db, order.id, "completed", input.paymentRef);
+    else if (payment.status === "failed") finalOrder = await settle(db, order.id, "failed", null);
+    else finalOrder = order; // created / authorized: not money in hand yet, so still pending (the webhook completes it)
   }
 
-  const paymentRef = input.paymentRef || `pay_demo_${randomUUID().replace(/-/g, "").slice(0, 14)}`;
-  const newStatus = isSuccess ? "completed" : "failed";
-
-  const updated = await db.paymentOrder.update({
-    where: { id: order.id },
-    data: {
-      status: newStatus,
-      paymentRef: isSuccess ? paymentRef : null,
-    },
+  await audit(finalOrder.status === "completed" ? "payment.verified" : finalOrder.status === "failed" ? "payment.failed" : "payment.pending", finalOrder.status === "failed" ? "failure" : "success", {
+    orderRef: finalOrder.orderRef,
+    status: finalOrder.status,
   });
+  return resultDto(finalOrder);
+}
 
-  await recordAudit(db, {
-    action: isSuccess ? "payment.verified" : "payment.failed",
-    outcome: isSuccess ? "success" : "failure",
-    actorUserId: auth.userId,
-    patientId: patient.id,
-    resourceType: "payment_order",
-    resourceId: updated.id,
-    requestId: ctx.requestId,
-    metadata: { orderRef: updated.orderRef, paymentRef: updated.paymentRef ?? "none", status: updated.status },
-  });
-
-  return {
-    id: updated.id,
-    orderRef: updated.orderRef,
-    paymentRef: updated.paymentRef,
-    status: updated.status,
-    receiptNumber: isSuccess ? `RCP-${updated.orderRef.slice(-8).toUpperCase()}` : null,
-    amountRupees: (updated.amountPaise / 100).toFixed(2),
-    currency: updated.currency,
-    isSandbox: updated.isSandbox,
-    verifiedAt: updated.updatedAt.toISOString(),
-  };
+/**
+ * Razorpay webhook: the server-to-server backstop for payments that completed after the browser closed. Authenticated
+ * only by the HMAC of the raw body with the webhook secret; every other input is untrusted.
+ */
+export async function handlePaymentWebhook(db: Db, env: Env, rawBody: Buffer | undefined, signature: string | undefined): Promise<{ handled: boolean }> {
+  if (!env.RAZORPAY_WEBHOOK_SECRET) throw new AppError("PROVIDER_DISABLED", "Webhook is not configured");
+  if (!rawBody || !signature || !signaturesMatch(webhookSignature(env.RAZORPAY_WEBHOOK_SECRET, rawBody), signature)) {
+    throw new AppError("FORBIDDEN", "Invalid webhook signature");
+  }
+  let event: { event?: string; payload?: { payment?: { entity?: { id?: string; order_id?: string; amount?: number; currency?: string; status?: string } } } };
+  try {
+    event = JSON.parse(rawBody.toString("utf8"));
+  } catch {
+    throw new AppError("VALIDATION_ERROR", "Malformed webhook body");
+  }
+  const p = event.payload?.payment?.entity;
+  if (!p?.order_id || !p.id) return { handled: false };
+  const order = await db.paymentOrder.findUnique({ where: { orderRef: p.order_id } });
+  if (!order || isSimulatedOrder(order.orderRef)) return { handled: false };
+  if (p.amount !== order.amountPaise || p.currency !== order.currency) {
+    log("warn", "Webhook amount/currency mismatch ignored", { orderId: order.id });
+    return { handled: false };
+  }
+  let settled: OrderRow | null = null;
+  if ((event.event === "payment.captured" || event.event === "order.paid") && p.status === "captured") settled = await settle(db, order.id, "completed", p.id);
+  else if (event.event === "payment.failed") settled = await settle(db, order.id, "failed", null);
+  if (settled) {
+    await recordAudit(db, {
+      action: settled.status === "completed" ? "payment.verified" : "payment.failed",
+      outcome: settled.status === "completed" ? "success" : "failure",
+      patientId: order.patientId,
+      resourceType: "payment_order",
+      resourceId: order.id,
+      metadata: { orderRef: order.orderRef, status: settled.status, via: "webhook" },
+    });
+  }
+  return { handled: settled !== null };
 }
 
 export async function listPaymentHistory(db: Db, auth: AuthContext) {
-  const patient = await db.patient.findUnique({
-    where: { userId: auth.userId },
-    select: { id: true },
-  });
-  if (!patient) throw new AppError("NOT_FOUND");
-
+  const patient = await ownPatient(db, auth);
   const orders = await db.paymentOrder.findMany({
     where: { patientId: patient.id },
-    include: {
-      appointment: {
-        include: {
-          slot: {
-            include: {
-              hospital: { select: { id: true, name: true, city: true } },
-            },
-          },
-        },
-      },
-    },
+    include: { appointment: { include: { slot: { include: { hospital: { select: { id: true, name: true, city: true } } } } } } },
     orderBy: { createdAt: "desc" },
   });
-
   return orders.map((o) => ({
     id: o.id,
     orderRef: o.orderRef,
@@ -252,7 +258,10 @@ export async function listPaymentHistory(db: Db, auth: AuthContext) {
     currency: o.currency,
     status: o.status,
     isSandbox: o.isSandbox,
-    hospitalName: o.appointment?.slot.hospital.name ?? "Clinic Consultation",
+    simulated: isSimulatedOrder(o.orderRef),
+    receiptNumber: o.status === "completed" ? receiptFor(o.orderRef) : null,
+    appointmentId: o.appointmentId,
+    hospitalName: o.appointment?.slot.hospital.name ?? "Clinic consultation",
     appointmentTime: o.appointment?.slot.startsAt.toISOString() ?? null,
     createdAt: o.createdAt.toISOString(),
   }));

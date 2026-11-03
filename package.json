@@ -23,7 +23,8 @@
     "build:web": "npm --prefix apps/web run build",
     "build:mobile": "npm --prefix apps/mobile run export:check",
     "build:all": "npm run build:api && npm run build:web && npm run build:mobile",
-    "seed:demo": "npm --prefix apps/api run seed:demo"
+    "seed:demo": "npm --prefix apps/api run seed:demo",
+    "test:web": "npm --prefix apps/web run test"
   },
   "workspaces": [
     "apps/*",

@@ -1,191 +1,116 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
-import { DICTIONARY, lookupTranslation, SUPPORTED_LANGUAGES, type SupportedLanguage } from "./languages";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
+import { DEFAULT_LANGUAGE, LOCALE_TAGS, isSupportedLanguage, type SupportedLanguage } from "./languages";
+import { translate, type TranslationParams } from "./translate";
+import { LANGUAGE_STORAGE_KEY, readStoredLanguage, writeStoredLanguage, type KeyValueStore } from "./storage";
+import { TRANSLATABLE_ATTRIBUTES, translateDocumentTree } from "./dom-translation";
 
-interface LanguageContextType {
+export interface LanguageContextType {
   language: SupportedLanguage;
   setLanguage: (lang: SupportedLanguage) => void;
-  t: (key: string, fallback?: string) => string;
+  /**
+   * Translate a UI string. `fallback` is the English text shown when the language has no entry.
+   * `params` fills `{name}` placeholders, and `params.count` picks the plural form.
+   */
+  t: (key: string, fallback?: string, params?: TranslationParams) => string;
 }
 
 const LanguageContext = createContext<LanguageContextType>({
-  language: "en",
+  language: DEFAULT_LANGUAGE,
   setLanguage: () => {},
-  t: (key, fallback) => fallback || key,
+  t: (key, fallback, params) => translate(DEFAULT_LANGUAGE, key, fallback, params),
 });
 
-const STORAGE_KEY = "healthhub_preferred_language";
-const originalTextMap = new WeakMap<Node, string>();
-
-function translateTextNode(node: Node, lang: SupportedLanguage) {
-  let original = originalTextMap.get(node);
-  if (!original) {
-    original = node.nodeValue || "";
-    originalTextMap.set(node, original);
-  }
-
-  if (lang === "en") {
-    if (node.nodeValue !== original) {
-      node.nodeValue = original;
-    }
-    return;
-  }
-
-  const trimmed = original.trim();
-  if (!trimmed) return;
-
-  let translation = lookupTranslation(lang, trimmed);
-
-  if (!translation) {
-    const dict = DICTIONARY[lang];
-    if (dict) {
-      let replaced = original;
-      const phrases = Object.keys(dict).filter((k) => k.length > 3 && !k.includes("_"));
-      phrases.sort((a, b) => b.length - a.length);
-      for (const phrase of phrases) {
-        if (replaced.includes(phrase)) {
-          replaced = replaced.replaceAll(phrase, dict[phrase]);
-        }
-      }
-      if (replaced !== original) {
-        translation = replaced;
-      }
-    }
-  }
-
-  if (translation) {
-    const leading = original.match(/^\s*/)?.[0] || "";
-    const trailing = original.match(/\s*$/)?.[0] || "";
-    const nextVal = leading + translation.trim() + trailing;
-    if (node.nodeValue !== nextVal) {
-      node.nodeValue = nextVal;
-    }
+function browserStorage(): KeyValueStore | null {
+  try {
+    return typeof window === "undefined" ? null : window.localStorage;
+  } catch {
+    // Accessing localStorage throws in some privacy modes and when site data is blocked.
+    return null;
   }
 }
 
-function translateDomTree(root: Node, lang: SupportedLanguage) {
-  if (typeof window === "undefined" || !root) return;
+// The language lives in a tiny external store, read through useSyncExternalStore. The server
+// snapshot is English, so hydration matches the server HTML; the saved choice is applied on the
+// client without a setState-in-effect.
+type Listener = () => void;
+const listeners = new Set<Listener>();
+// Keeps the choice for this page even when storage is blocked or full.
+let sessionLanguage: SupportedLanguage | null = null;
 
-  if (root.nodeType === Node.TEXT_NODE) {
-    translateTextNode(root, lang);
-    return;
-  }
+function getLanguageSnapshot(): SupportedLanguage {
+  return sessionLanguage ?? readStoredLanguage(browserStorage()) ?? DEFAULT_LANGUAGE;
+}
 
-  if (root.nodeType === Node.ELEMENT_NODE) {
-    const el = root as HTMLElement;
-    const tag = el.tagName.toLowerCase();
-    if (tag === "script" || tag === "style" || tag === "code" || tag === "pre") {
-      return;
-    }
+function getServerLanguageSnapshot(): SupportedLanguage {
+  return DEFAULT_LANGUAGE;
+}
 
-    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
-      if (el.placeholder) {
-        let orig = el.getAttribute("data-orig-placeholder");
-        if (!orig) {
-          orig = el.placeholder;
-          el.setAttribute("data-orig-placeholder", orig);
-        }
-        if (lang === "en") {
-          el.placeholder = orig;
-        } else {
-          const trans = lookupTranslation(lang, orig);
-          if (trans) el.placeholder = trans;
-        }
-      }
-    }
-
-    const walker = document.createTreeWalker(
-      root,
-      NodeFilter.SHOW_TEXT,
-      {
-        acceptNode(node) {
-          const parent = node.parentElement;
-          if (!parent) return NodeFilter.FILTER_REJECT;
-          const parentTag = parent.tagName.toLowerCase();
-          if (parentTag === "script" || parentTag === "style" || parentTag === "code" || parentTag === "pre") {
-            return NodeFilter.FILTER_REJECT;
-          }
-          if (!node.nodeValue || !node.nodeValue.trim()) {
-            return NodeFilter.FILTER_SKIP;
-          }
-          return NodeFilter.FILTER_ACCEPT;
-        },
-      }
-    );
-
-    const nodes: Node[] = [];
-    while (walker.nextNode()) {
-      nodes.push(walker.currentNode);
-    }
-
-    for (const textNode of nodes) {
-      translateTextNode(textNode, lang);
-    }
-  }
+function subscribeToLanguage(listener: Listener): () => void {
+  listeners.add(listener);
+  // Another tab changed the saved language.
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === LANGUAGE_STORAGE_KEY) listener();
+  };
+  window.addEventListener("storage", onStorage);
+  return () => {
+    listeners.delete(listener);
+    window.removeEventListener("storage", onStorage);
+  };
 }
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [language, setLanguageState] = useState<SupportedLanguage>(() => {
-    if (typeof window === "undefined") return "en";
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY) as SupportedLanguage | null;
-      if (stored && SUPPORTED_LANGUAGES.some((l) => l.code === stored)) {
-        return stored;
-      }
-    } catch {
-
-    }
-    return "en";
-  });
+  const language = useSyncExternalStore(subscribeToLanguage, getLanguageSnapshot, getServerLanguageSnapshot);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    document.documentElement.lang = language;
-    translateDomTree(document.body, language);
+    document.documentElement.lang = LOCALE_TAGS[language];
+    document.documentElement.dir = "ltr";
 
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    const observer = new MutationObserver(() => {
-      if (timeoutId) clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        translateDomTree(document.body, language);
-      }, 50);
-    });
+    let frame = 0;
+    const run = () => {
+      frame = 0;
+      translateDocumentTree(document.body, language);
+      // Discard the mutation records produced by our own writes, so they do not schedule another pass.
+      observer.takeRecords();
+    };
+    const schedule = () => {
+      if (!frame) frame = window.requestAnimationFrame(run);
+    };
 
+    const observer = new MutationObserver(schedule);
     observer.observe(document.body, {
       childList: true,
       subtree: true,
       characterData: true,
+      attributes: true,
+      attributeFilter: [...TRANSLATABLE_ATTRIBUTES],
     });
+    run();
 
     return () => {
-      if (timeoutId) clearTimeout(timeoutId);
       observer.disconnect();
+      if (frame) window.cancelAnimationFrame(frame);
     };
   }, [language]);
 
-  const setLanguage = (lang: SupportedLanguage) => {
-    setLanguageState(lang);
-    try {
-      localStorage.setItem(STORAGE_KEY, lang);
-    } catch {
+  const setLanguage = useCallback((lang: SupportedLanguage) => {
+    if (!isSupportedLanguage(lang)) return;
+    sessionLanguage = lang;
+    writeStoredLanguage(browserStorage(), lang);
+    listeners.forEach((listener) => listener());
+  }, []);
 
-    }
-  };
-
-  const t = (key: string, fallback?: string): string => {
-    if (language === "en") return fallback || key;
-    const translated = lookupTranslation(language, key);
-    if (translated) return translated;
-    return fallback || key;
-  };
-
-  return (
-    <LanguageContext.Provider value={{ language, setLanguage, t }}>
-      {children}
-    </LanguageContext.Provider>
+  const t = useCallback(
+    (key: string, fallback?: string, params?: TranslationParams) => translate(language, key, fallback, params),
+    [language],
   );
+
+  const value = useMemo(() => ({ language, setLanguage, t }), [language, setLanguage, t]);
+
+  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }
 
 export function useLanguage() {

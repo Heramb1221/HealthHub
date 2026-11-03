@@ -49,7 +49,7 @@ describe.skipIf(!TEST_DATABASE_URL)("prescription upload and reads", () => {
       const res = await upload(p.token, bytes, { filename: "My Rx.png" });
       expect(res.status).toBe(201);
       expect(Object.keys(res.body.data).sort()).toEqual(
-        ["createdAt", "id", "medications", "patientId", "prescriberName", "prescriptionDate", "processingStatus", "sourceType", "updatedAt", "verificationStatus"],
+        ["createdAt", "id", "medications", "patientId", "prescriberName", "prescriptionDate", "processingStatus", "sourceFile", "sourceType", "updatedAt", "verificationStatus"],
       );
       expect(res.body.data).toMatchObject({
         patientId: p.patientId,
@@ -218,7 +218,9 @@ describe.skipIf(!TEST_DATABASE_URL)("prescription upload and reads", () => {
     it("enforces the per-patient limit", async () => {
       const limited = buildApp(h.db, testEnv(TEST_DATABASE_URL as string, { PATIENT_PRESCRIPTION_LIMIT: "2" }), undefined, store);
       const p = await registerPatient(limited, h.db);
-      const send = () => request(limited).post("/api/v1/prescriptions").set(bearer(p.token)).attach("file", png(), { filename: "a.png", contentType: "image/png" });
+      // Distinct bytes each time: identical re-sends within a short window are treated as one upload (retry/double-tap).
+      let n = 0;
+      const send = () => request(limited).post("/api/v1/prescriptions").set(bearer(p.token)).attach("file", png(64 + n++), { filename: "a.png", contentType: "image/png" });
       expect((await send()).status).toBe(201);
       expect((await send()).status).toBe(201);
       const before = await storedCount();
@@ -270,7 +272,7 @@ describe.skipIf(!TEST_DATABASE_URL)("prescription upload and reads", () => {
     it("paginates newest first and validates paging input", async () => {
       const p = await registerPatient(app, h.db);
       const ids: string[] = [];
-      for (let i = 0; i < 3; i += 1) ids.push((await upload(p.token, png())).body.data.id);
+      for (let i = 0; i < 3; i += 1) ids.push((await upload(p.token, png(64 + i))).body.data.id); // distinct bytes: identical re-sends are de-duplicated
       const first = await request(app).get("/api/v1/prescriptions?limit=2").set(bearer(p.token));
       expect(first.body.data.map((r: { id: string }) => r.id)).toEqual([ids[2], ids[1]]);
       const second = await request(app).get(`/api/v1/prescriptions?limit=2&cursor=${first.body.page.nextCursor}`).set(bearer(p.token));

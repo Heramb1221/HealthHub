@@ -5,13 +5,15 @@ import { Alert, Linking, TextInput, TouchableOpacity, View } from "react-native"
 
 import { appointmentApi, hospitalApi } from "../api/endpoints";
 import { describeError, isApiError } from "../api/errors";
+import { useLanguage } from "../i18n/LanguageContext";
+import { lookupTranslation } from "../i18n/languages";
 import type { Appointment, AvailabilitySlot } from "../api/types";
 import { useResource } from "../hooks/useResource";
 import { formatDateTime, formatDayHeading, formatTimeOnly, localDayKey, orDash } from "../lib/format";
 import type { RootStackParamList } from "../navigation/types";
 import { AppText, Badge, Banner, Button, Card, Chip, DemoTag, Field, Row, Screen, Stack } from "../ui/components";
 import { EmptyState, ErrorState, LoadingState } from "../ui/states";
-import { colors, radius, space } from "../ui/theme";
+import { colors, MIN_TOUCH, radius, space } from "../ui/theme";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Hospital">;
 
@@ -23,6 +25,7 @@ function getSessionPeriod(date: Date): "Morning" | "Afternoon" | "Evening" {
 }
 
 export function HospitalScreen({ route, navigation }: Props) {
+  const { language } = useLanguage();
   const { id } = route.params;
   const hospital = useResource((signal) => hospitalApi.get(id, signal));
   const slots = useResource(async (signal) => ({ page: await hospitalApi.availability(id, signal), fetchedAt: Date.now() }));
@@ -334,8 +337,14 @@ export function HospitalScreen({ route, navigation }: Props) {
                   <TouchableOpacity
                     key={star}
                     onPress={() => setUserRating(star)}
+                    accessibilityRole="radio"
+                    accessibilityLabel={`${star} star${star > 1 ? "s" : ""}`}
+                    accessibilityState={{ checked: userRating === star }}
                     style={{
-                      padding: space.sm,
+                      minWidth: MIN_TOUCH,
+                      minHeight: MIN_TOUCH,
+                      alignItems: "center",
+                      justifyContent: "center",
                       borderRadius: radius.sm,
                       backgroundColor: userRating >= star ? colors.surface : colors.background,
                       borderWidth: 1,
@@ -350,7 +359,8 @@ export function HospitalScreen({ route, navigation }: Props) {
               <TextInput
                 value={userComment}
                 onChangeText={setUserComment}
-                placeholder="Share your experience (optional)..."
+                placeholder={lookupTranslation(language, "Share your experience (optional)...") || "Share your experience (optional)..."}
+                accessibilityLabel={lookupTranslation(language, "Your review") || "Your review"}
                 placeholderTextColor={colors.textMuted}
                 multiline
                 numberOfLines={3}

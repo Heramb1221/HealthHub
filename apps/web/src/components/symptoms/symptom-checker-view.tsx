@@ -35,7 +35,6 @@ import { symptomsApi } from "@/lib/api/symptoms";
 import type {
   PossibleExplanation,
   RuleQuestion,
-  SymptomAnswer,
   SymptomAssessmentResult,
   TriageUrgency,
 } from "@/lib/api/types";
@@ -58,6 +57,18 @@ const COMMON_SYMPTOMS = [
   "Chills",
 ];
 
+import {
+  ageProblem,
+  buildAnswerPayload,
+  canAdvance,
+  hasRedFlag,
+  isLastQuestion,
+  progressPercent,
+  symptomProblem,
+  unansweredQuestions,
+  type AnswerMap,
+} from "@/lib/symptoms/questionnaire";
+
 type Step = "select_symptoms" | "questionnaire" | "results";
 
 export function SymptomCheckerView() {
@@ -69,25 +80,24 @@ export function SymptomCheckerView() {
 
   const [questions, setQuestions] = React.useState<RuleQuestion[]>([]);
   const [currentQuestionIdx, setCurrentQuestionIdx] = React.useState(0);
-  const [answers, setAnswers] = React.useState<Record<string, { optionId: string; optionLabel: string; isRedFlag?: boolean }>>({});
+  const [answers, setAnswers] = React.useState<AnswerMap>({});
   const [loadingQuestions, setLoadingQuestions] = React.useState(false);
+  const [questionsError, setQuestionsError] = React.useState<{ title: string; detail: string } | null>(null);
+  const [submitError, setSubmitError] = React.useState<{ title: string; detail: string } | null>(null);
+  const [ageTouched, setAgeTouched] = React.useState(false);
+  const questionHeadingRef = React.useRef<HTMLHeadingElement | null>(null);
 
   const [evaluating, setEvaluating] = React.useState(false);
   const [result, setResult] = React.useState<SymptomAssessmentResult | null>(null);
   const [showAnswersRecap, setShowAnswersRecap] = React.useState(false);
 
   function handleAddSymptom(name: string) {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    if (symptoms.some((s) => s.toLowerCase() === trimmed.toLowerCase())) {
-      toast.info(`"${trimmed}" is already added.`);
+    const problem = symptomProblem(name, symptoms);
+    if (problem) {
+      if (name.trim()) toast.info(problem);
       return;
     }
-    if (symptoms.length >= 10) {
-      toast.error("Maximum of 10 symptoms can be assessed at once.");
-      return;
-    }
-    setSymptoms([...symptoms, trimmed]);
+    setSymptoms([...symptoms, name.trim()]);
     setCustomSymptom("");
   }
 
@@ -96,66 +106,34 @@ export function SymptomCheckerView() {
   }
 
   async function handleStartQuestionnaire() {
+    if (loadingQuestions) return;
     if (symptoms.length === 0) {
       toast.error("Please add at least one symptom to start the assessment.");
       return;
     }
+    setAgeTouched(true);
+    if (ageProblem(patientAge)) return;
 
     setLoadingQuestions(true);
+    setQuestionsError(null);
     try {
       const fetchedQuestions = await symptomsApi.getQuestions(symptoms);
       if (!fetchedQuestions || fetchedQuestions.length === 0) {
-        throw new Error("No questionnaire generated");
+        setQuestionsError({
+          title: "No follow-up questions were returned",
+          detail: "The assessment can't continue without them. Try again, or change your symptoms.",
+        });
+        return;
       }
       setQuestions(fetchedQuestions);
       setCurrentQuestionIdx(0);
       setAnswers({});
+      setSubmitError(null);
       setStep("questionnaire");
       window.scrollTo({ top: 0, behavior: "smooth" });
-    } catch {
-
-      const fallbackQuestions: RuleQuestion[] = [
-        {
-          id: "q_duration",
-          category: "duration",
-          question: "How long have you been experiencing these symptoms?",
-          subtext: "Clinical duration helps separate acute self-limiting episodes from subacute or progressive infections.",
-          options: [
-            { id: "dur_acute", label: "Less than 24 hours (acute onset)" },
-            { id: "dur_short", label: "1 to 3 days (developing)" },
-            { id: "dur_medium", label: "4 to 7 days (persisting for nearly a week)" },
-            { id: "dur_chronic", label: "More than 1 week (persistent or recurring)" },
-          ],
-        },
-        {
-          id: "q_progression",
-          category: "characteristics",
-          question: "How is the overall discomfort progressing?",
-          subtext: "Understanding the clinical trajectory aids in determining urgency level.",
-          options: [
-            { id: "prog_mild", label: "Mild and manageable, daily routine uninterrupted" },
-            { id: "prog_stable", label: "Moderate discomfort, noticeable but stable" },
-            { id: "prog_worsening", label: "Rapidly worsening or spreading today" },
-            { id: "prog_intermittent", label: "Comes and goes in waves or spasms" },
-          ],
-        },
-        {
-          id: "q_red_flags",
-          category: "red_flags",
-          question: "Are you experiencing any of these critical emergency warning signs?",
-          subtext: "Clinical safety screener: please answer accurately.",
-          options: [
-            { id: "rf_breathing", label: "Severe shortness of breath, gasping, or bluish lips/fingertips", isRedFlag: true },
-            { id: "rf_neuro", label: "Sudden facial drooping, arm weakness, or slurred speech", isRedFlag: true },
-            { id: "rf_bleeding", label: "Vomiting blood, coughing up blood, or black tarry stools", isRedFlag: true },
-            { id: "rf_none", label: "None of these warning signs are present" },
-          ],
-        },
-      ];
-      setQuestions(fallbackQuestions);
-      setCurrentQuestionIdx(0);
-      setAnswers({});
-      setStep("questionnaire");
+    } catch (err) {
+      // No made-up questions: a failure is shown as a failure, with a way to retry.
+      setQuestionsError(describeError(err));
     } finally {
       setLoadingQuestions(false);
     }
@@ -169,34 +147,41 @@ export function SymptomCheckerView() {
   }
 
   async function handleCompleteAssessment() {
+    if (evaluating) return;
+    const missing = unansweredQuestions(questions, answers);
+    if (missing.length > 0) {
+      const idx = questions.findIndex((q) => q.id === missing[0]!.id);
+      setCurrentQuestionIdx(idx);
+      toast.error("Please answer every question", { description: `Question ${idx + 1} still needs an answer.` });
+      return;
+    }
     setEvaluating(true);
+    setSubmitError(null);
     try {
-      const formattedAnswers: SymptomAnswer[] = questions
-        .filter((q) => answers[q.id])
-        .map((q) => ({
-          questionId: q.id,
-          questionText: q.question,
-          selectedOptionId: answers[q.id]!.optionId,
-          selectedOptionLabel: answers[q.id]!.optionLabel,
-        }));
-
       const res = await symptomsApi.assess({
         symptoms,
         patientAge: typeof patientAge === "number" ? patientAge : undefined,
         description: description.trim() || undefined,
-        answers: formattedAnswers,
+        answers: buildAnswerPayload(questions, answers),
       });
 
       setResult(res);
       setStep("results");
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
-      const { title, detail } = describeError(err);
-      toast.error(title, { description: detail });
+      // Answers stay in state, so the user can retry without re-entering anything.
+      const info = describeError(err);
+      setSubmitError(info);
+      toast.error(info.title, { description: info.detail });
     } finally {
       setEvaluating(false);
     }
   }
+
+  // Keep keyboard and screen-reader users oriented when the question changes.
+  React.useEffect(() => {
+    if (step === "questionnaire") questionHeadingRef.current?.focus({ preventScroll: true });
+  }, [step, currentQuestionIdx]);
 
   function handleReset() {
     setSymptoms([]);
@@ -206,6 +191,9 @@ export function SymptomCheckerView() {
     setCurrentQuestionIdx(0);
     setAnswers({});
     setResult(null);
+    setQuestionsError(null);
+    setSubmitError(null);
+    setAgeTouched(false);
     setStep("select_symptoms");
   }
 
@@ -245,7 +233,9 @@ export function SymptomCheckerView() {
 
   const currentQuestion = questions[currentQuestionIdx];
   const currentAnswer = currentQuestion ? answers[currentQuestion.id] : undefined;
-  const hasAnyRedFlag = Object.values(answers).some((a) => a.isRedFlag);
+  const hasAnyRedFlag = hasRedFlag(answers);
+  const ageError = ageTouched ? ageProblem(patientAge) : null;
+  const lastQuestion = isLastQuestion(currentQuestionIdx, questions.length);
 
   return (
     <div className="space-y-6">
@@ -360,8 +350,16 @@ export function SymptomCheckerView() {
                 max={120}
                 value={patientAge}
                 onChange={(e) => setPatientAge(e.target.value === "" ? "" : Number(e.target.value))}
+                onBlur={() => setAgeTouched(true)}
+                aria-invalid={ageError ? true : undefined}
+                aria-describedby={ageError ? "patient-age-error" : undefined}
                 className="text-sm"
               />
+              {ageError ? (
+                <p id="patient-age-error" role="alert" className="text-destructive text-xs">
+                  {ageError}
+                </p>
+              ) : null}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="description" className="text-xs font-medium">
@@ -369,6 +367,7 @@ export function SymptomCheckerView() {
               </Label>
               <Input
                 id="description"
+                maxLength={1000}
                 placeholder="e.g. Started after traveling; taking blood pressure medicines..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -377,7 +376,17 @@ export function SymptomCheckerView() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between pt-2">
+          {questionsError ? (
+            <Alert tone="danger" role="alert">
+              <AlertCircle className="size-4" aria-hidden="true" />
+              <AlertTitle className="text-sm font-semibold">{questionsError.title}</AlertTitle>
+              <AlertDescription className="text-xs">
+                {questionsError.detail} Nothing has been assessed. Press &ldquo;Start Guided Assessment&rdquo; to try again.
+              </AlertDescription>
+            </Alert>
+          ) : null}
+
+          <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-muted-foreground text-xs">
               {symptoms.length === 0
                 ? "Select at least 1 symptom above to begin"
@@ -387,7 +396,7 @@ export function SymptomCheckerView() {
               type="button"
               disabled={loadingQuestions || symptoms.length === 0}
               onClick={handleStartQuestionnaire}
-              className="min-w-56"
+              className="w-full sm:w-auto sm:min-w-56"
             >
               {loadingQuestions ? (
                 <>
@@ -425,7 +434,7 @@ export function SymptomCheckerView() {
             <div className="bg-muted h-1.5 w-full overflow-hidden rounded-full">
               <div
                 className="bg-primary h-full transition-all duration-300"
-                style={{ width: `${((currentQuestionIdx + 1) / questions.length) * 100}%` }}
+                style={{ width: `${progressPercent(currentQuestionIdx, questions.length)}%` }}
               />
             </div>
 
@@ -433,7 +442,11 @@ export function SymptomCheckerView() {
               <span className="text-muted-foreground text-[11px] font-semibold tracking-wider uppercase">
                 {currentQuestion.category.replace(/_/g, " ")}
               </span>
-              <h2 className="text-lg font-semibold text-foreground mt-0.5">
+              <h2
+                ref={questionHeadingRef}
+                tabIndex={-1}
+                className="text-lg font-semibold text-foreground mt-0.5 outline-none"
+              >
                 {currentQuestion.question}
               </h2>
               {currentQuestion.subtext ? (
@@ -443,13 +456,14 @@ export function SymptomCheckerView() {
               ) : null}
             </div>
 
-            <div className="space-y-2.5 pt-2">
+            <div className="space-y-2.5 pt-2" role="group" aria-label={currentQuestion.question}>
               {currentQuestion.options.map((opt) => {
                 const isSelected = currentAnswer?.optionId === opt.id;
                 return (
                   <button
                     key={opt.id}
                     type="button"
+                    aria-pressed={isSelected}
                     onClick={() =>
                       handleSelectOption(currentQuestion.id, opt.id, opt.label, opt.isRedFlag)
                     }
@@ -495,48 +509,67 @@ export function SymptomCheckerView() {
               </Alert>
             )}
 
-            <div className="flex items-center justify-between border-t pt-4">
+            {submitError ? (
+              <Alert tone="danger" role="alert">
+                <AlertCircle className="size-4" aria-hidden="true" />
+                <AlertTitle className="text-sm font-semibold">{submitError.title}</AlertTitle>
+                <AlertDescription className="text-xs">
+                  {submitError.detail} Your answers are still here. Press the button again to retry.
+                </AlertDescription>
+              </Alert>
+            ) : null}
+
+            {/* Stacks on narrow screens so the primary action is never pushed off-screen. */}
+            <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
+                className="w-full sm:w-auto"
                 onClick={() => setCurrentQuestionIdx((idx) => Math.max(0, idx - 1))}
-                disabled={currentQuestionIdx === 0}
+                disabled={currentQuestionIdx === 0 || evaluating}
               >
-                <ArrowLeft className="size-4 mr-1" /> Previous
+                <ArrowLeft className="size-4 mr-1" aria-hidden="true" /> Previous
               </Button>
 
-              {currentQuestionIdx < questions.length - 1 ? (
+              {!lastQuestion ? (
                 <Button
                   type="button"
                   size="sm"
+                  className="w-full sm:w-auto"
                   onClick={() => setCurrentQuestionIdx((idx) => idx + 1)}
-                  disabled={!currentAnswer}
+                  disabled={!canAdvance(currentQuestion, answers)}
                 >
-                  Next Question <ArrowRight className="size-4 ml-1" />
+                  Next Question <ArrowRight className="size-4 ml-1" aria-hidden="true" />
                 </Button>
               ) : (
                 <Button
                   type="button"
                   size="sm"
-                  onClick={handleCompleteAssessment}
-                  disabled={!currentAnswer || evaluating}
-                  className="bg-primary hover:bg-primary/90"
+                  onClick={() => void handleCompleteAssessment()}
+                  disabled={!canAdvance(currentQuestion, answers) || evaluating}
+                  aria-busy={evaluating}
+                  className="bg-primary hover:bg-primary/90 h-auto min-h-9 w-full whitespace-normal sm:w-auto"
                 >
                   {evaluating ? (
                     <>
-                      <LoaderCircle className="size-4 animate-spin mr-1.5" />
-                      Evaluating Rules…
+                      <LoaderCircle className="size-4 animate-spin mr-1.5" aria-hidden="true" />
+                      Evaluating…
                     </>
                   ) : (
                     <>
-                      Complete Assessment & View Output
-                      <CheckCircle2 className="size-4 ml-1.5" />
+                      Submit &amp; View Result
+                      <CheckCircle2 className="size-4 ml-1.5" aria-hidden="true" />
                     </>
                   )}
                 </Button>
               )}
             </div>
+            {!canAdvance(currentQuestion, answers) ? (
+              <p className="text-muted-foreground text-xs" aria-live="polite">
+                Choose an answer to continue.
+              </p>
+            ) : null}
           </div>
         </div>
       )}

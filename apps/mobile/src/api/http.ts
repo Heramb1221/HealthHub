@@ -3,7 +3,8 @@ import { ApiError, apiErrorFromResponse } from "./errors.ts";
 export interface HttpConfig {
 
   baseUrl: string | null;
-  getToken: () => string | null;
+  /** May be async: Clerk session tokens are short-lived, so a fresh one is requested per call. */
+  getToken: () => string | null | Promise<string | null>;
 
   onUnauthorized: () => void;
 
@@ -47,8 +48,13 @@ export function apiUrl(path: string, query?: Query): string {
   return qs ? `${url}?${qs}` : url;
 }
 
-export function authHeaders(): Record<string, string> {
-  const token = config.getToken();
+export async function authHeaders(): Promise<Record<string, string>> {
+  let token: string | null = null;
+  try {
+    token = await config.getToken();
+  } catch {
+    token = null;
+  }
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -78,7 +84,7 @@ interface RawResult {
 async function send(path: string, options: RequestOptions): Promise<RawResult> {
   const { method = "GET", query, json, formData, signal, timeoutMs = 20_000, skipUnauthorizedHandler } = options;
   const url = apiUrl(path, query);
-  const headers: Record<string, string> = { Accept: "application/json", ...authHeaders() };
+  const headers: Record<string, string> = { Accept: "application/json", ...(await authHeaders()) };
   const sentToken = "Authorization" in headers;
 
   let body: FormData | string | undefined;

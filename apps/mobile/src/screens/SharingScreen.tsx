@@ -7,7 +7,7 @@ import type { Consent } from "../api/types";
 import { useResource } from "../hooks/useResource";
 import { consentStatus, providerLabel, scopeLabel, sortConsents, type ConsentStatus } from "../lib/consents";
 import { formatDateTime } from "../lib/format";
-import { AppText, Badge, Banner, Button, Card, Field, Screen, Stack } from "../ui/components";
+import { AppText, Badge, Banner, Button, Card, Field, Row, Screen, SectionTitle, Stack } from "../ui/components";
 import { EmptyState, ErrorState, LoadingState } from "../ui/states";
 
 const STATUS: Record<ConsentStatus, { label: string; tone: "success" | "neutral"; icon: "check-circle" | "clock" | "slash" }> = {
@@ -72,8 +72,10 @@ export function SharingScreen() {
             const s = STATUS[status];
             return (
               <Card key={c.id}>
-                <AppText variant="label">{scopeLabel(c.resourceScope)}</AppText>
-                <Badge label={s.label} tone={s.tone} icon={s.icon} />
+                <Row style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
+                  <SectionTitle>{scopeLabel(c.resourceScope)}</SectionTitle>
+                  <Badge label={s.label} tone={s.tone} icon={s.icon} />
+                </Row>
                 <AppText variant="small" muted>{providerLabel(c.granteeUserId)}</AppText>
                 <Field label="Purpose" value={c.purpose} />
                 <Field label="Shared on" value={formatDateTime(c.createdAt)} />

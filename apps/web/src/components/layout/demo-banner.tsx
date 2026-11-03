@@ -10,7 +10,7 @@ export function DemoBanner() {
         <FlaskConical aria-hidden="true" className="mt-0.5 size-4 shrink-0 sm:mt-0" />
         <span>
           <strong className="font-semibold">Demo mode.</strong> Records here are synthetic samples stored in this browser only. Nothing is
-          sent to a hospital or a real HealthHub account.
+          sent to a hospital or a real Sehat Meds account.
         </span>
       </p>
     </div>

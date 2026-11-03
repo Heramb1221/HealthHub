@@ -1,3 +1,4 @@
+import type { Env } from "../../config/env.js";
 import type { Db } from "../../db/client.js";
 import type { AuthContext } from "../../middleware/authenticate.js";
 import { AppError } from "../../lib/errors.js";
@@ -182,7 +183,7 @@ export interface HealthCardDto {
   };
 }
 
-export async function getHealthCard(db: Db, auth: AuthContext): Promise<HealthCardDto> {
+export async function getHealthCard(db: Db, env: Pick<Env, "QR_LINK_BASE">, auth: AuthContext): Promise<HealthCardDto> {
   const id = await ownPatientId(db, auth);
   const row = await db.patient.findUniqueOrThrow({
     where: { id },
@@ -208,13 +209,16 @@ export async function getHealthCard(db: Db, auth: AuthContext): Promise<HealthCa
     phone: row.phone,
     emergencyContactName: row.emergencyContactName,
     emergencyContactPhone: row.emergencyContactPhone,
-    issuer: "HealthHub Digital Health Network",
-    notice: "Authorized National Digital Health Identity Card. In case of emergency, scan QR code for immediate vital medical info.",
+    issuer: "Sehat Meds",
+    // Honest labelling: this is an app-issued identifier, not a government or national health ID.
+    notice:
+      "This is a Sehat Meds identifier. It is not an official national health ID. Scanning its QR code opens a protected page: details are shown only to the card holder or an authorised care provider who signs in.",
     generatedAt: now,
     issuedAt: row.createdAt ? row.createdAt.toISOString() : now,
     qr: {
       reference: row.healthId,
-      url: `http://localhost:3000/qr/${row.healthId}`,
+      // Built from the configured link base (set QR_LINK_BASE to your public web address in production).
+      url: `${env.QR_LINK_BASE}qr/${row.healthId}`,
     },
   };
 }

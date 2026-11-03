@@ -8,7 +8,7 @@ import type { InsuranceProviderInfo, PatientInsurancePolicy } from "../api/types
 import { useResource } from "../hooks/useResource";
 import { AppText, Badge, Banner, Button, Card, Chip, Heading, Row, Screen, Stack, TextField } from "../ui/components";
 import { EmptyState, ErrorState, LoadingState } from "../ui/states";
-import { colors, radius, space } from "../ui/theme";
+import { colors, MIN_TOUCH, radius, space } from "../ui/theme";
 
 export function InsuranceScreen() {
   const [activeTab, setActiveTab] = useState<"policies" | "providers">("policies");
@@ -120,7 +120,7 @@ export function InsuranceScreen() {
         {activeTab === "policies" ? (
           <>
             <Banner tone="neutral" title="Personal Record Notice" icon="info">
-              Policy records in HealthHub are stored for your emergency convenience and cashless assistance. They do
+              Policy records in Sehat Meds are stored for your emergency convenience and cashless assistance. They do
               not constitute an authoritative guarantee of coverage from the insurer.
             </Banner>
 
@@ -138,8 +138,14 @@ export function InsuranceScreen() {
               <Card>
                 <Row style={{ justifyContent: "space-between", alignItems: "center" }}>
                   <Heading level={2}>Add Insurance Policy</Heading>
-                  <Pressable onPress={() => setShowAddForm(false)}>
-                    <Feather name="x" size={20} color={colors.textMuted} />
+                  <Pressable
+                    onPress={() => setShowAddForm(false)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Close add policy form"
+                    hitSlop={12}
+                    style={{ minWidth: MIN_TOUCH - 12, minHeight: MIN_TOUCH - 12, alignItems: "center", justifyContent: "center" }}
+                  >
+                    <Feather name="x" size={22} color={colors.textMuted} />
                   </Pressable>
                 </Row>
 
@@ -270,7 +276,11 @@ export function InsuranceScreen() {
                         <AppText variant="small" muted>
                           Cashless Helpline:
                         </AppText>
-                        <Pressable onPress={() => void Linking.openURL(`tel:${p.tpaContact?.replace(/\s+/g, "")}`)}>
+                        <Pressable
+                          onPress={() => void Linking.openURL(`tel:${p.tpaContact?.replace(/\s+/g, "")}`)}
+                          accessibilityRole="link"
+                          accessibilityLabel={`Call cashless helpline ${p.tpaContact ?? ""}`}
+                        >
                           <AppText variant="small" color={colors.primary} style={{ fontWeight: "600" }}>
                             {p.tpaContact} 📞
                           </AppText>
@@ -292,7 +302,7 @@ export function InsuranceScreen() {
                         variant="danger"
                         icon="trash-2"
                         onPress={() => confirmDelete(p)}
-                        style={{ minHeight: 36, paddingVertical: 6, paddingHorizontal: 12 }}
+                        style={{ paddingHorizontal: space.lg }}
                       />
                     </Row>
                   </Card>
@@ -333,7 +343,11 @@ export function InsuranceScreen() {
                     <AppText variant="small" muted>
                       Cashless Helpline:
                     </AppText>
-                    <Pressable onPress={() => void Linking.openURL(`tel:${prov.cashlessHelpline.replace(/\s+/g, "")}`)}>
+                    <Pressable
+                      onPress={() => void Linking.openURL(`tel:${prov.cashlessHelpline.replace(/\s+/g, "")}`)}
+                      accessibilityRole="link"
+                      accessibilityLabel={`Call cashless helpline ${prov.cashlessHelpline}`}
+                    >
                       <AppText variant="small" color={colors.primary} style={{ fontWeight: "600" }}>
                         {prov.cashlessHelpline}
                       </AppText>
@@ -368,7 +382,7 @@ export function InsuranceScreen() {
                       variant="secondary"
                       icon="external-link"
                       onPress={() => void Linking.openURL(prov.website)}
-                      style={{ minHeight: 36, paddingVertical: 6, paddingHorizontal: 12 }}
+                      style={{ paddingHorizontal: space.lg }}
                     />
                   </Row>
                 </Card>
@@ -405,11 +419,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: radius.sm,
   },
   planTagText: {
-    fontSize: 12,
+    fontSize: 13,
     color: colors.text,
   },
 });

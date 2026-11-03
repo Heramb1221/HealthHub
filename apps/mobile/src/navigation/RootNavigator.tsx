@@ -38,11 +38,25 @@ const theme = {
   colors: { ...DefaultTheme.colors, background: colors.background, card: colors.surface, text: colors.text, primary: colors.primary, border: colors.border },
 };
 
-const headerOptions = { headerTintColor: colors.primary, headerTitleStyle: { color: colors.text }, headerStyle: { backgroundColor: colors.surface } };
+const headerOptions = {
+  headerTintColor: colors.primary,
+  headerTitleStyle: { color: colors.text, fontWeight: "600" as const, fontSize: 18 },
+  headerStyle: { backgroundColor: colors.surface },
+  headerShadowVisible: false,
+  headerBackButtonDisplayMode: "minimal" as const,
+};
 
 function MainTabs() {
   return (
-    <Tabs.Navigator screenOptions={{ ...headerOptions, tabBarActiveTintColor: colors.primary, tabBarInactiveTintColor: colors.textMuted, tabBarLabelStyle: { fontSize: 12 } }}>
+    <Tabs.Navigator
+      screenOptions={{
+        ...headerOptions,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textMuted,
+        tabBarLabelStyle: { fontSize: 13, fontWeight: "600" },
+        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
+      }}
+    >
       <Tabs.Screen name="Home" component={DashboardScreen} options={{ title: "Home", tabBarIcon: ({ color, size }) => <Feather name="home" color={color} size={size} /> }} />
       <Tabs.Screen name="Prescriptions" component={PrescriptionListScreen} options={{ title: "Prescriptions", tabBarIcon: ({ color, size }) => <Feather name="file-text" color={color} size={size} /> }} />
       <Tabs.Screen name="Medicines" component={MedicationScreen} options={{ title: "Medicines", tabBarIcon: ({ color, size }) => <Feather name="clock" color={color} size={size} /> }} />
@@ -72,7 +86,7 @@ export function RootNavigator() {
     return <BlockingScreen title="App not configured">{API_CONFIG.problem}</BlockingScreen>;
   }
   if (state.status === "loading") {
-    return <Screen safeEdges={["top"]}><LoadingState label="Starting HealthHub…" /></Screen>;
+    return <Screen safeEdges={["top"]}><LoadingState label="Starting Sehat Meds…" /></Screen>;
   }
   if (state.status === "signedOut") {
     return (

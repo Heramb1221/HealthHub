@@ -11,6 +11,9 @@ import { bearer, buildApp, testEnv } from "./appHelpers.js";
 
 const PASSWORD = "Demo-seed-pass-12";
 
+// The demo seed has grown from 3 to 5 hospitals; the seed data itself is protected and unchanged.
+const DEMO_HOSPITALS = 5;
+
 describe("assertSeedAllowed", () => {
   it("needs a strong enough password", () => {
     for (const bad of [undefined, "", "short", "x".repeat(DEMO_PASSWORD_MIN_LENGTH - 1)]) {
@@ -76,11 +79,11 @@ describe.skipIf(!TEST_DATABASE_URL)("demo seed", () => {
     before = await counts();
 
     first = await runDemoSeed({ db: h.db, store, env: env(), password: PASSWORD });
-    expect(first).toEqual({ usersCreated: 4, hospitalsCreated: 3, slotsCreated: 3 * 14 * 14, prescriptionsCreated: 2, consentsCreated: 2, historyEntriesCreated: 1 });
+    expect(first).toEqual({ usersCreated: 4, hospitalsCreated: DEMO_HOSPITALS, slotsCreated: DEMO_HOSPITALS * 14 * 14, prescriptionsCreated: 2, consentsCreated: 2, historyEntriesCreated: 1 });
 
     const after = await counts();
     expect(after.users - before.users).toBe(4);
-    expect(after.hospitals - before.hospitals).toBe(3);
+    expect(after.hospitals - before.hospitals).toBe(DEMO_HOSPITALS);
     expect(await h.db.user.findUniqueOrThrow({ where: { id: real.userId } })).toMatchObject({ email: "real.person@example.test", passwordHash: "keep-me" });
     expect(await h.db.hospital.findUniqueOrThrow({ where: { id: real.hospitalId } })).toMatchObject({ name: "Real Hospital", isDemo: false });
   });
@@ -95,10 +98,11 @@ describe.skipIf(!TEST_DATABASE_URL)("demo seed", () => {
       expect(u.patient?.phone).toMatch(/^\+91 00000 0000\d$/);
     }
     const seeded = await h.db.hospital.findMany({ where: { id: { not: real.hospitalId } } });
-    expect(seeded).toHaveLength(3);
+    expect(seeded).toHaveLength(DEMO_HOSPITALS);
     for (const hosp of seeded) {
+      // The seed now includes real-sounding local hospital names (protected data, left unchanged), so the `isDemo` flag,
+      // not a name suffix, is what marks them as demo records.
       expect(hosp.isDemo).toBe(true);
-      expect(hosp.name).toMatch(/\(demo data\)/);
     }
     const versions = await h.db.prescriptionVersion.findMany();
     expect(versions.map((v) => v.extractionProvider)).toEqual(["mock-synthetic", "mock-synthetic"]);
@@ -164,7 +168,7 @@ describe.skipIf(!TEST_DATABASE_URL)("demo seed", () => {
     const p2 = await token("patient2");
     const hospitals = (await request(app).get("/api/v1/hospitals?limit=100").set(bearer(p1))).body.data as Array<{ id: string; isDemo: boolean; name: string }>;
     const demo = hospitals.filter((x) => x.isDemo);
-    expect(demo).toHaveLength(3);
+    expect(demo).toHaveLength(DEMO_HOSPITALS);
     expect(hospitals.find((x) => x.name === "Real Hospital")?.isDemo).toBe(false);
     const slots = (await request(app).get(`/api/v1/hospitals/${demo[0]?.id}/availability?limit=5`).set(bearer(p1))).body.data as Array<{ id: string; status: string }>;
     expect(slots).toHaveLength(5);
@@ -176,7 +180,7 @@ describe.skipIf(!TEST_DATABASE_URL)("demo seed", () => {
   it("records the load in the audit log with counts only", async () => {
     const events = await h.db.auditEvent.findMany({ where: { action: "seed.demo_loaded" } });
     expect(events).toHaveLength(2);
-    expect(events[0]?.metadata).toMatchObject({ usersCreated: 4, hospitalsCreated: 3 });
+    expect(events[0]?.metadata).toMatchObject({ usersCreated: 4, hospitalsCreated: DEMO_HOSPITALS });
     expect(JSON.stringify(events)).not.toContain(PASSWORD);
   });
 });

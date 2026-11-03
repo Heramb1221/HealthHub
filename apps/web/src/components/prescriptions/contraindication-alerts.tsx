@@ -49,7 +49,7 @@ export function ContraindicationAlerts({ prescriptionId, status }: Contraindicat
 
   if (report.status === "loading") {
     return (
-      <div className="space-y-3 rounded-lg border border-border p-4 animate-pulse bg-card">
+      <div className="space-y-3 rounded-xl border border-border p-4 animate-pulse bg-card shadow-[var(--shadow-soft)]">
         <div className="h-4 w-48 bg-muted rounded" />
         <div className="h-12 w-full bg-muted/60 rounded" />
       </div>

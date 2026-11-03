@@ -7,8 +7,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { LanguageProvider } from "@/lib/i18n/language-context";
 
 export const metadata: Metadata = {
-  title: { default: "Sehat Med - Bharat ka apna Sathi", template: "%s · Sehat Med" },
-  description: "Sehat Med - Bharat ka apna Sathi. Keep your prescriptions, medication schedule and medical history in one place.",
+  title: { default: "Sehat Meds - Bharat ka apna Saathi", template: "%s · Sehat Meds" },
+  description: "Sehat Meds - Bharat ka apna Saathi. Keep your prescriptions, medication schedule and medical history in one place.",
   icons: {
     icon: [
       { url: "/favicon.ico" },

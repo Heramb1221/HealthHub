@@ -170,8 +170,8 @@ async function context(): Promise<Context> {
 function pdfLines(rx: Prescription, healthId: string): PdfLine[] {
   const lines: PdfLine[] = [
     { text: "DEMO DOCUMENT - synthetic data, not a real prescription", bold: true, size: 10 },
-    { text: "HealthHub prescription record", bold: true, size: 20, gap: 14 },
-    { text: `HealthHub ID: ${healthId}`, gap: 12 },
+    { text: "Sehat Meds prescription record", bold: true, size: 20, gap: 14 },
+    { text: `Sehat Meds ID: ${healthId}`, gap: 12 },
     { text: `Prescription record ID: ${rx.id}` },
     { text: "Source: Scanned from a paper prescription (not a digitally issued or signed prescription)" },
     { text: `Reading status: ${PROCESSING_STATUS[rx.processingStatus].label}` },
@@ -262,6 +262,12 @@ export const demoPrescriptionsApi: PrescriptionsApi = {
     return merged;
   },
 
+  async latestVersion(id) {
+    const list = await demoPrescriptionsApi.versions(id);
+    const latest = list.at(-1) ?? list[0];
+    if (!latest) throw new ApiError({ code: "NOT_FOUND", message: "No versions found.", status: 404 });
+    return latest;
+  },
   async correct(id, input: CorrectionInput) {
     const ctx = await context();
     const rx = ctx.all.find((p) => p.id === id) ?? notFound();
@@ -308,7 +314,7 @@ export const demoPrescriptionsApi: PrescriptionsApi = {
   async downloadPdf(id) {
     const rx = (await context()).all.find((p) => p.id === id) ?? notFound();
     const patient = await demoPatientsApi.getMe();
-    return { blob: buildPdf(pdfLines(rx, patient.healthId)), filename: `healthhub-prescription-${id}.pdf` };
+    return { blob: buildPdf(pdfLines(rx, patient.healthId)), filename: `sehatmeds-prescription-${id}.pdf` };
   },
 
   async downloadFile(id) {

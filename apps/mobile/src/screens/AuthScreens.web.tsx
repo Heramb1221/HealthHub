@@ -24,10 +24,10 @@ export function WelcomeScreen({ navigation }: Props<"Welcome">) {
             resizeMode="contain"
           />
           <AppText variant="title" style={{ fontSize: 28, textAlign: "center" }}>
-            Sehat Med
+            Sehat Meds
           </AppText>
           <AppText style={{ fontSize: 14, color: colors.textMuted, fontWeight: "500", marginTop: -6, textAlign: "center" }}>
-            Bharat ka apna Sathi
+            Bharat ka apna Saathi
           </AppText>
           <AppText muted style={{ textAlign: "center" }}>
             Keep your prescriptions, medicine schedule, health history and appointments in one place.

@@ -298,7 +298,7 @@ function AddCustomVaccineDialog({
   }
 
   return (
-    <div className="bg-card rounded-lg border p-5 space-y-4 max-w-xl">
+    <div className="bg-card rounded-xl border p-5 space-y-4 max-w-xl shadow-[var(--shadow-soft)]">
       <div className="space-y-1">
         <h2 className="text-lg font-semibold">Add other vaccine</h2>
         <p className="text-muted-foreground text-sm">
@@ -550,7 +550,7 @@ export function VaccinationView() {
       />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="rounded-lg border bg-card p-4 space-y-1">
+        <div className="rounded-xl border bg-card p-4 space-y-1 shadow-[var(--shadow-soft)]">
           <p className="text-muted-foreground text-xs font-medium">Total Tracked</p>
           <p className="text-2xl font-bold">{summary.total}</p>
           <p className="text-muted-foreground text-xs">Directory & custom</p>
@@ -565,7 +565,7 @@ export function VaccinationView() {
           <p className="text-2xl font-bold text-amber-900 dark:text-amber-200">{summary.notTaken}</p>
           <p className="text-amber-700/80 text-xs dark:text-amber-400">Marked unreceived</p>
         </div>
-        <div className="rounded-lg border bg-card p-4 space-y-1">
+        <div className="rounded-xl border bg-card p-4 space-y-1 shadow-[var(--shadow-soft)]">
           <p className="text-muted-foreground text-xs font-medium">Unrecorded</p>
           <p className="text-2xl font-bold text-muted-foreground">{summary.unrecorded}</p>
           <p className="text-muted-foreground text-xs">Awaiting input</p>
@@ -704,7 +704,7 @@ export function VaccinationView() {
           <p className="text-muted-foreground text-xs font-medium">
             Showing {filtered.length} of {items.length} vaccines
           </p>
-          <ul className="space-y-2.5">
+          <ul className="min-w-0 space-y-2.5">
             {filtered.map((item) => (
               <VaccineRow
                 key={`${item.vaccineName}-${item.status ?? "none"}-${item.administeredDate ?? ""}-${item.notes ?? ""}`}

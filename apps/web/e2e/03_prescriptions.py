@@ -70,7 +70,7 @@ with sync_playwright() as p:
     q=subprocess.run(["qpdf","--check",path],capture_output=True,text=True)
     ok("pdf passes qpdf --check", q.returncode==0, q.stdout[-200:]+q.stderr[-200:])
     txt=subprocess.run(["pdftotext","-layout",path,"-"],capture_output=True,text=True).stdout
-    ok("pdf has HealthHub ID, record ID, source, verification, QR ref", all(s in txt for s in ["HH-4F7K-9QXM","demo-rx-1","Scanned from a paper prescription","Corrected by you","QR reference: demo-qr-demo-rx-1"]), txt[:300])
+    ok("pdf has Sehat Meds ID, record ID, source, verification, QR ref", all(s in txt for s in ["HH-4F7K-9QXM","demo-rx-1","Scanned from a paper prescription","Corrected by you","QR reference: demo-qr-demo-rx-1"]), txt[:300])
     ok("pdf is labelled demo", "DEMO DOCUMENT" in txt)
     # correction on rx-2
     pg.goto(B+"/prescriptions/demo-rx-2"); pg.wait_for_selector("table")

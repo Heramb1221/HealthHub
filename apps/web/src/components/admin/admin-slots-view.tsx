@@ -93,7 +93,7 @@ export function AdminSlotsView({ id }: { id: string }) {
           <h2 id="open" className="text-lg">
             {slots.status === "ready" ? slots.data.length : 0} open {slots.status === "ready" && slots.data.length === 1 ? "time" : "times"} over {days.length} {days.length === 1 ? "day" : "days"}
           </h2>
-          <dl className="bg-card divide-y rounded-md border">
+          <dl className="bg-card divide-y rounded-xl border shadow-[var(--shadow-soft)]">
             {days.map((day) => (
               <div key={day.key} className="grid gap-2 px-5 py-3 sm:grid-cols-[14rem_1fr]">
                 <dt className="text-sm font-medium">{formatDayLong(day.date)}</dt>

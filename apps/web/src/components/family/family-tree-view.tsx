@@ -922,6 +922,7 @@ function FamilyMemberModal({
   const [newConditionInput, setNewConditionInput] = React.useState("");
   const [notes, setNotes] = React.useState(member?.notes ?? "");
   const [submitting, setSubmitting] = React.useState(false);
+  const [fieldErrors, setFieldErrors] = React.useState<{ fullName?: string; age?: string }>({});
 
   function handleAddCondition(name: string) {
     const trimmed = name.trim();
@@ -938,20 +939,23 @@ function FamilyMemberModal({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!fullName.trim()) {
-      toast.error("Please enter the full name");
+    if (submitting) return;
+    const errs: { fullName?: string; age?: string } = {};
+    const trimmedName = fullName.trim();
+    if (!trimmedName) errs.fullName = "Enter the family member's full name.";
+    else if (trimmedName.length > 120) errs.fullName = "Use 120 characters or fewer.";
+    const parsedAge = age.trim() ? Number(age.trim()) : null;
+    if (parsedAge !== null && (!Number.isInteger(parsedAge) || parsedAge < 0 || parsedAge > 130)) {
+      errs.age = "Enter a whole number of years between 0 and 130.";
+    }
+    setFieldErrors(errs);
+    if (errs.fullName || errs.age) {
+      document.getElementById(errs.fullName ? "member-fullname" : "member-age")?.focus();
       return;
     }
 
     setSubmitting(true);
     try {
-      const parsedAge = age.trim() ? parseInt(age.trim(), 10) : null;
-      if (parsedAge !== null && (isNaN(parsedAge) || parsedAge < 0 || parsedAge > 130)) {
-        toast.error("Please enter a valid age between 0 and 130");
-        setSubmitting(false);
-        return;
-      }
-
       if (mode === "create") {
         const input: CreateFamilyMemberInput = {
           fullName: fullName.trim(),
@@ -1004,7 +1008,7 @@ function FamilyMemberModal({
           </Button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4">
           <div>
             <label htmlFor="member-fullname" className="text-xs font-medium text-foreground block mb-1">
               Full Name *
@@ -1015,7 +1019,14 @@ function FamilyMemberModal({
               onChange={(e) => setFullName(e.target.value)}
               placeholder="e.g. Ramesh Sharma"
               required
+              aria-invalid={fieldErrors.fullName ? true : undefined}
+              aria-describedby={fieldErrors.fullName ? "member-fullname-error" : undefined}
             />
+            {fieldErrors.fullName ? (
+              <p id="member-fullname-error" role="alert" className="text-destructive mt-1 text-xs font-medium">
+                {fieldErrors.fullName}
+              </p>
+            ) : null}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1067,7 +1078,14 @@ function FamilyMemberModal({
                 value={age}
                 onChange={(e) => setAge(e.target.value)}
                 placeholder="e.g. 58"
+                aria-invalid={fieldErrors.age ? true : undefined}
+                aria-describedby={fieldErrors.age ? "member-age-error" : undefined}
               />
+              {fieldErrors.age ? (
+                <p id="member-age-error" role="alert" className="text-destructive mt-1 text-xs font-medium">
+                  {fieldErrors.age}
+                </p>
+              ) : null}
             </div>
 
             <div>

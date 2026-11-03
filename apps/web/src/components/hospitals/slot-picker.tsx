@@ -361,7 +361,7 @@ function SessionBlock({ title, timeRange, slots, selectedSlotId, onSelectSlot }:
               key={slot.id}
               type="button"
               onClick={() => void onSelectSlot(slot)}
-              className="border-emerald-600/30 bg-card hover:border-emerald-600 hover:bg-emerald-500/10 text-foreground relative flex flex-col items-center justify-center rounded-lg border py-2 text-xs font-medium transition-all hover:scale-[1.02] active:scale-95"
+              className="border-emerald-600/30 bg-card hover:border-emerald-600 hover:bg-emerald-500/10 text-foreground relative flex flex-col items-center justify-center rounded-xl border py-2 text-xs font-medium transition-all hover:scale-[1.02] active:scale-95 shadow-[var(--shadow-soft)]"
               aria-label={`Available slot: ${timeAria}`}
             >
               <span>{timeLabel}</span>

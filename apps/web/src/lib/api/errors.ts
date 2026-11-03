@@ -69,7 +69,7 @@ export function apiErrorFromResponse(status: number, body: unknown): ApiError {
 export function describeError(error: unknown): { title: string; detail: string; requestId?: string } {
   if (isApiError(error)) {
     if (error.code === "NETWORK_ERROR") {
-      return { title: "Can't reach HealthHub", detail: "Check your connection and try again." };
+      return { title: "Can't reach Sehat Meds", detail: "Check your connection and try again." };
     }
     if (error.isUnauthenticated) {
       return { title: "You're signed out", detail: "Sign in again to continue." };

@@ -14,16 +14,17 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { calendarApi } from "@/lib/api/calendar";
+import { describeCalendarSync } from "@/lib/calendar-sync-message";
 import { describeError } from "@/lib/api/errors";
 import { medicationSchedulesApi } from "@/lib/api/medication-schedules";
 import { prescriptionsApi } from "@/lib/api/prescriptions";
 import type { MedicationSchedule } from "@/lib/api/types";
 import { downloadMedicationIcsFile, type MedicationCalendarItem } from "@/lib/calendar";
 import { formatClock, formatDate, formatDayLong, formatTime } from "@/lib/format";
-import { CONCERN_TEXT, scheduleConcern, slotsForDay, type DoseSlot } from "@/lib/schedule";
+import { CONCERN_TEXT, dueSlots, scheduleConcern, slotsForDay, type DoseSlot } from "@/lib/schedule";
 import { useResource } from "@/lib/use-resource";
 import { buildWhatsAppReminderUrl } from "@/lib/whatsapp";
-import { isBrowserNotificationGranted, requestBrowserNotificationPermission, triggerBrowserMedicationAlarm } from "@/lib/browser-notifications";
+import { browserNotificationState, requestBrowserNotificationPermission, showDoseAlert } from "@/lib/browser-notifications";
 import { useLanguage } from "@/lib/i18n/language-context";
 
 function AddButton() {
@@ -54,36 +55,20 @@ function DoseRow({
 
   onRecord: (slot: DoseSlot, status: "taken" | "skipped") => Promise<boolean>;
 }) {
-  const [changing, setChanging] = React.useState(false);
   const [pending, setPending] = React.useState(false);
   const [announce, setAnnounce] = React.useState("");
-  const changeRef = React.useRef<HTMLButtonElement>(null);
-  const justRecorded = React.useRef(false);
   const { schedule, at, event } = slot;
   const label = `${schedule.medicationName} at ${formatTime(at)}`;
 
   const canRecord = at.getTime() <= now.getTime() + HOUR;
-  const showButtons = canRecord && (!event || changing);
-
-  React.useEffect(() => {
-    if (justRecorded.current && event && !changing) {
-      changeRef.current?.focus();
-      justRecorded.current = false;
-    }
-  }, [event, changing]);
+  // Recorded doses are an append-only log: once saved they cannot be edited, so there is no "change" action.
+  const showButtons = canRecord && !event;
 
   async function record(status: "taken" | "skipped") {
     setPending(true);
-
-    justRecorded.current = true;
     const saved = await onRecord(slot, status);
     setPending(false);
-    if (saved) {
-      setChanging(false);
-      setAnnounce(`${label} marked as ${status}.`);
-    } else {
-      justRecorded.current = false;
-    }
+    if (saved) setAnnounce(`${label} marked as ${status}.`);
   }
 
   return (
@@ -103,15 +88,15 @@ function DoseRow({
               </Badge>
             </p>
           ) : null}
-          {event && !changing ? (
-            <p className="text-muted-foreground text-sm">Recorded at {formatTime(new Date(event.recordedAt))} · self-reported</p>
+          {event ? (
+            <p className="text-muted-foreground text-sm">Recorded at {formatTime(new Date(event.recordedAt))} · self-reported · can’t be changed</p>
           ) : (
             <p className="text-muted-foreground text-sm">{at > now ? "Upcoming" : "Not recorded yet"}</p>
           )}
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2 pl-24 sm:pl-0">
-        {event && !changing ? (
+        {event ? (
           <>
             {event.status === "taken" ? (
               <Badge tone="success">
@@ -122,9 +107,6 @@ function DoseRow({
                 <CircleSlash aria-hidden="true" /> Skipped
               </Badge>
             )}
-            <Button ref={changeRef} variant="ghost" size="sm" onClick={() => setChanging(true)} aria-label={`Change record for ${label}`}>
-              Change
-            </Button>
           </>
         ) : null}
         {showButtons ? (
@@ -151,11 +133,6 @@ function DoseRow({
                 <span className="hidden sm:inline">WhatsApp</span>
               </a>
             </Button>
-            {changing ? (
-              <Button variant="ghost" size="sm" disabled={pending} onClick={() => setChanging(false)}>
-                Cancel
-              </Button>
-            ) : null}
           </>
         ) : null}
       </div>
@@ -221,7 +198,8 @@ export function MedicationsView() {
       }
 
       const res = await calendarApi.syncSchedules({});
-      toast.success(`Synced ${res.syncedCount} medication reminders to Google Calendar!`);
+      const m = describeCalendarSync(res);
+      toast[m.tone === "info" ? "info" : m.tone](m.title, m.description ? { description: m.description } : undefined);
     } catch (err) {
       const { title, detail } = describeError(err);
       toast.error("Could not sync with Google Calendar", { description: `${title}. ${detail}` });
@@ -232,8 +210,11 @@ export function MedicationsView() {
 
   function handleExportIcs() {
     if (schedules.status !== "ready" || schedules.data.length === 0) return;
-    const items: MedicationCalendarItem[] = schedules.data.flatMap((s) =>
+    // Only reminders that are on and current: a paused, finished or out-of-date schedule must not end up on a calendar.
+    const live = schedules.data.filter((s) => s.active && s.remindersEnabled !== false && s.remindersActive !== false && s.times.length > 0);
+    const items: MedicationCalendarItem[] = live.flatMap((s) =>
       s.times.map((time) => ({
+        id: s.id,
         medicationName: s.medicationName,
         strength: s.strength,
         dose: s.dose,
@@ -241,31 +222,55 @@ export function MedicationsView() {
         time,
         startDate: s.startDate,
         endDate: s.endDate,
+        ...(s.timezone ? { timezone: s.timezone } : {}),
       })),
     );
-    downloadMedicationIcsFile(items, "healthhub-all-medications.ics");
-    toast.success("Exported schedules to .ics calendar file");
+    if (items.length === 0) {
+      toast.info("Nothing to export", { description: "Reminders are off, paused, finished or out of date with the prescription." });
+      return;
+    }
+    downloadMedicationIcsFile(items, "sehatmeds-all-medications.ics");
+    toast.success(`Exported ${items.length} reminder${items.length === 1 ? "" : "s"} to a calendar file`, {
+      description: "Importing it again updates the same events instead of adding copies.",
+    });
   }
 
   const { t } = useLanguage();
-  const [deviceAlarmsActive, setDeviceAlarmsActive] = React.useState(() => isBrowserNotificationGranted());
+  const [notificationState, setNotificationState] = React.useState(() => browserNotificationState());
+  const deviceAlarmsActive = notificationState === "granted";
 
   async function handleToggleDeviceAlarms() {
+    if (notificationState === "unsupported") {
+      toast.info("This browser can’t show notifications.", { description: "Use the phone app or export to your calendar for reminders." });
+      return;
+    }
+    if (notificationState === "denied") {
+      toast.info("Notifications are blocked for this site.", { description: "Allow notifications in your browser’s site settings, then try again." });
+      return;
+    }
     const granted = await requestBrowserNotificationPermission();
-    setDeviceAlarmsActive(granted);
+    setNotificationState(browserNotificationState());
     if (granted) {
-      toast.success(t("active_alarms", "Device alarms active for scheduled doses"), {
-        description: "Your browser will trigger notification alarms at your scheduled dose times.",
-      });
-      triggerBrowserMedicationAlarm({
-        medicationName: "HealthHub Reminder",
-        dose: "Alarm Active",
-        instructions: "Scheduled dose alarms will trigger automatically.",
+      toast.success(t("active_alarms", "Alerts are on while this page is open"), {
+        description: "You’ll get an alert when a dose is due, but only while Sehat Meds is open in a browser tab. For reminders when it’s closed, use the phone app or your calendar.",
       });
     } else {
-      toast.info("Browser notifications unavailable or blocked in settings.");
+      toast.info("Notifications weren’t allowed.", { description: "You can change this in your browser’s site settings." });
     }
   }
+
+  // Fire one alert per dose that has just come due. Alerts name no medicine and are tagged per dose, so two open
+  // tabs replace each other instead of stacking.
+  const firedAlerts = React.useRef(new Set<string>());
+  React.useEffect(() => {
+    if (!deviceAlarmsActive || schedules.status !== "ready") return;
+    for (const slot of dueSlots(schedules.data, now)) {
+      const tag = `sehat-dose-${slot.schedule.id}-${Math.floor(slot.at.getTime() / 60_000)}`;
+      if (firedAlerts.current.has(tag)) continue;
+      firedAlerts.current.add(tag);
+      showDoseAlert(tag);
+    }
+  }, [deviceAlarmsActive, schedules, now]);
 
   const actions = (
     <div className="flex flex-wrap items-center gap-2">
@@ -276,10 +281,10 @@ export function MedicationsView() {
             variant={deviceAlarmsActive ? "secondary" : "outline"}
             size="sm"
             onClick={handleToggleDeviceAlarms}
-            title="Enable local device alarms and browser notifications"
+            title="Show a browser notification when a dose is due. Works only while this page is open."
           >
             <Bell className={`mr-1.5 size-4 ${deviceAlarmsActive ? "text-primary" : ""}`} aria-hidden="true" />
-            {deviceAlarmsActive ? t("device_alarms", "Device Alarms: On") : t("enable_notifications", "Enable Alarms")}
+            {deviceAlarmsActive ? t("device_alarms", "Alerts while open: On") : notificationState === "denied" ? "Alerts blocked" : t("enable_notifications", "Alert me while open")}
           </Button>
           <Button
             type="button"
@@ -314,7 +319,7 @@ export function MedicationsView() {
     <div className="space-y-10">
       <PageHeader
         title="Medication schedule"
-        description="Reminders for medicines you’ve checked against your paper prescription. Taken and skipped are recorded by you; HealthHub doesn’t check them."
+        description="Reminders for medicines you’ve checked against your paper prescription. Taken and skipped are recorded by you; Sehat Meds doesn’t check them."
         actions={actions}
       />
 
@@ -340,7 +345,7 @@ export function MedicationsView() {
               return slots.length === 0 ? (
                 <p className="text-muted-foreground text-sm">No reminders today.</p>
               ) : (
-                <ul className="divide-y rounded-md border bg-card px-4">
+                <ul className="divide-y rounded-xl border bg-card px-4 shadow-[var(--shadow-soft)]">
                   {slots.map((slot) => (
                     <DoseRow key={`${slot.schedule.id}-${slot.at.toISOString()}`} slot={slot} now={now} concern={concerns.get(slot.schedule.id) ?? null} onRecord={record} />
                   ))}

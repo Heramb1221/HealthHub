@@ -21,7 +21,7 @@ describe.skipIf(!TEST_DATABASE_URL)("patient profile, health card, access histor
     request(app).patch("/api/v1/patients/me").set(bearer(token)).send(body as object);
 
   const PROFILE_KEYS = [
-    "address", "allergies", "bloodGroup", "createdAt", "currentMedications", "dateOfBirth", "emergencyContact",
+    "address", "allergies", "bloodGroup", "createdAt", "currentMedications", "dateOfBirth", "email", "emergencyContact",
     "existingConditions", "fullName", "gender", "healthId", "id", "phone", "updatedAt",
   ];
 
@@ -253,13 +253,17 @@ describe.skipIf(!TEST_DATABASE_URL)("patient profile, health card, access histor
       });
       const res = await get("/patients/me/health-card", p.token);
       expect(res.status).toBe(200);
+      // The card is the holder's OWN authenticated view and is printed with their contact and next-of-kin on the back,
+      // so those identity/contact fields are intentionally present. Clinical and address data never are.
       expect(Object.keys(res.body.data).sort()).toEqual(
-        ["bloodGroup", "dateOfBirth", "fullName", "generatedAt", "healthId", "issuer", "notice"],
+        ["bloodGroup", "dateOfBirth", "emergencyContactName", "emergencyContactPhone", "fullName", "gender", "generatedAt", "healthId", "issuedAt", "issuer", "notice", "phone", "qr"],
       );
-      expect(res.body.data).toMatchObject({ fullName: "Card Holder", dateOfBirth: "1985-01-02", bloodGroup: "B+", issuer: "HealthHub" });
+      expect(res.body.data).toMatchObject({ fullName: "Card Holder", dateOfBirth: "1985-01-02", bloodGroup: "B+", issuer: "Sehat Meds" });
       expect(res.body.data.notice).toMatch(/not an official national health ID/);
+      expect(Object.keys(res.body.data.qr).sort()).toEqual(["reference", "url"]);
+      expect(res.body.data.qr.reference).toBe(res.body.data.healthId);
       const text = JSON.stringify(res.body);
-      for (const secret of ["private-allergen", "private-condition", "private-med", "Private Street", "Private Contact", "90000 11111"]) {
+      for (const secret of ["private-allergen", "private-condition", "private-med", "Private Street"]) {
         expect(text).not.toContain(secret);
       }
     });

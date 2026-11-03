@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Alert, StyleSheet, View } from "react-native";
+import { Alert, Linking, StyleSheet, View } from "react-native";
 
 import { appointmentApi, paymentApi } from "../api/endpoints";
 import { describeError } from "../api/errors";
 import type { Appointment, PaymentHistoryItem, PaymentOrder, PaymentVerificationResult } from "../api/types";
+import { WEB_APP_URL } from "../config";
 import { useResource } from "../hooks/useResource";
 import { formatDateTime } from "../lib/format";
 import { AppText, Badge, Banner, Button, Card, Heading, Row, Screen, Stack } from "../ui/components";
@@ -11,6 +12,7 @@ import { EmptyState, ErrorState, LoadingState } from "../ui/states";
 import { colors, radius, space } from "../ui/theme";
 
 export function PaymentsScreen() {
+  const configRes = useResource((signal) => paymentApi.getConfig(signal));
   const appointmentsRes = useResource((signal) => appointmentApi.list(signal));
   const historyRes = useResource((signal) => paymentApi.listHistory(signal));
 
@@ -19,43 +21,41 @@ export function PaymentsScreen() {
   const [verifying, setVerifying] = useState(false);
   const [verifiedResult, setVerifiedResult] = useState<PaymentVerificationResult | null>(null);
 
+  const mode = configRes.data?.mode ?? null;
+  const fee = configRes.data?.appointmentFeeRupees ?? null;
+
   async function handleStartPayment(appointmentId: string) {
+    if (creating) return;
+    if (mode === "razorpay_test" || mode === "razorpay_live") {
+      // This app has no payment SDK, so it never pretends to take payment. Real payments use the secure web checkout,
+      // where Razorpay confirms the money with the server; this screen then shows the confirmed result.
+      void Linking.openURL(`${WEB_APP_URL}/payments`).catch(() => Alert.alert("Couldn't open the browser", `Open ${WEB_APP_URL}/payments yourself to pay.`));
+      return;
+    }
     setCreating(appointmentId);
     try {
-      const order = await paymentApi.createOrder({
-        appointmentId,
-        amountPaise: 50000,
-        currency: "INR",
-      });
+      const order = await paymentApi.createOrder({ appointmentId });
       setActiveOrder(order);
       setVerifiedResult(null);
     } catch (e) {
       const info = describeError(e);
-      Alert.alert("Error", `${info.title}. ${info.detail}`);
+      Alert.alert(info.title, info.detail);
     } finally {
       setCreating(null);
     }
   }
 
-  async function handleVerify(simulateFailure = false) {
-    if (!activeOrder) return;
+  async function handleSimulate(outcome: "success" | "failure") {
+    if (!activeOrder || verifying) return;
     setVerifying(true);
     try {
-      const res = await paymentApi.verifyPayment({
-        orderRef: activeOrder.orderRef,
-        paymentRef: simulateFailure ? undefined : `pay_demo_${Date.now()}`,
-        simulateFailure,
-      });
+      // Only simulated development orders accept this; the server refuses it for real orders and in production.
+      const res = await paymentApi.verifyPayment({ orderRef: activeOrder.orderRef, simulate: outcome });
       setVerifiedResult(res);
-      if (res.status === "completed") {
-        Alert.alert("Payment Success", `Consultation fee paid! Receipt: ${res.receiptNumber}`);
-      } else {
-        Alert.alert("Payment Failed", "Transaction simulation failed. Try again.");
-      }
       await historyRes.reload();
     } catch (e) {
       const info = describeError(e);
-      Alert.alert("Error", `${info.title}. ${info.detail}`);
+      Alert.alert(info.title, info.detail);
     } finally {
       setVerifying(false);
     }
@@ -63,86 +63,56 @@ export function PaymentsScreen() {
 
   const appointments = appointmentsRes.data?.items ?? [];
   const history = historyRes.data?.items ?? [];
+  const paidAppointmentIds = new Set(history.filter((h) => h.status === "completed").map((h) => h.appointmentId));
+  const pendingAppointments = appointments.filter((a) => a.status === "confirmed" && new Date(a.startsAt) > new Date() && !paidAppointmentIds.has(a.id));
 
-  const paidAppointmentTimes = new Set(
-    history.filter((h) => h.status === "completed").map((h) => h.appointmentTime)
-  );
-
-  const pendingAppointments = appointments.filter(
-    (a) => a.status === "confirmed" && !paidAppointmentTimes.has(a.startsAt)
-  );
+  const banner =
+    mode === "razorpay_live"
+      ? { tone: "success" as const, title: "Pay securely on the website", text: "Cards, UPI and net banking are handled by Razorpay on the website. Pull down here afterwards to see your receipt." }
+      : mode === "razorpay_test"
+        ? { tone: "neutral" as const, title: "Test payments (sandbox)", text: "Payments are made on the website using Razorpay test cards. No real money moves. Pull down here afterwards to see the result." }
+        : mode === "simulated"
+          ? { tone: "neutral" as const, title: "Development test payments", text: "No payment gateway is connected. Outcomes here are simulated and no money moves." }
+          : mode === "unavailable"
+            ? { tone: "neutral" as const, title: "Online payment isn't available yet", text: "Please pay at the hospital for now." }
+            : null;
 
   return (
-    <Screen refreshing={appointmentsRes.refreshing || historyRes.refreshing} onRefresh={() => { appointmentsRes.refresh(); historyRes.refresh(); }}>
+    <Screen refreshing={appointmentsRes.refreshing || historyRes.refreshing} onRefresh={() => { appointmentsRes.refresh(); historyRes.refresh(); configRes.refresh(); }}>
       <Stack gap={space.lg}>
-        <Banner tone="neutral" title="Sandbox Payment Simulator" icon="shield">
-          Payments are processed in sandbox test mode. No real debit/credit cards or bank accounts will be charged.
-        </Banner>
+        {banner ? <Banner tone={banner.tone} title={banner.title} icon="shield">{banner.text}</Banner> : null}
 
         {activeOrder ? (
           <Card style={styles.checkoutCard}>
-            <Heading level={2}>Pay Consultation Fee</Heading>
+            <Heading level={2}>Test payment</Heading>
             <View style={styles.checkoutBox}>
               <Row style={styles.detailRow}>
-                <AppText variant="small" muted>
-                  Hospital:
-                </AppText>
-                <AppText variant="small" style={{ fontWeight: "600" }}>
-                  {activeOrder.hospitalName}
-                </AppText>
+                <AppText variant="small" muted>Hospital:</AppText>
+                <AppText variant="small" style={{ fontWeight: "600" }}>{activeOrder.hospitalName}</AppText>
               </Row>
               <Row style={styles.detailRow}>
-                <AppText variant="small" muted>
-                  Order Ref:
-                </AppText>
-                <AppText variant="small" style={{ fontFamily: "monospace" }}>
-                  {activeOrder.orderRef}
-                </AppText>
-              </Row>
-              <Row style={styles.detailRow}>
-                <AppText variant="small" muted>
-                  Amount:
-                </AppText>
-                <AppText variant="label" style={{ color: colors.success, fontSize: 16 }}>
-                  ₹{activeOrder.amountRupees} {activeOrder.currency}
-                </AppText>
+                <AppText variant="small" muted>Amount:</AppText>
+                <AppText variant="label" style={{ color: colors.success, fontSize: 16 }}>₹{activeOrder.amountRupees} {activeOrder.currency}</AppText>
               </Row>
             </View>
-
             {!verifiedResult ? (
-              <Row style={{ gap: space.sm, marginTop: space.sm }}>
-                <Button
-                  label="Simulate Failure"
-                  variant="danger"
-                  onPress={() => void handleVerify(true)}
-                  disabled={verifying}
-                  style={{ flex: 1 }}
-                />
-                <Button
-                  label={verifying ? "Processing…" : `Pay ₹${activeOrder.amountRupees}`}
-                  variant="primary"
-                  onPress={() => void handleVerify(false)}
-                  loading={verifying}
-                  style={{ flex: 1 }}
-                />
-              </Row>
+              <View style={{ gap: space.sm, marginTop: space.sm }}>
+                <Badge label="Test only: no money moves" tone="warning" />
+                <Row style={{ gap: space.sm }}>
+                  <Button label="Test: fails" variant="danger" onPress={() => void handleSimulate("failure")} disabled={verifying} style={{ flex: 1 }} />
+                  <Button label={verifying ? "Working…" : "Test: succeeds"} variant="primary" onPress={() => void handleSimulate("success")} loading={verifying} style={{ flex: 1 }} />
+                </Row>
+              </View>
             ) : (
               <View style={{ marginTop: space.sm }}>
                 <Banner
-                  tone={verifiedResult.status === "completed" ? "success" : "danger"}
-                  title={verifiedResult.status === "completed" ? "Payment Completed" : "Payment Failed"}
+                  tone={verifiedResult.status === "completed" ? "success" : verifiedResult.status === "pending" ? "warning" : "danger"}
+                  title={verifiedResult.status === "completed" ? "Test payment recorded" : verifiedResult.status === "pending" ? "Waiting for confirmation" : "Test payment failed"}
                   icon={verifiedResult.status === "completed" ? "check-circle" : "alert-circle"}
                 >
-                  {verifiedResult.status === "completed"
-                    ? `Receipt: ${verifiedResult.receiptNumber}\nAmount: ₹${verifiedResult.amountRupees}`
-                    : "Simulated decline or failure."}
+                  {verifiedResult.status === "completed" ? `Receipt ${verifiedResult.receiptNumber}. Amount ₹${verifiedResult.amountRupees}` : "No money moved."}
                 </Banner>
-                <Button
-                  label="Done"
-                  variant="secondary"
-                  onPress={() => setActiveOrder(null)}
-                  style={{ marginTop: space.sm }}
-                />
+                <Button label="Done" variant="secondary" onPress={() => setActiveOrder(null)} style={{ marginTop: space.sm }} />
               </View>
             )}
           </Card>
@@ -175,12 +145,13 @@ export function PaymentsScreen() {
                   Fee: ₹500.00
                 </AppText>
                 <Button
-                  label={creating === a.id ? "Creating…" : "Pay ₹500"}
+                  label={creating === a.id ? "Preparing…" : mode === "unavailable" ? "Pay at hospital" : fee ? `Pay ₹${fee}` : "Pay"}
                   variant="primary"
                   icon="credit-card"
                   onPress={() => void handleStartPayment(a.id)}
+                  disabled={mode === "unavailable"}
                   loading={creating === a.id}
-                  style={{ minHeight: 38, paddingVertical: 8, paddingHorizontal: 16 }}
+                  style={{ paddingHorizontal: space.lg }}
                 />
               </Row>
             </Card>

@@ -102,7 +102,7 @@ export function ProfileView() {
           description={
             isOnboarding
               ? "Fill in your basic information to complete account registration."
-              : "Changes are saved to your HealthHub medical profile when you select Save changes."
+              : "Changes are saved to your Sehat Meds medical profile when you select Save changes."
           }
         />
         <ProfileForm
@@ -113,7 +113,7 @@ export function ProfileView() {
             patient.setData(updated);
             setEditing(false);
             if (isOnboarding) {
-              toast.success("Profile setup complete! Welcome to HealthHub.");
+              toast.success("Profile setup complete! Welcome to Sehat Meds.");
               router.push("/dashboard");
             }
           }}
@@ -135,7 +135,7 @@ export function ProfileView() {
       />
 
       <Group title="Identity">
-        <Field label="Sehat Med ID">
+        <Field label="Sehat Meds ID">
           <span className="flex flex-wrap items-center gap-2">
             <HealthId value={p.healthId} />
             {p.isDemo ? <DemoTag /> : null}

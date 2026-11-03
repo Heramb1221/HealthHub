@@ -156,7 +156,7 @@ export function AdminHospitalsView() {
                 </Table>
               </div>
 
-              <ul className="bg-card divide-y rounded-md border md:hidden">
+              <ul className="bg-card divide-y rounded-xl border shadow-[var(--shadow-soft)] md:hidden">
                 {shown.map((h) => (
                   <li key={h.id} className="space-y-3 px-4 py-4">
                     <div className="space-y-1">

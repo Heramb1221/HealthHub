@@ -35,7 +35,7 @@ export function SelectField({ name, label, hint, error, placeholder = "Select", 
           name={name}
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy}
-          className="border-input bg-card h-10 w-full appearance-none rounded-md border py-2 pr-10 pl-3 text-base md:text-sm aria-invalid:border-destructive"
+          className="border-input bg-card h-10 w-full appearance-none rounded-xl border py-2 pr-10 pl-3 text-base md:text-sm aria-invalid:border-destructive shadow-[var(--shadow-soft)]"
           {...props}
         >
           <option value="">{placeholder}</option>

@@ -9,9 +9,11 @@ import { useResource } from "../hooks/useResource";
 import { formatDateOnly, formatDateTime } from "../lib/format";
 import { PROCESSING_STATUS, VERIFICATION_STATUS } from "../lib/status";
 import type { RootStackParamList } from "../navigation/types";
-import { AppText, Badge, Banner, Button, Card, Screen, Stack } from "../ui/components";
+import { AppText, Badge, Banner, Button, Card, Row, Screen, Stack } from "../ui/components";
 import { EmptyState, ErrorState, LoadingState } from "../ui/states";
-import { Pressable } from "react-native";
+import { Feather } from "@expo/vector-icons";
+import { Pressable, View } from "react-native";
+import { colors, radius } from "../ui/theme";
 
 export function PrescriptionListScreen() {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -73,15 +75,23 @@ export function PrescriptionListScreen() {
                 onPress={() => nav.navigate("PrescriptionDetail", { id: p.id })}
               >
                 <Card>
-                  <AppText variant="label">{p.prescriptionDate ? formatDateOnly(p.prescriptionDate) : `Uploaded ${formatDateTime(p.createdAt)}`}</AppText>
-                  {p.prescriberName ? <AppText variant="small" muted>{p.prescriberName}</AppText> : null}
+                  <Row style={{ alignItems: "flex-start" }}>
+                    <View style={{ width: 40, height: 40, borderRadius: radius.md, backgroundColor: colors.iconTile, alignItems: "center", justifyContent: "center" }} importantForAccessibility="no">
+                      <Feather name="file-text" size={20} color={colors.primary} />
+                    </View>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <AppText variant="label">{p.prescriptionDate ? formatDateOnly(p.prescriptionDate) : `Uploaded ${formatDateTime(p.createdAt)}`}</AppText>
+                      {p.prescriberName ? <AppText variant="small" muted>{p.prescriberName}</AppText> : null}
+                    </View>
+                    <Feather name="chevron-right" size={20} color={colors.textMuted} importantForAccessibility="no" />
+                  </Row>
                   <AppText variant="small" muted numberOfLines={2}>
                     {names || (p.processingStatus === "completed" ? "No medicines were read from this file." : "Details not available yet.")}
                   </AppText>
-                  <Stack gap={4}>
+                  <Row style={{ flexWrap: "wrap" }}>
                     <Badge label={proc.label} tone={proc.tone} icon={proc.icon as never} />
                     <Badge label={ver.label} tone={ver.tone} icon={ver.icon as never} />
-                  </Stack>
+                  </Row>
                 </Card>
               </Pressable>
             );

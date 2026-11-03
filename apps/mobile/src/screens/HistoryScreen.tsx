@@ -9,7 +9,7 @@ import { formatDateOnly, formatDateTime } from "../lib/format";
 import { describeHistoryVerification } from "../lib/status";
 import { isValidDateOnly } from "../lib/validation";
 import type { RootStackParamList } from "../navigation/types";
-import { AppText, Badge, Banner, Button, Card, Chip, DemoTag, Row, Screen, Stack, TextField } from "../ui/components";
+import { AppText, Badge, Banner, Button, Card, Chip, DemoTag, Row, Screen, SectionTitle, Stack, TextField } from "../ui/components";
 import { EmptyState, ErrorState, LoadingState } from "../ui/states";
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -84,7 +84,7 @@ export function HistoryScreen() {
         {success ? <Banner tone="success" title="Condition added" icon="check-circle" /> : null}
         {adding ? (
           <Card>
-            <AppText variant="heading" accessibilityRole="header">Add a condition</AppText>
+            <SectionTitle>Add a condition</SectionTitle>
             <TextField label="Condition" value={name} onChangeText={setName} error={nameError} hint="For example: Seasonal allergy" maxLength={120} />
             <TextField label="Notes (optional)" value={notes} onChangeText={setNotes} multiline maxLength={500} />
             <TextField label="When it was diagnosed (optional)" value={diagnosed} onChangeText={setDiagnosed} error={diagnosedError} hint="YYYY-MM-DD, or leave blank" keyboardType="numbers-and-punctuation" />

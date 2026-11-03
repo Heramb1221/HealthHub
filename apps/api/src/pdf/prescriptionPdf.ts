@@ -62,7 +62,10 @@ function formatPdfDate(dateStr: string | null, fallbackDate: Date): string {
 
 export function buildPrescriptionPdf(input: PrescriptionPdfInput): Buffer {
   const { version } = input;
-  const pdf = new PdfBuilder("Sehat Med - Clinical Prescription");
+  // A photographed/uploaded paper prescription is a digitized COPY. Only prescriptions created by a clinician
+  // inside the platform are presented as issued documents.
+  const digitizedCopy = input.sourceType !== "clinician_issued";
+  const pdf = new PdfBuilder(digitizedCopy ? "Sehat Meds - Digitized prescription copy" : "Sehat Meds - Prescription");
 
   const MARGIN = 40;
   const CONTENT_WIDTH = 515;
@@ -75,15 +78,15 @@ export function buildPrescriptionPdf(input: PrescriptionPdfInput): Buffer {
 
   let y = 802;
 
-  pdf.textAt("SEHAT MED", MARGIN, y - 18, { size: 20, bold: true, color: PRIMARY_DARK });
-  pdf.textAt("PATIENT CARE * CLINICAL DOCUMENT RECORD", MARGIN, y - 30, {
+  pdf.textAt("SEHAT MEDS", MARGIN, y - 18, { size: 20, bold: true, color: PRIMARY_DARK });
+  pdf.textAt(digitizedCopy ? "BHARAT KA APNA SAATHI * DIGITIZED COPY OF A PRESCRIPTION" : "BHARAT KA APNA SAATHI * PRESCRIPTION", MARGIN, y - 30, {
     size: 7.5,
     bold: true,
     color: [0.45, 0.50, 0.55],
   });
 
   const dateFormatted = formatPdfDate(version.prescriptionDate, input.generatedAt);
-  pdf.textAt("PRESCRIPTION", 445, y - 14, { size: 11, bold: true, color: [0.10, 0.15, 0.22] });
+  pdf.textAt(digitizedCopy ? "PRESCRIPTION COPY" : "PRESCRIPTION", digitizedCopy ? 423 : 445, y - 14, { size: 11, bold: true, color: [0.10, 0.15, 0.22] });
   pdf.textAt(`Date: ${dateFormatted}`, 445, y - 26, { size: 8.5, color: [0.25, 0.30, 0.35] });
 
   y -= 38;
@@ -149,21 +152,13 @@ export function buildPrescriptionPdf(input: PrescriptionPdfInput): Buffer {
   pdf.textAt("PRESCRIBER & FACILITY", MARGIN, y, { size: 9, bold: true, color: PRIMARY_DARK });
   y -= 6;
 
+  const NOT_STATED = "Not stated on the document";
+  const prescriberName = version.prescriberName?.trim();
   const prescriberRows: Array<[string, string]> = [
-    [
-      "Hospital / Clinic",
-      input.hospitalName || "Apollo Multi-Specialty Hospital & Diagnostics",
-    ],
-    [
-      "Prescriber",
-      version.prescriberName
-        ? (version.prescriberName.startsWith("Dr") ? version.prescriberName : `Dr. ${version.prescriberName}`)
-        : "Dr. A. Kulkarni",
-    ],
-    [
-      "Specialty / Registration No.",
-      "_______________________________",
-    ],
+    ["Hospital / Clinic", input.hospitalName?.trim() || NOT_STATED],
+    // Never invent a prescriber: print what was read or confirmed, otherwise say so.
+    ["Prescriber", prescriberName ? (/^dr\b/i.test(prescriberName) ? prescriberName : `Dr. ${prescriberName}`) : NOT_STATED],
+    ["Specialty / Registration No.", digitizedCopy ? "See the original prescription" : "_______________________________"],
   ];
 
   const pfLabelW = 145;
@@ -280,6 +275,19 @@ export function buildPrescriptionPdf(input: PrescriptionPdfInput): Buffer {
 
   y -= 14;
 
+  if (digitizedCopy) {
+    // A copy carries no blank diagnosis/signature boxes: nothing here was written or signed by a clinician through Sehat Meds.
+    pdf.textAt("ABOUT THIS DOCUMENT", MARGIN, y, { size: 9, bold: true, color: PRIMARY_DARK });
+    y -= 14;
+    for (const line of [
+      "This is a digitized copy of a prescription provided by the patient. It was not issued, signed or",
+      "authenticated through Sehat Meds. Always follow the original prescription and your doctor's advice.",
+    ]) {
+      pdf.textAt(line, MARGIN, y, { size: 8, color: [0.25, 0.30, 0.35] });
+      y -= 11;
+    }
+    y -= 8;
+  } else {
   pdf.textAt("CLINICAL NOTES & FOLLOW-UP", MARGIN, y, { size: 9, bold: true, color: PRIMARY_DARK });
   y -= 6;
 
@@ -329,11 +337,13 @@ export function buildPrescriptionPdf(input: PrescriptionPdfInput): Buffer {
 
   y -= sigRowH + 16;
 
+  }
+
   const qrBoxY = Math.max(50, y - 56);
   const qrX = MARGIN + CONTENT_WIDTH - 64;
 
   pdf.textAt("SCAN TO OPEN HEALTH RECORD", MARGIN + 190, qrBoxY + 44, { size: 8.5, bold: true, color: [0.15, 0.20, 0.28] });
-  pdf.textAt(`HealthHub ID: ${input.healthId}`, MARGIN + 215, qrBoxY + 32, { size: 7.5, color: [0.35, 0.40, 0.45] });
+  pdf.textAt(`Sehat Meds ID: ${input.healthId}`, MARGIN + 215, qrBoxY + 32, { size: 7.5, color: [0.35, 0.40, 0.45] });
   pdf.textAt("QR links to this prescription record.", MARGIN + 200, qrBoxY + 20, { size: 7, color: [0.50, 0.55, 0.60] });
 
   const verificationStatusText =
@@ -363,7 +373,7 @@ export function buildPrescriptionPdf(input: PrescriptionPdfInput): Buffer {
     { size: 6.5, color: [0.65, 0.68, 0.72] },
   );
   pdf.textAt(
-    `HealthHub patient ID: ${input.healthId} * ${verificationStatusText} Generated ${input.generatedAt.toISOString()} (UTC). not an official national health ID.`,
+    `Sehat Meds patient ID: ${input.healthId} * ${verificationStatusText} Generated ${input.generatedAt.toISOString()} (UTC). not an official national health ID.`,
     MARGIN,
     qrBoxY + 10,
     { size: 6.5, color: [0.65, 0.68, 0.72] },
@@ -374,7 +384,7 @@ export function buildPrescriptionPdf(input: PrescriptionPdfInput): Buffer {
   pdf.qrAt(qrMatrix(input.qrPayload), qrX, qrBoxY - 2, 1.85);
 
   pdf.lineAt(MARGIN, 34, MARGIN + CONTENT_WIDTH, 34, { stroke: [0.85, 0.88, 0.90], strokeWidth: 0.5 });
-  pdf.textAt("SEHAT MED * Clinical prescription document", MARGIN, 24, { size: 7.5, color: [0.45, 0.50, 0.55] });
+  pdf.textAt(digitizedCopy ? "SEHAT MEDS * Digitized prescription copy - not a newly issued prescription" : "SEHAT MEDS * Prescription document", MARGIN, 24, { size: 7.5, color: [0.45, 0.50, 0.55] });
   pdf.textAt("Page 1", MARGIN + CONTENT_WIDTH - 30, 24, { size: 7.5, color: [0.45, 0.50, 0.55] });
 
   return pdf.build();

@@ -5,6 +5,7 @@ import { parseDateOnly } from "../../lib/text.js";
 import type { AuthContext } from "../../middleware/authenticate.js";
 import { authorizePatientData } from "../access/patientAccess.js";
 import { recordAudit } from "../audit/audit.js";
+import { dateInZone, zonedInstant } from "../../lib/zonedTime.js";
 import { ownPatientId } from "../patients/ownPatient.js";
 import { checkScheduleEligibility, REFUSAL_MESSAGE, type IneligibleReason } from "./eligibility.js";
 import type { CreateScheduleInput, UpdateScheduleInput } from "./schemas.js";
@@ -283,6 +284,17 @@ export async function createSchedule(db: Db, auth: AuthContext, input: CreateSch
   return (await toDtos(db, [row], now))[0] as ScheduleDto;
 }
 
+/** Schedules (with their computed state) matching `where`, for server features such as calendar sync and the dashboard. */
+export async function loadScheduleDtos(db: Db, where: Prisma.MedicationScheduleWhereInput, now: Date = new Date()): Promise<ScheduleDto[]> {
+  const rows = await db.medicationSchedule.findMany({
+    where,
+    select: scheduleSelect(since(now)),
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: 200,
+  });
+  return toDtos(db, rows, now);
+}
+
 export async function listSchedules(
   db: Db,
   auth: AuthContext,
@@ -387,7 +399,7 @@ export async function recordDoseEvent(
   const patientId = await ownPatientId(db, auth);
   const schedule = await db.medicationSchedule.findFirst({
     where: { id: scheduleId, patientId },
-    select: { id: true, isActive: true, timezone: true, startDate: true, endDate: true },
+    select: { id: true, isActive: true, timezone: true, startDate: true, endDate: true, reminderTimes: true },
   });
   if (!schedule) throw new AppError("NOT_FOUND", "Medication reminder not found");
   if (!schedule.isActive) throw new AppError("CONFLICT", "This reminder schedule is currently paused or inactive");
@@ -401,9 +413,23 @@ export async function recordDoseEvent(
     throw new AppError("VALIDATION_ERROR", "Dose time falls outside the active date range of this reminder schedule");
   }
 
+  // A dose belongs to one of the schedule's reminder slots. Snapping to the exact slot instant (in the schedule's own
+  // time zone, daylight-saving aware) means a retry or a client with a slightly different clock cannot create a second
+  // record for the same dose. Schedules without reminder times accept any time the patient reports.
+  let scheduledFor = input.scheduledFor;
+  if (schedule.reminderTimes.length > 0) {
+    const minute = Math.floor(input.scheduledFor.getTime() / 60_000);
+    const localDay = dateInZone(input.scheduledFor, schedule.timezone);
+    const slot = schedule.reminderTimes
+      .map((time) => zonedInstant(localDay, time, schedule.timezone))
+      .find((instant) => instant !== null && Math.floor(instant.getTime() / 60_000) === minute);
+    if (!slot) throw new AppError("VALIDATION_ERROR", "That time is not one of this schedule's reminder times");
+    scheduledFor = slot;
+  }
+
   try {
     const event = await db.doseEvent.create({
-      data: { scheduleId, scheduledFor: input.scheduledFor, status: input.status },
+      data: { scheduleId, scheduledFor, status: input.status },
       select: { id: true, scheduleId: true, scheduledFor: true, status: true, recordedAt: true },
     });
     return {
@@ -417,10 +443,15 @@ export async function recordDoseEvent(
   } catch (err) {
     if (typeof err === "object" && err !== null && (err as { code?: unknown }).code === "P2002") {
       const existing = await db.doseEvent.findUnique({
-        where: { scheduleId_scheduledFor: { scheduleId, scheduledFor: input.scheduledFor } },
+        where: { scheduleId_scheduledFor: { scheduleId, scheduledFor } },
         select: { id: true, scheduleId: true, scheduledFor: true, status: true, recordedAt: true },
       });
       if (existing) {
+        // The log is append-only. Repeating the SAME report (a retry or double tap) is safe and returns the original;
+        // a DIFFERENT status is refused so the patient is never told "skipped" while the record says "taken".
+        if (existing.status !== input.status) {
+          throw new AppError("CONFLICT", `This dose is already recorded as ${existing.status}. Recorded doses cannot be changed`);
+        }
         return {
           id: existing.id,
           scheduleId: existing.scheduleId,

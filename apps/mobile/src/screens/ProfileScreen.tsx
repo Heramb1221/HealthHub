@@ -17,9 +17,10 @@ import { useLanguage } from "../i18n/LanguageContext";
 import { SUPPORTED_LANGUAGES } from "../i18n/languages";
 import { LanguageModal } from "../ui/LanguageModal";
 import type { RootStackParamList } from "../navigation/types";
-import { AppText, Badge, Banner, Button, Card, Chip, Divider, Field, ListRow, Row, Screen, Stack, TextField } from "../ui/components";
+import { AppText, Badge, Banner, Button, Card, Chip, Divider, Field, ListRow, Row, Screen, SectionTitle, Stack, TextField } from "../ui/components";
 import { ErrorState, LoadingState } from "../ui/states";
-import { space } from "../ui/theme";
+import { colors, radius, space } from "../ui/theme";
+import { View } from "react-native";
 
 interface Form {
   fullName: string;
@@ -131,7 +132,7 @@ export function ProfileScreen() {
         <Stack>
           {saveError ? <Banner tone="danger" title={saveError} icon="alert-circle" /> : null}
           {isOnboarding ? (
-            <Banner tone="info" title="Welcome to HealthHub!" icon="info">
+            <Banner tone="info" title="Welcome to Sehat Meds!" icon="info">
               Please complete your profile to activate your medical account and access appointments and records.
             </Banner>
           ) : (
@@ -183,12 +184,27 @@ export function ProfileScreen() {
     <Screen refreshing={res.refreshing} onRefresh={res.refresh}>
       <Stack>
         {saved ? <Banner tone="success" title="Profile saved" icon="check-circle" /> : null}
+        <Card style={{ flexDirection: "row", alignItems: "center", gap: space.md }}>
+          <View
+            accessible
+            accessibilityLabel={`Profile initials ${initialsOf(patient.fullName)}`}
+            style={{ width: 56, height: 56, borderRadius: radius.pill, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" }}
+          >
+            <AppText variant="heading" color={colors.onPrimary}>{initialsOf(patient.fullName)}</AppText>
+          </View>
+          <View style={{ flex: 1, gap: 2 }}>
+            <AppText variant="heading" numberOfLines={1}>{patient.fullName || "Your name"}</AppText>
+            <AppText variant="small" muted numberOfLines={1}>{email || "No email on this account"}</AppText>
+            <AppText variant="caption" selectable style={{ color: colors.primary, fontWeight: "600" }}>ID {patient.healthId}</AppText>
+          </View>
+        </Card>
         <Card>
-          <Field label="Sehat Med ID" value={patient.healthId} />
+          <SectionTitle>Account</SectionTitle>
+          <Field label="Sehat Meds ID" value={patient.healthId} />
           <Field label="Account email" value={email || "Not provided"} />
         </Card>
         <Card>
-          <AppText variant="heading" accessibilityRole="header">Personal details</AppText>
+          <SectionTitle>Personal details</SectionTitle>
           <Field label="Full name" value={orDash(patient.fullName)} />
           <Field label="Date of birth" value={formatDateOnly(patient.dateOfBirth)} />
           <Field label="Gender" value={genderLabel(patient.gender)} />
@@ -199,26 +215,27 @@ export function ProfileScreen() {
           <Field label="Emergency contact" value={[patient.emergencyContact?.name, patient.emergencyContact?.phone].filter(Boolean).join(" · ") || "Not provided"} />
         </Card>
         <Card>
-          <AppText variant="heading" accessibilityRole="header">Health information (self-reported)</AppText>
+          <SectionTitle>Health information (self-reported)</SectionTitle>
           <Field label="Allergies" value={patient.allergies.length ? patient.allergies.join(", ") : "None listed"} />
           <Field label="Existing conditions" value={patient.existingConditions.length ? patient.existingConditions.join(", ") : "None listed"} />
           <Field label="Current medications" value={patient.currentMedications.length ? patient.currentMedications.join(", ") : "None listed"} />
         </Card>
-        <Card style={{ gap: 0 }}>
+        <Card style={{ gap: 0, padding: space.sm }}>
           <ListRow
+            icon="globe"
             title={t("bhashini_language", "Regional Language (Bhashini AI)")}
             subtitle={`${SUPPORTED_LANGUAGES.find((l) => l.code === language)?.nativeName ?? "English"} (Govt of India Bhashini)`}
             onPress={() => setLangModalVisible(true)}
           />
-          <ListRow title="Sharing and access" subtitle="See and revoke who can view your records" onPress={() => nav.navigate("Sharing")} />
-          <ListRow title="Digital health card" onPress={() => nav.navigate("HealthCard")} />
-          <ListRow title="Medical history" onPress={() => nav.navigate("History")} />
-          <ListRow title="Vaccination details" subtitle="Track taken and pending vaccines" onPress={() => nav.navigate("Vaccinations")} />
-          <ListRow title="Family health tree" subtitle="Map relatives & hereditary health risks" onPress={() => nav.navigate("FamilyTree")} />
+          <ListRow icon="share-2" title="Sharing and access" subtitle="See and revoke who can view your records" onPress={() => nav.navigate("Sharing")} />
+          <ListRow icon="smartphone" title="Digital health card" onPress={() => nav.navigate("HealthCard")} />
+          <ListRow icon="book-open" title="Medical history" onPress={() => nav.navigate("History")} />
+          <ListRow icon="shield" title="Vaccination details" subtitle="Track taken and pending vaccines" onPress={() => nav.navigate("Vaccinations")} />
+          <ListRow icon="users" title="Family health tree" subtitle="Map relatives & hereditary health risks" onPress={() => nav.navigate("FamilyTree")} />
         </Card>
         <Card>
           <Row style={{ justifyContent: "space-between", alignItems: "center" }}>
-            <AppText variant="heading" accessibilityRole="header">Family health tree</AppText>
+            <SectionTitle>Family health tree</SectionTitle>
             <Badge label="Active" tone="info" icon="users" />
           </Row>
           <AppText variant="small" muted>
@@ -228,11 +245,11 @@ export function ProfileScreen() {
         </Card>
         <Button label="Edit profile" icon="edit-2" onPress={() => { setForm(toForm(patient)); setSaved(false); setEditing(true); }} />
         <Card>
-          <AppText variant="heading" accessibilityRole="header">About Sehat Med</AppText>
+          <SectionTitle>About Sehat Meds</SectionTitle>
           <Field label="Version" value={Constants.expoConfig?.version ?? "Unknown"} />
           <Field label="Connection" value={IS_DEMO ? "Demo mode (built-in sample data)" : `Live server: ${hostOf(API_CONFIG.baseUrl)}`} />
           <AppText variant="small" muted>
-            Sehat Med - Bharat ka apna Sathi is a personal health-record tool, not a medical device. It does not diagnose, prescribe or change treatment. Text read from a prescription by
+            Sehat Meds - Bharat ka apna Saathi is a personal health-record tool, not a medical device. It does not diagnose, prescribe or change treatment. Text read from a prescription by
             computer can be wrong, so always check it against your paper prescription and follow your doctor's instructions.
           </AppText>
         </Card>
@@ -244,6 +261,15 @@ export function ProfileScreen() {
       </Stack>
     </Screen>
   );
+}
+
+function initialsOf(name: string | null | undefined): string {
+  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "SM";
+  return parts
+    .slice(0, 2)
+    .map((p) => p[0]!.toUpperCase())
+    .join("");
 }
 
 function hostOf(url: string | null): string {

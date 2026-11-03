@@ -1,6 +1,6 @@
 
 import { isApiError } from "./errors";
-import { getAuthToken, request, setAuthToken } from "./http";
+import { resolveAuthToken, request, setAuthToken } from "./http";
 import type { AuthUser, LoginInput, RegisterInput, UserRole } from "./types";
 
 export interface AuthApi {
@@ -73,7 +73,7 @@ const liveAuthApi: AuthApi = {
     }
   },
   async getSession() {
-    const token = getAuthToken();
+    const token = await resolveAuthToken();
     if (!token) return null;
     try {
       return toUser(await request<AuthResponse>("/auth/me"));

@@ -1,6 +1,7 @@
 import { request } from "./http";
 import type {
   CreatePaymentOrderInput,
+  PaymentConfig,
   PaymentHistoryItem,
   PaymentOrder,
   PaymentVerificationResult,
@@ -8,6 +9,7 @@ import type {
 } from "./types";
 
 export interface PaymentsApi {
+  getConfig(): Promise<PaymentConfig>;
   createOrder(input: CreatePaymentOrderInput): Promise<PaymentOrder>;
   verifyPayment(input: VerifyPaymentInput): Promise<PaymentVerificationResult>;
   listHistory(): Promise<PaymentHistoryItem[]>;
@@ -21,6 +23,7 @@ function unwrapData<T>(res: T | { data: T }): T {
 }
 
 const livePaymentsApi: PaymentsApi = {
+  getConfig: async () => unwrapData(await request<PaymentConfig | { data: PaymentConfig }>("/payments/config")),
   createOrder: async (input) => {
     const res = await request<PaymentOrder | { data: PaymentOrder }>("/payments/orders", {
       method: "POST",

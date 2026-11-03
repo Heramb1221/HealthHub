@@ -12,6 +12,8 @@ export interface PrescriptionsApi {
   process(id: string): Promise<UploadResult>;
 
   versions(id: string): Promise<PrescriptionVersion[]>;
+  /** The newest version of the record (what a correction is based on). */
+  latestVersion(id: string): Promise<PrescriptionVersion>;
 
   correct(id: string, input: CorrectionInput): Promise<Prescription>;
   downloadPdf(id: string): Promise<{ blob: Blob; filename?: string }>;
@@ -21,6 +23,19 @@ export interface PrescriptionsApi {
 }
 
 const path = (id: string) => `/prescriptions/${encodeURIComponent(id)}`;
+
+/**
+ * Build the PATCH body the API's strict correctionSchema accepts: `baseVersionNumber` is required,
+ * and `confirmed: true` marks rows the patient checked against the paper original.
+ */
+export function toCorrectionBody(input: CorrectionInput & { baseVersionNumber: number }) {
+  return {
+    baseVersionNumber: input.baseVersionNumber,
+    prescriptionDate: input.prescriptionDate,
+    prescriberName: input.prescriberName,
+    medications: input.medications.map((m) => ({ ...m, ...(input.confirmedByPatient ? { confirmed: true } : {}) })),
+  };
+}
 
 const livePrescriptionsApi: PrescriptionsApi = {
   async list() {
@@ -46,7 +61,14 @@ const livePrescriptionsApi: PrescriptionsApi = {
     const items = asList(await request<PrescriptionVersion[] | { items: PrescriptionVersion[] }>(`${path(id)}/versions`));
     return [...items].sort((a, b) => a.versionNumber - b.versionNumber);
   },
-  correct: (id, input) => request<Prescription>(`${path(id)}/extracted-fields`, { method: "PATCH", json: input }),
+  latestVersion: (id) => request<PrescriptionVersion>(`${path(id)}/latest`),
+  async correct(id, input) {
+    // The API requires the version the edit is based on. Without it every save is rejected (400).
+    const base = input.baseVersionNumber ?? (await request<PrescriptionVersion>(`${path(id)}/latest`)).versionNumber;
+    await request<unknown>(`${path(id)}/extracted-fields`, { method: "PATCH", json: toCorrectionBody({ ...input, baseVersionNumber: base }) });
+    // The API answers with the new *version*; the screen needs the *prescription* (its id is different).
+    return request<Prescription>(path(id));
+  },
   downloadPdf: (id) => requestBlob(`${path(id)}/pdf`),
   downloadFile: (id) => requestBlob(`${path(id)}/file`),
   contraindications: (id) => request<import("./types").ContraindicationReport>(`${path(id)}/contraindications`),

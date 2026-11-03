@@ -7,6 +7,7 @@ import { prescriptionApi } from "../api/endpoints";
 import { ApiError, describeError } from "../api/errors";
 import type { MedicationInput, Prescription, PrescriptionMedication } from "../api/types";
 import { IS_DEMO } from "../config";
+import { OriginalDocumentCard } from "../components/OriginalDocumentCard";
 import { useResource } from "../hooks/useResource";
 import { useServerValue } from "../hooks/useServerValue";
 import { formatDateOnly, formatDateTime, orDash, toDateInput } from "../lib/format";
@@ -14,7 +15,7 @@ import { doseLine, medicationReviewReasons, REVIEW_REASON_LABEL, SCHEDULE_BLOCK_
 import { PROCESSING_STATUS, SOURCE_TYPE_LABEL, VERIFICATION_STATUS } from "../lib/status";
 import { blankToNull, isValidDateOnly } from "../lib/validation";
 import type { RootStackParamList } from "../navigation/types";
-import { AppText, Badge, Banner, Button, Card, Chip, Divider, Field, Screen, Stack, TextField } from "../ui/components";
+import { AppText, Badge, Banner, Button, Card, Chip, Divider, Field, Screen, SectionTitle, Stack, TextField } from "../ui/components";
 import { ErrorState, LoadingState } from "../ui/states";
 import { colors, space } from "../ui/theme";
 
@@ -190,8 +191,8 @@ export function PrescriptionDetailScreen({ route, navigation }: Props) {
         setPdfMsg("Sharing isn't available on this device.");
         return;
       }
-      const { url, headers } = prescriptionApi.pdfRequest(id);
-      file = await File.downloadFileAsync(url, new File(Paths.cache, `healthhub-prescription-${id}.pdf`), { headers, idempotent: true });
+      const { url, headers } = await prescriptionApi.pdfRequest(id);
+      file = await File.downloadFileAsync(url, new File(Paths.cache, `sehatmeds-prescription-${id}.pdf`), { headers, idempotent: true });
       await Sharing.shareAsync(file.uri, { mimeType: "application/pdf", UTI: "com.adobe.pdf", dialogTitle: "Prescription PDF" });
     } catch {
       setPdfMsg("Couldn't get the PDF. Check your connection and that the prescription has finished reading, then try again.");
@@ -218,7 +219,7 @@ export function PrescriptionDetailScreen({ route, navigation }: Props) {
           <TextField label="Prescriber name" value={prescriber} onChangeText={setPrescriber} hint="Leave blank if unknown" />
           {meds.map((m, i) => (
             <Card key={i}>
-              <AppText variant="heading" accessibilityRole="header">Medicine {i + 1}</AppText>
+              <SectionTitle>Medicine {i + 1}</SectionTitle>
               {MED_FIELDS.map((f) => (
                 <TextField
                   key={f.key}
@@ -250,7 +251,7 @@ export function PrescriptionDetailScreen({ route, navigation }: Props) {
     <Screen refreshing={res.refreshing} onRefresh={res.refresh}>
       <Stack>
         <Card>
-          <AppText variant="heading" accessibilityRole="header">Status</AppText>
+          <SectionTitle>Status</SectionTitle>
           <Badge label={proc.label} tone={proc.tone} icon={proc.icon as never} />
           <AppText variant="small" muted>{proc.explanation}</AppText>
           {stillWorking ? <AppText variant="caption" muted>{gaveUp ? "This is taking longer than expected. Pull down to check again." : "Checking automatically…"}</AppText> : null}
@@ -263,8 +264,10 @@ export function PrescriptionDetailScreen({ route, navigation }: Props) {
           <AppText variant="small" muted>{ver.explanation}</AppText>
         </Card>
 
+        <OriginalDocumentCard prescription={rx} />
+
         <Card>
-          <AppText variant="heading" accessibilityRole="header">Source</AppText>
+          <SectionTitle>Source</SectionTitle>
           <Field label="Source" value={SOURCE_TYPE_LABEL[rx.sourceType] ?? rx.sourceType} />
           {rx.sourceType === "uploaded_physical" ? (
             <AppText variant="small" muted>This is a copy of a paper prescription that you uploaded. It is not a digitally issued or signed prescription.</AppText>
@@ -275,18 +278,18 @@ export function PrescriptionDetailScreen({ route, navigation }: Props) {
 
         {rx.processingStatus === "completed" && rx.verificationStatus !== "verified_by_authorized_clinician" ? (
           <Banner tone="warning" title="Check these details before relying on them" icon="alert-triangle">
-            Reading by computer can make mistakes. HealthHub does not give medical advice. Follow your doctor's instructions.
+            Reading by computer can make mistakes. Sehat Meds does not give medical advice. Follow your doctor's instructions.
           </Banner>
         ) : null}
         {saveMsg ? <Banner tone={saveMsg.tone} title={saveMsg.text} icon="info" /> : null}
 
         <Card>
-          <AppText variant="heading" accessibilityRole="header">Prescription details</AppText>
+          <SectionTitle>Prescription details</SectionTitle>
           <Field label="Prescription date" value={formatDateOnly(rx.prescriptionDate)} />
           <Field label="Prescriber" value={orDash(rx.prescriberName)} />
         </Card>
 
-        <AppText variant="heading" accessibilityRole="header">Medicines</AppText>
+        <SectionTitle>Medicines</SectionTitle>
         {rx.medications.length === 0 ? (
           <AppText muted>{stillWorking ? "Medicines will appear here once reading finishes." : "No medicines have been recorded for this prescription."}</AppText>
         ) : (
@@ -334,7 +337,7 @@ export function PrescriptionDetailScreen({ route, navigation }: Props) {
         </Stack>
 
         <Card>
-          <AppText variant="heading" accessibilityRole="header">Version history</AppText>
+          <SectionTitle>Version history</SectionTitle>
           {versions.loading ? (
             <AppText muted>Loading versions…</AppText>
           ) : versions.error ? (

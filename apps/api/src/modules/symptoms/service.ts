@@ -753,7 +753,7 @@ export async function assessSymptoms(env: Env, input: SymptomAssessmentInput): P
       .map((a) => `- ${a.questionText}: ${a.selectedOptionLabel}`)
       .join("\n");
 
-    const prompt = `You are a clinical decision-support triage assistant for HealthHub India.
+    const prompt = `You are a clinical decision-support triage assistant for Sehat Meds India.
 Analyze the following patient-reported symptoms and structured rule-based questionnaire answers for triage purposes ONLY.
 STRICT CLINICAL RULES:
 1. You must NEVER give a definitive diagnosis.

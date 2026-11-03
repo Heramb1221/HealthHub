@@ -30,7 +30,7 @@ function ChangeLine({ change }: { change: Change }) {
 
 export function VersionHistory({ versions }: { versions: PrescriptionVersion[] }) {
   return (
-    <ol className="space-y-6">
+    <ol className="min-w-0 space-y-6 break-words">
       {[...versions].reverse().map((version) => {
         const index = versions.findIndex((v) => v.id === version.id);
         const changes = diffVersions(versions[index - 1] ?? null, version);

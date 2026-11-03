@@ -8,6 +8,7 @@ export type ErrorCode =
   | "UNSUPPORTED_MEDIA_TYPE"
   | "RATE_LIMITED"
   | "PROVIDER_DISABLED"
+  | "BAD_GATEWAY"
   | "INTERNAL_ERROR";
 
 const STATUS: Record<ErrorCode, number> = {
@@ -20,6 +21,7 @@ const STATUS: Record<ErrorCode, number> = {
   UNSUPPORTED_MEDIA_TYPE: 415,
   RATE_LIMITED: 429,
   PROVIDER_DISABLED: 503,
+  BAD_GATEWAY: 502,
   INTERNAL_ERROR: 500,
 };
 
@@ -33,6 +35,7 @@ const DEFAULT_MESSAGE: Record<ErrorCode, string> = {
   UNSUPPORTED_MEDIA_TYPE: "Unsupported media type",
   RATE_LIMITED: "Too many requests",
   PROVIDER_DISABLED: "This capability is disabled by configuration",
+  BAD_GATEWAY: "An upstream service did not respond correctly",
   INTERNAL_ERROR: "An unexpected error occurred",
 };
 

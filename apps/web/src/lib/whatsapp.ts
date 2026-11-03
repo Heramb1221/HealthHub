@@ -11,7 +11,7 @@ export interface WhatsAppReminderOptions {
 export function buildWhatsAppReminderUrl(options: WhatsAppReminderOptions): string {
   const cleanPhone = options.phone ? options.phone.replace(/[^0-9]/g, "") : "";
   const lines = [
-    "🏥 *HealthHub (Sehat Med) Medication Reminder*",
+    "🏥 *Sehat Meds (Sehat Meds) Medication Reminder*",
     "",
     `Patient: ${options.patientName || "Patient"} (${options.healthId || "ID: Record"})`,
     `Medicine: *${options.medicationName}*`,
@@ -19,9 +19,9 @@ export function buildWhatsAppReminderUrl(options: WhatsAppReminderOptions): stri
     options.timeStr ? `Time: ${options.timeStr}` : null,
     options.instructions ? `Instructions: ${options.instructions}` : null,
     "",
-    "⏰ *Action:* Please take your dose on time and mark it taken in your HealthHub dashboard.",
+    "⏰ *Action:* Please take your dose on time and mark it taken in your Sehat Meds dashboard.",
     "",
-    "_Bharat ka apna Health Sathi_",
+    "_Bharat ka apna Health Saathi_",
   ].filter(Boolean);
 
   const text = encodeURIComponent(lines.join("\n"));
@@ -36,13 +36,13 @@ export function buildWhatsAppAppointmentUrl(options: {
 }): string {
   const cleanPhone = options.phone ? options.phone.replace(/[^0-9]/g, "") : "";
   const lines = [
-    "🏥 *HealthHub Appointment Confirmation*",
+    "🏥 *Sehat Meds Appointment Confirmation*",
     "",
     `Hospital: *${options.hospitalName}*`,
     `Scheduled Time: *${options.dateStr}*`,
     options.patientName ? `Patient: ${options.patientName}` : null,
     "",
-    "Please carry your digital HealthHub card or QR code to the reception desk.",
+    "Please carry your digital Sehat Meds card or QR code to the reception desk.",
   ].filter(Boolean);
 
   const text = encodeURIComponent(lines.join("\n"));

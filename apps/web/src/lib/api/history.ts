@@ -8,12 +8,20 @@ export interface HistoryApi {
   addCondition(input: AddConditionInput): Promise<HistoryEntry>;
 }
 
+/**
+ * The API's addConditionSchema is strict and names the field `title`; the form calls it `name`.
+ * Sending `name` made every live "Add condition" request fail validation.
+ */
+export function toAddConditionBody(input: AddConditionInput) {
+  return { title: input.name.trim(), diagnosedOn: input.diagnosedOn, notes: input.notes };
+}
+
 const liveHistoryApi: HistoryApi = {
   async list() {
     const items = asList(await request<HistoryEntry[] | { items: HistoryEntry[] }>("/health-history"));
     return [...items].sort((a, b) => (b.occurredOn ?? b.createdAt).localeCompare(a.occurredOn ?? a.createdAt));
   },
-  addCondition: (input) => request<HistoryEntry>("/health-history/conditions", { method: "POST", json: input }),
+  addCondition: (input) => request<HistoryEntry>("/health-history/conditions", { method: "POST", json: toAddConditionBody(input) }),
 };
 
 export const historyApi: HistoryApi =

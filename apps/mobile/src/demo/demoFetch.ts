@@ -1,5 +1,6 @@
 import { demoNameFor } from "./accounts.ts";
 import { VACCINE_CATALOG } from "../lib/vaccineCatalog.ts";
+import { dateInZone, isValidTimeZone, zonedInstant } from "../lib/zonedTime.ts";
 import type {
   FamilyMember,
   FamilyRelationship,
@@ -152,6 +153,16 @@ const nextId = (prefix: string): string => `${prefix}-${++counter}`;
 const iso = (d: Date): string => d.toISOString();
 const dateKey = (d: Date): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
+interface DemoPayment {
+  id: string;
+  orderRef: string;
+  appointmentId: string;
+  amountPaise: number;
+  status: "pending" | "completed" | "failed";
+  paymentRef: string | null;
+  createdAt: string;
+}
+
 interface State {
   registered: Set<string>;
   email: string;
@@ -165,6 +176,7 @@ interface State {
   qr: Map<string, QrSess>;
   slots: Slot[];
   appts: Appt[];
+  payments: DemoPayment[];
   vaccinations: Map<string, { vaccineName: string; status: "taken" | "not_taken"; administeredDate?: string | null; notes?: string | null; custom?: boolean; category?: string }>;
   familyMembers: FamilyMember[];
 }
@@ -247,6 +259,7 @@ function freshState(): State {
     qr: new Map(),
     slots: [],
     appts: [],
+    payments: [],
     vaccinations: new Map([
       ["bacillus calmette–guérin (bcg)", { vaccineName: "Bacillus Calmette–Guérin (BCG)", status: "taken", administeredDate: "1995-04-10", notes: "Childhood routine" }],
       ["oral polio vaccine (opv & bivalent opv)", { vaccineName: "Oral Polio Vaccine (OPV & Bivalent OPV)", status: "taken", administeredDate: "1995-04-10", notes: "Pulse Polio routine" }],
@@ -441,7 +454,8 @@ function scheduleView(sch: Schedule): Json {
     if (!now) sourceStatus = "removed";
     else sourceStatus = MED_KEYS.every((k) => now[k] === sch.med[k]) ? "current" : "changed";
   }
-  const today = dateKey(new Date());
+  // Like the real API: the active window is measured in the schedule's own time zone.
+  const today = dateInZone(new Date(), isValidTimeZone(sch.timezone) ? sch.timezone : "UTC");
   const inWindow = sch.startDate <= today && (sch.endDate === null || today <= sch.endDate);
   const cutoff = Date.now() - 14 * 86_400_000;
   return {
@@ -639,8 +653,8 @@ export async function demoFetch(input: string | URL | Request, init?: RequestIni
       fullName: p.fullName,
       dateOfBirth: p.dateOfBirth,
       bloodGroup: p.bloodGroup,
-      issuer: "HealthHub (demo)",
-      notice: "This is a HealthHub identifier. It is not an official or national health ID. Demo data.",
+      issuer: "Sehat Meds (demo)",
+      notice: "This is a Sehat Meds identifier. It is not an official or national health ID. Demo data.",
       generatedAt: iso(new Date()),
     });
   }
@@ -810,10 +824,24 @@ export async function demoFetch(input: string | URL | Request, init?: RequestIni
       const at = Date.parse(body.scheduledFor);
       if (!sch.isActive) return fail(409, "CONFLICT", "This schedule is stopped");
       if (at > Date.now() + 3_600_000) return invalid();
-      const day = new Date(at).toISOString().slice(0, 10);
+      const zone = isValidTimeZone(sch.timezone) ? sch.timezone : "UTC";
+      const day = dateInZone(new Date(at), zone);
       if (day < sch.startDate || (sch.endDate && day > sch.endDate)) return invalid();
-      if (sch.doses.some((d) => Date.parse(d.scheduledFor) === at)) return fail(409, "CONFLICT", "A dose is already recorded for this time");
-      const event: DemoDose = { id: nextId("demo-dose"), scheduledFor: new Date(at).toISOString(), status: body.status, recordedAt: iso(new Date()) };
+      // Same rule as the real API: with reminder times, a dose must be one of the schedule's slots in its own zone.
+      let slotAt = at;
+      if (sch.reminderTimes.length > 0) {
+        const minute = Math.floor(at / 60_000);
+        const slot = sch.reminderTimes.map((t) => zonedInstant(day, t, zone)).find((d) => d !== null && Math.floor(d.getTime() / 60_000) === minute);
+        if (!slot) return invalid();
+        slotAt = slot.getTime();
+      }
+      const existing = sch.doses.find((d) => Date.parse(d.scheduledFor) === slotAt);
+      if (existing) {
+        // Append-only: repeating the same answer is a harmless retry, a different answer is refused.
+        if (existing.status !== body.status) return fail(409, "CONFLICT", `This dose is already recorded as ${existing.status}. Recorded doses cannot be changed`);
+        return ok({ ...existing, scheduleId: sch.id, selfReported: true }, 201);
+      }
+      const event: DemoDose = { id: nextId("demo-dose"), scheduledFor: new Date(slotAt).toISOString(), status: body.status, recordedAt: iso(new Date()) };
       sch.doses.push(event);
       return ok({ ...event, scheduleId: sch.id, selfReported: true }, 201);
     }
@@ -900,6 +928,44 @@ export async function demoFetch(input: string | URL | Request, init?: RequestIni
       if (slot) slot.booked = false;
     }
     return ok(apptView(a));
+  }
+
+  // Payments in demo mode are always simulated and labelled so; the amount is decided here, like the real server does.
+  const FEE_PAISE = 50_000;
+  if (path === "/payments/config" && method === "GET") {
+    return ok({ mode: "simulated", keyId: null, currency: "INR", appointmentFeePaise: FEE_PAISE, appointmentFeeRupees: (FEE_PAISE / 100).toFixed(2) });
+  }
+  if (path === "/payments/orders" && method === "POST") {
+    if (!isRecord(body) || Object.keys(body).some((k) => k !== "appointmentId") || typeof body.appointmentId !== "string") return invalid();
+    const appt = state.appts.find((a) => a.id === body.appointmentId);
+    if (!appt) return notFound();
+    if (appt.status !== "confirmed") return fail(409, "CONFLICT", "Cannot start a payment for a cancelled appointment");
+    if (state.payments.some((p) => p.appointmentId === appt.id && p.status === "completed")) return fail(409, "CONFLICT", "Payment has already been completed for this appointment");
+    let pay = state.payments.find((p) => p.appointmentId === appt.id && p.status === "pending");
+    if (!pay) {
+      pay = { id: nextId("demo-pay"), orderRef: `order_sim_${nextId("o")}`, appointmentId: appt.id, amountPaise: FEE_PAISE, status: "pending", paymentRef: null, createdAt: iso(new Date()) };
+      state.payments.push(pay);
+    }
+    const view = apptView(appt) as { hospital: { name: string }; startsAt: string };
+    return ok({ id: pay.id, orderRef: pay.orderRef, amountPaise: pay.amountPaise, amountRupees: (pay.amountPaise / 100).toFixed(2), currency: "INR", status: pay.status, isSandbox: true, simulated: true, mode: "simulated", keyId: null, hospitalName: view.hospital.name, slotTime: view.startsAt, createdAt: pay.createdAt }, 201);
+  }
+  if (path === "/payments/verify" && method === "POST") {
+    if (!isRecord(body) || typeof body.orderRef !== "string") return invalid();
+    const pay = state.payments.find((p) => p.orderRef === body.orderRef);
+    if (!pay) return notFound();
+    if (pay.status !== "completed") {
+      if (body.simulate !== "success" && body.simulate !== "failure") return invalid();
+      pay.status = body.simulate === "success" ? "completed" : "failed";
+      pay.paymentRef = body.simulate === "success" ? `pay_sim_${nextId("p")}` : null;
+    }
+    return ok({ id: pay.id, orderRef: pay.orderRef, paymentRef: pay.paymentRef, status: pay.status, simulated: true, receiptNumber: pay.status === "completed" ? `RCP-${pay.orderRef.slice(-8).toUpperCase()}` : null, amountRupees: (pay.amountPaise / 100).toFixed(2), currency: "INR", isSandbox: true, verifiedAt: iso(new Date()) });
+  }
+  if (path === "/payments/history" && method === "GET") {
+    return list([...state.payments].reverse().map((pay) => {
+      const appt = state.appts.find((a) => a.id === pay.appointmentId);
+      const view = appt ? (apptView(appt) as { hospital: { name: string }; startsAt: string }) : null;
+      return { id: pay.id, orderRef: pay.orderRef, paymentRef: pay.paymentRef, amountPaise: pay.amountPaise, amountRupees: (pay.amountPaise / 100).toFixed(2), currency: "INR", status: pay.status, isSandbox: true, simulated: true, receiptNumber: pay.status === "completed" ? `RCP-${pay.orderRef.slice(-8).toUpperCase()}` : null, appointmentId: pay.appointmentId, hospitalName: view?.hospital.name ?? "Clinic consultation", appointmentTime: view?.startsAt ?? null, createdAt: pay.createdAt };
+    }));
   }
 
   if (path === "/vaccinations") {

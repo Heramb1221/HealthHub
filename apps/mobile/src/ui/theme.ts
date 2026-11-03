@@ -1,20 +1,20 @@
 
 export const colors = {
-  background: "#f6f5f2",
+  background: "#f2f7f6",
   surface: "#ffffff",
-  text: "#14202e",
-  textMuted: "#556070",
-  primary: "#12355b",
+  text: "#0d1b2e",
+  textMuted: "#4c5b6b",
+  primary: "#0a6b60",
   onPrimary: "#ffffff",
-  secondary: "#e8edf2",
-  accent: "#dcecec",
-  accentText: "#0e4a4f",
-  border: "#d9d5cc",
-  inputBorder: "#8c877b",
-  focus: "#1f6fb2",
+  secondary: "#e6eef5",
+  accent: "#dcf3ea",
+  accentText: "#07524a",
+  border: "#d3e0df",
+  inputBorder: "#6f8886",
+  focus: "#1a7f9e",
   danger: "#b3261e",
   dangerSurface: "#fbe9e7",
-  success: "#1e6b4a",
+  success: "#17653f",
   successSurface: "#e5f2ec",
   warning: "#7a4f00",
   warningSurface: "#fbf1db",
@@ -22,21 +22,42 @@ export const colors = {
   infoSurface: "#e3eef8",
   demo: "#5b3f8c",
   demoSurface: "#efe9f7",
-  neutralSurface: "#eeece7",
+  neutralSurface: "#e9f0ef",
+  /** Deep navy from the logo, for headings and secondary emphasis. */
+  navy: "#0b3475",
+  /** Tinted panel behind grouped content, one step off the page background. */
+  surfaceMuted: "#f6faf9",
+  /** Tint behind leading icons in list rows. */
+  iconTile: "#e4f1ee",
+  /** Hairline separators inside cards. */
+  divider: "#e3ecea",
 } as const;
 
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;
 
-export const radius = { sm: 4, md: 8 } as const;
+export const radius = { sm: 8, md: 12, lg: 16, pill: 999 } as const;
 
+/**
+ * Type scale tuned for phone reading distance: nothing below 13px, body at 16px,
+ * generous line heights. Keys are used as AppText variants, so keep them stable.
+ */
 export const type = {
-  title: { fontSize: 24, lineHeight: 30, fontWeight: "700" as const },
-  heading: { fontSize: 18, lineHeight: 24, fontWeight: "600" as const },
-  body: { fontSize: 16, lineHeight: 23, fontWeight: "400" as const },
-  label: { fontSize: 14, lineHeight: 20, fontWeight: "600" as const },
-  small: { fontSize: 14, lineHeight: 20, fontWeight: "400" as const },
-  caption: { fontSize: 12, lineHeight: 16, fontWeight: "400" as const },
+  title: { fontSize: 26, lineHeight: 32, fontWeight: "700" as const },
+  heading: { fontSize: 19, lineHeight: 25, fontWeight: "600" as const },
+  body: { fontSize: 16, lineHeight: 24, fontWeight: "400" as const },
+  label: { fontSize: 15, lineHeight: 21, fontWeight: "600" as const },
+  small: { fontSize: 15, lineHeight: 21, fontWeight: "400" as const },
+  caption: { fontSize: 13, lineHeight: 18, fontWeight: "400" as const },
 };
+
+/** Soft, single-layer elevation shared by cards and floating surfaces. */
+export const elevation = {
+  shadowColor: "#0d1b2e",
+  shadowOpacity: 0.05,
+  shadowRadius: 8,
+  shadowOffset: { width: 0, height: 2 },
+  elevation: 1,
+} as const;
 
 export const MIN_TOUCH = 48;
 

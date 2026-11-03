@@ -15,6 +15,8 @@ import {
 const syncSchema = z.object({
   scheduleIds: z.array(z.string().uuid()).optional(),
   prescriptionId: z.string().uuid().optional(),
+  /** Opt in to putting the medicine name in calendar events (calendar pop-ups can appear on lock screens). */
+  showMedicineNames: z.boolean().optional(),
 });
 
 const callbackQuerySchema = z.object({

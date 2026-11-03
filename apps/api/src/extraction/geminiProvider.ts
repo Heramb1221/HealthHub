@@ -20,7 +20,9 @@ Strict Medical & Clinical Safety Rules:
    - 0.70 to 0.89: slightly messy handwriting or minor ambiguity
    - below 0.70: uncertain or hard-to-read handwriting
 5. If the document is not a medical prescription or contains no readable medicines, return an empty medications array and a low overallConfidence (< 0.2).
-6. Format dates as YYYY-MM-DD. If year, month, or day is uncertain or absent, set prescriptionDate to null.
+6. Format dates as YYYY-MM-DD. If year, month, or day is uncertain or absent, set prescriptionDate to null. Numeric dates are day-first (DD/MM/YYYY) unless the document clearly says otherwise. Use the date the prescription was written, never a date of birth, a follow-up/review date, or an expiry date.
+7. prescriberName is ONLY the doctor who wrote or signed the prescription, usually printed at the top with qualifications (MBBS, MD, MS, BAMS, BHMS, DNB...) and a registration number, and/or in the signature area. It is NEVER: the patient's name, a clinic/hospital/laboratory/pharmacy/shop name, a pharmacist, or a registration number. If several doctors appear, choose the one who signed. If you cannot tell who the prescriber is, set prescriberName to null. Transcribe the name exactly as written; do not correct, expand or translate it.
+8. Copy medication names exactly as written. Do not substitute a similar-looking brand or generic name. Keep frequency notation such as "1-0-1" exactly as written, and do not convert it into times or doses.
 
 Format the output strictly as a JSON object with this exact structure:
 {
@@ -61,13 +63,13 @@ export class GeminiExtractionProvider implements ExtractionProvider {
     let lastError: Error | null = null;
 
     for (const model of candidateModels) {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
       let response: Response;
       try {
         response = await fetch(url, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "x-goog-api-key": this.apiKey },
           body: JSON.stringify({
             contents: [
               {

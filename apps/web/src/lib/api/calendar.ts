@@ -6,7 +6,7 @@ export interface CalendarApi {
   getStatus(): Promise<CalendarStatus>;
   getGoogleAuthUrl(): Promise<{ url: string }>;
   disconnect(): Promise<{ success: boolean }>;
-  syncSchedules(input: { scheduleIds?: string[]; prescriptionId?: string }): Promise<CalendarSyncResult>;
+  syncSchedules(input: { scheduleIds?: string[]; prescriptionId?: string; showMedicineNames?: boolean }): Promise<CalendarSyncResult>;
 }
 
 const liveCalendarApi: CalendarApi = {

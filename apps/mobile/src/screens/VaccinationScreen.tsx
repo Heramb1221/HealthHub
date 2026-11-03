@@ -9,7 +9,7 @@ import { useResource } from "../hooks/useResource";
 import { VACCINE_CATEGORIES, type VaccineCategory } from "../lib/vaccineCatalog";
 import { AppText, Badge, Banner, Button, Card, Chip, Divider, Row, Screen, Stack, TextField } from "../ui/components";
 import { EmptyState, ErrorState, LoadingState } from "../ui/states";
-import { colors, radius, space } from "../ui/theme";
+import { colors, MIN_TOUCH, radius, space } from "../ui/theme";
 
 export function VaccinationScreen() {
   const res = useResource((signal) => vaccinationApi.list(signal));
@@ -421,8 +421,9 @@ const styles = StyleSheet.create({
   disclosureBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    paddingVertical: 4,
+    gap: space.xs,
+    minHeight: MIN_TOUCH - 8,
+    paddingVertical: space.xs,
   },
   expandedBox: {
     marginTop: space.sm,

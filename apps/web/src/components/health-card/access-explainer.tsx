@@ -2,13 +2,13 @@ import { Ban, Check, Lock } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 
-const CONTAINS = ["A random reference code", "The address of a HealthHub page"];
+const CONTAINS = ["A random reference code", "The address of a Sehat Meds page"];
 const NEVER = ["Your name or date of birth", "Medicines, conditions or allergies", "Any prescription or appointment detail", "A password or a long-lived key"];
 
 const STEPS = [
-  { title: "Someone scans the code", body: "Their phone opens a HealthHub page. That page shows no medical information." },
+  { title: "Someone scans the code", body: "Their phone opens a Sehat Meds page. That page shows no medical information." },
   { title: "They need an authorized account", body: "Signing in is required. Hospital administrator accounts don’t get access to medical records." },
-  { title: "HealthHub checks your consent", body: "The request is checked against your consent and its purpose before anything is opened." },
+  { title: "Sehat Meds checks your consent", body: "The request is checked against your consent and its purpose before anything is opened." },
   { title: "Access is short and limited", body: "If allowed, it’s a short session that shows only what’s permitted. It ends when it expires, and withdrawing consent stops future access." },
   { title: "It’s recorded", body: "Access is logged. The log is kept even after consent is withdrawn." },
 ];
@@ -50,7 +50,7 @@ export function AccessExplainer() {
           <h2 id="how" className="text-lg">
             How protected access is designed to work
           </h2>
-          <p className="text-muted-foreground text-sm">These checks run on HealthHub’s servers, not in this app.</p>
+          <p className="text-muted-foreground text-sm">These checks run on Sehat Meds’s servers, not in this app.</p>
         </div>
         <ol className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {STEPS.map((step, i) => (
@@ -63,7 +63,7 @@ export function AccessExplainer() {
         </ol>
       </section>
 
-      <section aria-labelledby="controls" className="bg-card max-w-3xl space-y-3 rounded-md border p-5">
+      <section aria-labelledby="controls" className="bg-card max-w-3xl space-y-3 rounded-xl border p-5 shadow-[var(--shadow-soft)]">
         <div className="flex flex-wrap items-center gap-3">
           <Lock aria-hidden="true" className="text-muted-foreground size-5" />
           <h2 id="controls" className="text-lg">

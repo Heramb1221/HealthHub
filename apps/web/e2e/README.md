@@ -1,7 +1,7 @@
 # Browser tests
 
 End-to-end checks that drive the real app in a headless browser. They test the **demo build** (typed demo adapters,
-no backend) and, separately, the **live-mode client against a stubbed API**. **No test here talks to a real HealthHub API.**
+no backend) and, separately, the **live-mode client against a stubbed API**. **No test here talks to a real Sehat Meds API.**
 
 ## Prerequisites
 

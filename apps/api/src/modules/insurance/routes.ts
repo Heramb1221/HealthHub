@@ -20,6 +20,9 @@ const createPolicySchema = z.strictObject({
   validTill: z.string().date().optional(),
   tpaContact: z.string().max(50).optional(),
   notes: z.string().max(500).optional(),
+}).refine((v) => !v.validFrom || !v.validTill || v.validTill >= v.validFrom, {
+  path: ["validTill"],
+  message: "validTill cannot be before validFrom",
 });
 
 export function createInsuranceRouter(db: Db, env: Env): Router {

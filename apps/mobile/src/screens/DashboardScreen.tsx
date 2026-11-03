@@ -13,9 +13,9 @@ import { useLanguage } from "../i18n/LanguageContext";
 import { SUPPORTED_LANGUAGES } from "../i18n/languages";
 import { LanguageModal } from "../ui/LanguageModal";
 import type { RootStackParamList } from "../navigation/types";
-import { AppText, Banner, Card, Field, ListRow, Row, Screen, Stack } from "../ui/components";
+import { AppText, Banner, Card, Field, ListRow, Row, Screen, SectionTitle, Stack } from "../ui/components";
 import { ErrorState, LoadingState } from "../ui/states";
-import { colors, space } from "../ui/theme";
+import { colors, MIN_TOUCH, radius, space } from "../ui/theme";
 
 type Settled<T> = { ok: true; value: T } | { ok: false; error: unknown };
 
@@ -70,15 +70,16 @@ export function DashboardScreen() {
             onPress={() => setLangModalVisible(true)}
             accessibilityRole="button"
             accessibilityLabel="Change regional language"
+            hitSlop={8}
             style={{
               flexDirection: "row",
               alignItems: "center",
               backgroundColor: colors.surface,
               borderWidth: 1,
               borderColor: colors.border,
-              paddingHorizontal: space.sm,
-              paddingVertical: 5,
-              borderRadius: 16,
+              paddingHorizontal: space.md,
+              minHeight: MIN_TOUCH - 8,
+              borderRadius: radius.pill,
               gap: 6,
             }}
           >
@@ -92,9 +93,9 @@ export function DashboardScreen() {
 
         <Card style={{ backgroundColor: colors.primary, borderColor: colors.primary }}>
           <AppText variant="caption" color="#c9d6e4">
-            Your Sehat Med ID
+            Your Sehat Meds ID
           </AppText>
-          <AppText variant="title" color={colors.onPrimary} selectable accessibilityLabel={`Your Sehat Med ID is ${patient.healthId}`}>
+          <AppText variant="title" color={colors.onPrimary} selectable accessibilityLabel={`Your Sehat Meds ID is ${patient.healthId}`}>
             {patient.healthId}
           </AppText>
           <AppText variant="small" color="#c9d6e4">
@@ -127,7 +128,7 @@ export function DashboardScreen() {
         ) : null}
 
         <Card>
-          <AppText variant="heading">Next up</AppText>
+          <SectionTitle>Next up</SectionTitle>
           {d.schedules.ok ? (
             reminder ? (
               <Field label="Next medicine reminder" value={`${formatDateTime(reminder.at.toISOString())} · ${reminder.medicationName}`} />
@@ -148,13 +149,13 @@ export function DashboardScreen() {
           )}
         </Card>
 
-        <Card style={{ gap: 0 }}>
-          <ListRow title={t("prescriptions", "Upload a prescription")} subtitle="Photo or PDF" onPress={() => nav.navigate("PrescriptionUpload")} />
-          <ListRow title={t("symptom_checker", "AI Symptom Checker")} subtitle="Clinical triage & emergency screening" onPress={() => nav.navigate("SymptomChecker")} />
-          <ListRow title={t("insurance", "Health Insurance")} subtitle="Policy vault & cashless helplines" onPress={() => nav.navigate("Insurance")} />
-          <ListRow title={t("payments", "Consultation Payments")} subtitle="Pay consultation fees & receipts" onPress={() => nav.navigate("Payments")} />
-          <ListRow title={t("history", "Medical history")} onPress={() => nav.navigate("History")} />
-          <ListRow title={t("health_card", "Digital health card and QR")} onPress={() => nav.navigate("HealthCard")} />
+        <Card style={{ gap: 0, padding: space.sm }}>
+          <ListRow icon="upload" title={t("prescriptions", "Upload a prescription")} subtitle="Photo or PDF" onPress={() => nav.navigate("PrescriptionUpload")} />
+          <ListRow icon="activity" title={t("symptom_checker", "AI Symptom Checker")} subtitle="Clinical triage & emergency screening" onPress={() => nav.navigate("SymptomChecker")} />
+          <ListRow icon="shield" title={t("insurance", "Health Insurance")} subtitle="Policy vault & cashless helplines" onPress={() => nav.navigate("Insurance")} />
+          <ListRow icon="credit-card" title={t("payments", "Consultation Payments")} subtitle="Pay consultation fees & receipts" onPress={() => nav.navigate("Payments")} />
+          <ListRow icon="book-open" title={t("history", "Medical history")} onPress={() => nav.navigate("History")} />
+          <ListRow icon="smartphone" title={t("health_card", "Digital health card and QR")} onPress={() => nav.navigate("HealthCard")} />
         </Card>
 
         <LanguageModal visible={langModalVisible} onClose={() => setLangModalVisible(false)} />

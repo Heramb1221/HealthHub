@@ -16,15 +16,31 @@ export function LanguageModal({
   const { language, setLanguage, t } = useLanguage();
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+      accessibilityViewIsModal
+    >
       <View style={styles.overlay}>
         <View style={styles.content}>
           <Row style={styles.header}>
             <View style={{ flex: 1 }}>
-              <AppText variant="heading">{t("bhashini_language", "Regional Language")}</AppText>
-              <AppText variant="caption" muted>Govt of India Bhashini Mission</AppText>
+              <AppText variant="heading" accessibilityRole="header">
+                {t("bhashini_language", "Regional Language")}
+              </AppText>
+              <AppText variant="caption" muted>
+                {t("Govt of India Bhashini Mission", "Govt of India Bhashini Mission")}
+              </AppText>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn} accessibilityLabel="Close language selector">
+            <TouchableOpacity
+              onPress={onClose}
+              style={styles.closeBtn}
+              accessibilityRole="button"
+              accessibilityLabel={t("close", "Close")}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
               <Feather name="x" size={20} color={colors.text} />
             </TouchableOpacity>
           </Row>
@@ -40,6 +56,9 @@ export function LanguageModal({
                     onClose();
                   }}
                   style={[styles.langItem, isSelected && styles.selectedLangItem]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${item.nativeName}, ${item.name}`}
+                  accessibilityState={{ selected: isSelected }}
                 >
                   <View>
                     <AppText variant="body" style={{ fontWeight: isSelected ? "700" : "500", color: isSelected ? colors.primary : colors.text }}>
@@ -84,12 +103,16 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   closeBtn: {
-    padding: space.xs,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
   },
   langItem: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    minHeight: 48,
     paddingVertical: space.sm,
     paddingHorizontal: space.md,
     borderRadius: radius.md,

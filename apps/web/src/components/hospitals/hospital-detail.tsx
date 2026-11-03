@@ -144,7 +144,7 @@ export function HospitalDetail({ id }: { id: string }) {
         {!(h.active ?? h.isActive ?? true) ? <Badge tone="warning">Not accepting appointments</Badge> : null}
       </div>
 
-      <dl className="bg-card divide-y rounded-md border px-5 text-sm">
+      <dl className="bg-card divide-y rounded-xl border px-5 text-sm shadow-[var(--shadow-soft)]">
         <div className="grid gap-1 py-3 sm:grid-cols-[10rem_1fr]">
           <dt className="text-muted-foreground">Address</dt>
           <dd className="space-y-1.5">
@@ -233,7 +233,7 @@ export function HospitalDetail({ id }: { id: string }) {
         ) : null}
 
         {!(h.active ?? h.isActive ?? true) ? (
-          <EmptyState icon={CalendarX} title="This hospital isn’t accepting appointments" description="It has been deactivated by a HealthHub administrator. Choose another hospital." action={<Button asChild variant="outline"><Link href="/hospitals">Find a hospital</Link></Button>} />
+          <EmptyState icon={CalendarX} title="This hospital isn’t accepting appointments" description="It has been deactivated by a Sehat Meds administrator. Choose another hospital." action={<Button asChild variant="outline"><Link href="/hospitals">Find a hospital</Link></Button>} />
         ) : availability.status === "loading" ? (
           <LoadingState label="Loading available times" rows={3} />
         ) : availability.status === "error" ? (

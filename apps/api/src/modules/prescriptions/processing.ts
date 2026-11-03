@@ -31,49 +31,6 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
-export function inferReminderTimes(frequency: string | null | undefined): string[] {
-  if (!frequency) return ["08:00"];
-  const f = frequency.toLowerCase().trim();
-
-  if (f.includes("1-1-1-1") || f.includes("four times") || f.includes("qds") || f.includes("qid")) {
-    return ["08:00", "12:00", "16:00", "20:00"];
-  }
-
-  if (f.includes("1-1-1") || f.includes("three times") || f.includes("thrice") || f.includes("tds") || f.includes("tid")) {
-    return ["08:00", "14:00", "20:00"];
-  }
-
-  if (f.includes("1-0-1") || f.includes("0-1-1") || f.includes("twice") || f.includes("bd") || f.includes("bid")) {
-    return ["08:00", "20:00"];
-  }
-
-  if (f.includes("0-1-0") || f.includes("afternoon")) {
-    return ["14:00"];
-  }
-
-  if (f.includes("0-0-1") || f.includes("night") || f.includes("bedtime") || f.includes("hs") || f.includes("at bed")) {
-    return ["20:00"];
-  }
-
-  if (f.includes("1-0-0") || f.includes("morning") || f.includes("od") || f.includes("once")) {
-    return ["08:00"];
-  }
-
-  return ["08:00"];
-}
-
-function parseDurationDays(duration: string | null | undefined): number | null {
-  if (!duration) return null;
-  const match = duration.match(/(\d+)\s*(day|days|week|weeks|month|months)/i);
-  if (!match || !match[1] || !match[2]) return null;
-  const count = parseInt(match[1], 10);
-  const unit = match[2].toLowerCase();
-  if (unit.startsWith("day")) return count;
-  if (unit.startsWith("week")) return count * 7;
-  if (unit.startsWith("month")) return count * 30;
-  return null;
-}
-
 export async function processPrescription(
   deps: { db: Db; store: PrivateFileStore; provider: ExtractionProvider | null },
   auth: AuthContext,
@@ -131,8 +88,16 @@ export async function processPrescription(
   if (!bytes) return fail("original_file_missing");
 
   let raw: unknown;
+  let usedProvider = provider.name;
   try {
-    raw = await withTimeout(provider.extract({ bytes, mimeType: record.originalMimeType }), EXTRACTION_TIMEOUT_MS);
+    const input = { bytes, mimeType: record.originalMimeType };
+    if (provider.extractWithProvenance) {
+      const detailed = await withTimeout(provider.extractWithProvenance(input), EXTRACTION_TIMEOUT_MS);
+      raw = detailed.raw;
+      usedProvider = detailed.provider;
+    } else {
+      raw = await withTimeout(provider.extract(input), EXTRACTION_TIMEOUT_MS);
+    }
   } catch (err) {
     if (err instanceof ExtractionUnrecognizedError) return fail("unrecognized_input");
 
@@ -155,13 +120,13 @@ export async function processPrescription(
       const latest = await tx.prescriptionVersion.aggregate({ where: { prescriptionId }, _max: { versionNumber: true } });
       const versionNumber = (latest._max.versionNumber ?? 0) + 1;
 
-      const createdVersion = await tx.prescriptionVersion.create({
+      await tx.prescriptionVersion.create({
         data: {
           prescriptionId,
           versionNumber,
           kind: "extraction",
           verificationStatus: result.verificationStatus,
-          extractionProvider: provider.name,
+          extractionProvider: usedProvider,
           extractionConfidence: result.overallConfidence,
           prescriptionDate: result.prescriptionDate,
           prescriberName: result.prescriberName,
@@ -169,64 +134,12 @@ export async function processPrescription(
           createdByUserId: null,
           medications: { create: result.medications.map((medication, position) => ({ position, ...medication })) },
         },
-        include: { medications: true },
       });
 
-      const today = new Date();
-      for (const med of createdVersion.medications) {
-        if (!med.name) continue;
-        const reminderTimes = inferReminderTimes(med.frequency);
-        const days = parseDurationDays(med.duration);
-        const endDate = days ? new Date(today.getTime() + days * 86_400_000) : null;
-
-        const existing = await tx.medicationSchedule.findFirst({
-          where: {
-            patientId,
-            isActive: true,
-            medicationName: { equals: med.name, mode: "insensitive" },
-          },
-          select: { id: true },
-        });
-
-        if (!existing) {
-          await tx.medicationSchedule.create({
-            data: {
-              patientId,
-              sourceMedicationId: med.id,
-              medicationName: med.name,
-              strength: med.strength ?? "",
-              dose: med.dose ?? "1 dose",
-              route: med.route,
-              frequency: med.frequency ?? "As prescribed",
-              duration: med.duration,
-              instructions: med.instructions,
-              startDate: today,
-              endDate,
-              reminderTimes,
-              remindersEnabled: true,
-              timezone: "Asia/Kolkata",
-              isActive: true,
-            },
-          });
-        }
-      }
-
-      const doctorTitle = result.prescriberName
-        ? `Prescription: Dr. ${result.prescriberName.replace(/^Dr\.?\s*/i, "")}`
-        : "Prescription Consultation";
-      const medSummary = result.medications.map((m) => m.name).filter(Boolean).join(", ");
-
-      await tx.healthHistoryEntry.create({
-        data: {
-          patientId,
-          kind: "condition",
-          title: doctorTitle,
-          notes: `Prescribed medications: ${medSummary || "Medicines listed"}. Recorded automatically from prescription.`,
-          diagnosedOn: result.prescriptionDate ?? today,
-          source: "patient_reported",
-          verificationStatus: "unverified",
-        },
-      });
+      // Deliberately NOT done here: creating medication schedules or history entries from the raw
+      // reading. Automatic extraction is unverified, so it must never turn into reminders (or into
+      // a health-history "fact") before the patient has reviewed and confirmed the details. Schedules
+      // are created later, through the gated schedules endpoint, from confirmed rows only.
 
       const completed = await tx.prescriptionRecord.updateMany({
         where: { id: prescriptionId, processingStatus: "processing" },
@@ -244,7 +157,7 @@ export async function processPrescription(
         requestId: ctx.requestId,
 
         metadata: {
-          provider: provider.name,
+          provider: usedProvider,
           versionNumber,
           verificationStatus: result.verificationStatus,
           reviewReasons: result.reviewReasons,

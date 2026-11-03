@@ -76,7 +76,7 @@ export function describeError(error: unknown): ErrorDescription {
     case "NOT_CONFIGURED":
       return { title: "App not configured", detail: error.message, retryable: false };
     case "NETWORK_ERROR":
-      return { title: "Can't reach HealthHub", detail: "Check your internet connection and try again.", retryable: true };
+      return { title: "Can't reach Sehat Meds", detail: "Check your internet connection and try again.", retryable: true };
     case "TIMEOUT":
       return { title: "This is taking too long", detail: "The server did not respond in time. Try again.", retryable: true };
     case "RATE_LIMITED":
@@ -106,7 +106,7 @@ export function describeError(error: unknown): ErrorDescription {
     return { title: "Not found", detail: "This item doesn't exist or isn't available to you.", retryable: false, ...withId };
   }
   if (error.status >= 500) {
-    return { title: "HealthHub had a problem", detail: "Try again in a moment.", retryable: true, ...withId };
+    return { title: "Sehat Meds had a problem", detail: "Try again in a moment.", retryable: true, ...withId };
   }
   return { title: "Request not accepted", detail: error.message, retryable: false, ...withId };
 }

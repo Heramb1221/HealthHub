@@ -74,6 +74,7 @@ export function authenticate(db: Db, env: Pick<Env, "JWT_SECRET" | "CLERK_SECRET
                 `${clerkClaims.sub}@clerk.user`;
               const normalizedEmail = primaryEmail.toLowerCase();
               const fullName = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || null;
+              const verifiedPhone = clerkUser.phoneNumbers.find((p) => p.id === clerkUser.primaryPhoneNumberId)?.phoneNumber ?? null;
 
               const existingByEmail = await db.user.findUnique({
                 where: { email: normalizedEmail },
@@ -102,6 +103,7 @@ export function authenticate(db: Db, env: Pick<Env, "JWT_SECRET" | "CLERK_SECRET
                       userId: created.id,
                       healthId: generateHealthId(),
                       fullName,
+                      phone: verifiedPhone,
                     },
                   });
                   return created;

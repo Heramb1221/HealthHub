@@ -3,12 +3,13 @@ import type { Env } from "../../config/env.js";
 import { AppError } from "../../lib/errors.js";
 import { log } from "../../lib/logger.js";
 import type { AuthContext } from "../../middleware/authenticate.js";
+import { loadScheduleDtos } from "../schedules/service.js";
 import { ownPatientId } from "../patients/ownPatient.js";
+import { reconcileScheduleEvents, wantedTimes } from "./events.js";
 import { createClerkClient } from "@clerk/express";
 
 const GOOGLE_AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
-const GOOGLE_CALENDAR_EVENTS_ENDPOINT = "https://www.googleapis.com/calendar/v3/calendars/primary/events";
 const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events";
 
 export interface CalendarStatusDto {
@@ -19,7 +20,13 @@ export interface CalendarStatusDto {
 }
 
 export interface SyncResultDto {
+  /** Calendar events now in place (created or updated). */
   syncedCount: number;
+  /** Events removed because a schedule was paused, finished, out of date or had that time removed. */
+  removedCount: number;
+  /** Schedules with nothing to put on the calendar (reminders off, paused, finished, out of date). */
+  skippedCount: number;
+  failedCount: number;
   events: Array<{
     medicationName: string;
     time: string;
@@ -267,115 +274,30 @@ export async function syncMedicationSchedules(
   db: Db,
   auth: AuthContext,
   env: Env,
-  input: { scheduleIds?: string[]; prescriptionId?: string },
+  input: { scheduleIds?: string[]; prescriptionId?: string; showMedicineNames?: boolean },
 ): Promise<SyncResultDto> {
   const patientId = await ownPatientId(db, auth);
   const accessToken = await getValidAccessToken(db, auth, env);
 
-  const schedules = await db.medicationSchedule.findMany({
-    where: {
-      patientId,
-      isActive: true,
-      ...(input.scheduleIds && input.scheduleIds.length > 0 ? { id: { in: input.scheduleIds } } : {}),
-      ...(input.prescriptionId
-        ? { sourceMedication: { version: { prescriptionId: input.prescriptionId } } }
-        : {}),
-    },
+  // Every matching schedule is reconciled, including paused and finished ones, so their calendar events are removed.
+  const schedules = await loadScheduleDtos(db, {
+    patientId,
+    ...(input.scheduleIds && input.scheduleIds.length > 0 ? { id: { in: input.scheduleIds } } : {}),
+    ...(input.prescriptionId ? { sourceMedication: { version: { prescriptionId: input.prescriptionId } } } : {}),
   });
 
-  if (schedules.length === 0) {
-    return { syncedCount: 0, events: [] };
-  }
-
-  const createdEvents: Array<{ medicationName: string; time: string; calendarLink?: string }> = [];
-
+  const events: SyncResultDto["events"] = [];
+  let removedCount = 0;
+  let failedCount = 0;
+  let skippedCount = 0;
   for (const schedule of schedules) {
-    const times = schedule.reminderTimes.length > 0 ? schedule.reminderTimes : ["08:00"];
-    const tz = schedule.timezone || "Asia/Kolkata";
-    const startIsoDate = schedule.startDate.toISOString().slice(0, 10);
-
-    for (const time of times) {
-      const [hourStr, minStr] = time.split(":");
-      const startDateTime = `${startIsoDate}T${(hourStr || "08").padStart(2, "0")}:${(minStr || "00").padStart(2, "0")}:00`;
-
-      const startD = new Date(`${startIsoDate}T${time}:00`);
-      const endD = new Date(startD.getTime() + 15 * 60_000);
-      const endDateTime = `${startIsoDate}T${String(endD.getHours()).padStart(2, "0")}:${String(endD.getMinutes()).padStart(2, "0")}:00`;
-
-      const recurrenceRules: string[] = [];
-      if (schedule.endDate) {
-        const untilStr = schedule.endDate.toISOString().slice(0, 10).replace(/-/g, "");
-        recurrenceRules.push(`RRULE:FREQ=DAILY;UNTIL=${untilStr}T235959Z`);
-      } else {
-        recurrenceRules.push("RRULE:FREQ=DAILY");
-      }
-
-      const eventPayload = {
-        summary: `💊 Take ${schedule.medicationName}${schedule.strength ? ` ${schedule.strength}` : ""}`,
-        description: [
-          `HealthHub Medication Reminder`,
-          `Medicine: ${schedule.medicationName}`,
-          `Dose: ${schedule.dose}`,
-          `Prescribed frequency: ${schedule.frequency}`,
-          schedule.instructions ? `Instructions: ${schedule.instructions}` : null,
-          `Take on time as advised by your doctor.`,
-        ]
-          .filter(Boolean)
-          .join("\n"),
-        start: {
-          dateTime: startDateTime,
-          timeZone: tz,
-        },
-        end: {
-          dateTime: endDateTime,
-          timeZone: tz,
-        },
-        recurrence: recurrenceRules,
-        reminders: {
-          useDefault: false,
-          overrides: [
-            { method: "popup", minutes: 5 },
-            { method: "popup", minutes: 0 },
-          ],
-        },
-      };
-
-      try {
-        const calRes = await fetch(GOOGLE_CALENDAR_EVENTS_ENDPOINT, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(eventPayload),
-        });
-
-        if (calRes.ok) {
-          const created = (await calRes.json()) as { htmlLink?: string };
-          createdEvents.push({
-            medicationName: schedule.medicationName,
-            time,
-            calendarLink: created.htmlLink,
-          });
-        } else {
-          const errBody = await calRes.text();
-          log("error", "Google Calendar event creation failed", {
-            status: calRes.status,
-            error: errBody,
-            scheduleId: schedule.id,
-          });
-        }
-      } catch (err) {
-        log("error", "Exception creating Google Calendar event", {
-          error: (err as Error).message,
-          scheduleId: schedule.id,
-        });
-      }
-    }
+    if (wantedTimes(schedule).length === 0) skippedCount += 1;
+    const result = await reconcileScheduleEvents(fetch, accessToken, schedule, { showMedicineNames: input.showMedicineNames === true });
+    removedCount += result.removed;
+    failedCount += result.failed;
+    for (const l of result.links) events.push({ medicationName: schedule.medication.name ?? "Medicine", time: l.time, ...(l.link ? { calendarLink: l.link } : {}) });
   }
+  if (failedCount > 0) log("error", "Google Calendar sync had failures", { failedCount });
 
-  return {
-    syncedCount: createdEvents.length,
-    events: createdEvents,
-  };
+  return { syncedCount: events.length, removedCount, skippedCount, failedCount, events };
 }

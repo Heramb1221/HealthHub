@@ -50,9 +50,8 @@ export function SessionGate({ children }: { children: React.ReactNode }) {
     let cancelled = false;
     (async () => {
       try {
-        const token = await getToken();
+        // Requests fetch a fresh token from Clerk themselves; nothing is stored here.
         if (cancelled) return;
-        if (token) setAuthToken(token);
 
         let user = await authApi.getSession().catch(() => null);
         if (!user && clerkUser) {

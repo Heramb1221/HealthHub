@@ -4,11 +4,13 @@ import { View } from "react-native";
 
 import { patientApi, prescriptionApi, qrApi } from "../api/endpoints";
 import { describeError } from "../api/errors";
+import { WEB_APP_URL } from "../config";
+import { healthCardQrUrl } from "../lib/qr";
 import type { QrLookup, QrSession } from "../api/types";
 import { useResource } from "../hooks/useResource";
 import { describeAccessEvent } from "../lib/access";
 import { formatCountdown, formatDateOnly, formatDateTime, formatDateTime as fmt, orDash } from "../lib/format";
-import { AppText, Banner, Button, Card, Chip, Divider, Field, Row, Screen, Stack } from "../ui/components";
+import { AppText, Banner, Button, Card, Chip, Divider, Field, Row, Screen, SectionTitle, Stack } from "../ui/components";
 import { ErrorState, LoadingState } from "../ui/states";
 import { colors, space } from "../ui/theme";
 
@@ -98,7 +100,7 @@ export function HealthCardScreen() {
       <Stack>
         <Card style={{ backgroundColor: colors.primary, borderColor: colors.primary }} >
           <Row style={{ justifyContent: "space-between" }}>
-            <AppText variant="caption" color="#c9d6e4">HEALTHHUB HEALTH CARD</AppText>
+            <AppText variant="caption" color="#c9d6e4">SEHAT MEDS HEALTH CARD</AppText>
           </Row>
           <AppText variant="title" color={colors.onPrimary} selectable>{orDash(c.healthId)}</AppText>
           <AppText color={colors.onPrimary}>{orDash(c.fullName)}</AppText>
@@ -108,8 +110,18 @@ export function HealthCardScreen() {
           </Row>
         </Card>
         <Card>
+          <SectionTitle>Your card QR code</SectionTitle>
+          <View style={{ alignItems: "center", paddingVertical: space.md }} accessible accessibilityLabel={`QR code for health card ${c.healthId}`}>
+            <QRCode value={healthCardQrUrl(c.healthId, c.qr?.url, WEB_APP_URL)} size={168} />
+          </View>
           <AppText variant="small" muted>
-            {c.notice ?? "This is a Sehat Med identifier. It is not an official or national health ID."}
+            The QR code holds only your Health ID inside a link, never medical details. Scanning it opens a protected page: details appear only after you, or a
+            care provider you are connected with, sign in.
+          </AppText>
+        </Card>
+        <Card>
+          <AppText variant="small" muted>
+            {c.notice ?? "This is a Sehat Meds identifier. It is not an official or national health ID."}
           </AppText>
           <AppText variant="caption" muted>
             The card shows identity details only. Allergies, conditions and your emergency contact are in Profile.
@@ -117,7 +129,7 @@ export function HealthCardScreen() {
           </AppText>
         </Card>
 
-        <AppText variant="heading" accessibilityRole="header">Share a prescription with a QR code</AppText>
+        <SectionTitle>Share a prescription with a QR code</SectionTitle>
         <AppText variant="small" muted>
           The QR code holds only a random link, never medical details. Scanning it gives no access by itself: a provider also needs your consent. It stops working when it expires or when you turn it off, and each use is recorded below.
         </AppText>
@@ -166,10 +178,10 @@ export function HealthCardScreen() {
         ) : null}
 
         <Card>
-          <AppText variant="heading" accessibilityRole="header">What the QR code holds</AppText>
+          <SectionTitle>What the QR code holds</SectionTitle>
           <AppText variant="small">
             <AppText variant="label">It contains: </AppText>
-            A random reference link to a Sehat Med page.
+            A random reference link to a Sehat Meds page.
           </AppText>
           <AppText variant="small" muted>
             <AppText variant="label">It never contains: </AppText>
@@ -180,13 +192,13 @@ export function HealthCardScreen() {
           <AppText variant="caption" muted>
             1. Someone scans the code → opens a page with no medical information.{"\n"}
             2. The viewer must log in with an authorized provider account.{"\n"}
-            3. Sehat Med verifies your consent and stated purpose on the server.{"\n"}
+            3. Sehat Meds verifies your consent and stated purpose on the server.{"\n"}
             4. If permitted, a short-lived scoped session opens.{"\n"}
             5. Every lookup is recorded in your access history below.
           </AppText>
         </Card>
 
-        <AppText variant="heading" accessibilityRole="header">Who looked at your records</AppText>
+        <SectionTitle>Who looked at your records</SectionTitle>
         {access.loading ? (
           <AppText muted>Loading access history…</AppText>
         ) : access.error ? (

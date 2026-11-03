@@ -79,6 +79,8 @@ export interface HealthCard {
 
   notice?: string;
   generatedAt?: string;
+  /** Link encoded in the card's QR code (the Health ID inside a web address; no medical data). */
+  qr?: { reference: string; url: string };
 }
 
 export interface AccessEvent {
@@ -127,6 +129,8 @@ export interface Prescription {
   prescriptionDate: string | null;
   prescriberName: string | null;
   medications: PrescriptionMedication[];
+  /** Type and size of the original upload (no file name: names can contain personal details). */
+  sourceFile?: { mimeType: string; sizeBytes: number } | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -165,6 +169,8 @@ export interface UploadFile {
   uri: string;
   name: string;
   mimeType: string;
+  size?: number;
+  file?: Blob;
 }
 
 export type ScheduleSourceStatus = "current" | "changed" | "removed";
@@ -537,14 +543,25 @@ export interface CreatePolicyBody {
   notes?: string;
 }
 
+/** The amount is decided by the server; the app sends only which appointment to pay for. */
 export interface CreatePaymentOrderBody {
   appointmentId: string;
-  amountPaise?: number;
-  currency?: "INR";
+}
+
+export type PaymentMode = "razorpay_test" | "razorpay_live" | "simulated" | "unavailable";
+
+export interface PaymentConfig {
+  mode: PaymentMode;
+  keyId: string | null;
+  currency: string;
+  appointmentFeePaise: number;
+  appointmentFeeRupees: string;
 }
 
 export interface PaymentOrder {
   id: string;
+  simulated?: boolean;
+  mode?: PaymentMode;
   orderRef: string;
   amountPaise: number;
   amountRupees: string;
@@ -559,14 +576,18 @@ export interface PaymentOrder {
 export interface VerifyPaymentBody {
   orderRef: string;
   paymentRef?: string;
-  simulateFailure?: boolean;
+  signature?: string;
+  /** Simulated development orders only. */
+  simulate?: "success" | "failure";
 }
 
 export interface PaymentVerificationResult {
   id: string;
   orderRef: string;
   paymentRef: string | null;
-  status: "completed" | "failed";
+  /** "pending" = the gateway has not confirmed the money; never shown as paid. */
+  status: "completed" | "failed" | "pending";
+  simulated?: boolean;
   receiptNumber: string | null;
   amountRupees: string;
   currency?: string;
@@ -575,6 +596,9 @@ export interface PaymentVerificationResult {
 }
 
 export interface PaymentHistoryItem {
+  appointmentId?: string | null;
+  receiptNumber?: string | null;
+  simulated?: boolean;
   id: string;
   orderRef: string;
   paymentRef: string | null;

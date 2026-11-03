@@ -194,7 +194,7 @@ export class PdfBuilder {
       `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${this.pages.length} >>`,
       fonts("Helvetica"),
       fonts("Helvetica-Bold"),
-      `<< /Title (${toPdfText(this.title)}) /Producer (HealthHub) >>`,
+      `<< /Title (${toPdfText(this.title)}) /Producer (Sehat Meds) >>`,
     ];
     this.pages.forEach((content, i) => {
       const id = 6 + i * 2;

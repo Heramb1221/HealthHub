@@ -33,7 +33,7 @@ export interface Prescription {
 
   isDemo?: boolean;
 
-  sourceFile?: { fileName: string; mimeType: string; sizeBytes: number } | null;
+  sourceFile?: { fileName?: string; mimeType: string; sizeBytes: number } | null;
 }
 
 export type AlertSeverity = "high" | "moderate" | "low";
@@ -201,6 +201,15 @@ export interface MedicationSchedule {
 
   startDate: string;
   endDate: string | null;
+  /** IANA zone the reminder times are written in (e.g. "Asia/Kolkata"). Defaults to UTC for old/demo data. */
+  timezone?: string;
+  /** Whether reminders are switched on, and whether they are firing right now (in window, source unchanged). */
+  remindersEnabled?: boolean;
+  remindersActive?: boolean;
+  /** "current" unless the prescription changed after this schedule was made. */
+  sourceStatus?: "current" | "changed" | "removed";
+  /** Version of the prescription this schedule was made from (needed to make another schedule). */
+  sourceVersionNumber?: number;
 
   active: boolean;
   doseEvents?: DoseEvent[];
@@ -267,6 +276,13 @@ export interface UploadResult {
 export type CorrectedMedication = Omit<PrescriptionMedication, "confidence" | "source">;
 
 export interface CorrectionInput {
+  /**
+   * The version the patient was looking at. The API refuses the save (409) if someone changed the
+   * record since, instead of silently overwriting. Required by the live API.
+   */
+  baseVersionNumber?: number;
+  /** True when the patient ticked "I checked these details against my paper prescription". */
+  confirmedByPatient?: boolean;
   prescriptionDate: string | null;
   prescriberName: string | null;
   medications: CorrectedMedication[];
@@ -513,14 +529,27 @@ export interface CreatePolicyInput {
   notes?: string;
 }
 
+/** The amount is decided by the server; the client sends only which appointment to pay for. */
 export interface CreatePaymentOrderInput {
   appointmentId: string;
-  amountPaise?: number;
-  currency?: "INR";
+}
+
+export type PaymentMode = "razorpay_test" | "razorpay_live" | "simulated" | "unavailable";
+
+export interface PaymentConfig {
+  mode: PaymentMode;
+  keyId: string | null;
+  isLiveRazorpay: boolean;
+  currency: string;
+  appointmentFeePaise: number;
+  appointmentFeeRupees: string;
 }
 
 export interface PaymentOrder {
   id: string;
+  /** True for development test orders: no gateway, no money moves. */
+  simulated?: boolean;
+  mode?: PaymentMode;
   orderRef: string;
   amountPaise: number;
   amountRupees: string;
@@ -539,14 +568,17 @@ export interface VerifyPaymentInput {
   orderRef: string;
   paymentRef?: string;
   signature?: string;
-  simulateFailure?: boolean;
+  /** Simulated test orders only. */
+  simulate?: "success" | "failure";
 }
 
 export interface PaymentVerificationResult {
   id: string;
   orderRef: string;
   paymentRef: string | null;
-  status: "completed" | "failed";
+  /** "pending" means the gateway has not confirmed the money yet; it is never shown as paid. */
+  status: "completed" | "failed" | "pending";
+  simulated?: boolean;
   receiptNumber: string | null;
   amountRupees: string;
   currency?: string;
@@ -563,6 +595,9 @@ export interface PaymentHistoryItem {
   currency: string;
   status: string;
   isSandbox: boolean;
+  simulated?: boolean;
+  receiptNumber?: string | null;
+  appointmentId?: string | null;
   hospitalName: string;
   appointmentTime: string | null;
   createdAt: string;
@@ -576,7 +611,11 @@ export interface CalendarStatus {
 }
 
 export interface CalendarSyncResult {
+  /** Calendar events now in place (created or updated). */
   syncedCount: number;
+  removedCount?: number;
+  skippedCount?: number;
+  failedCount?: number;
   events: Array<{
     medicationName: string;
     time: string;

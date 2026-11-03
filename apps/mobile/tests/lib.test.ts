@@ -6,13 +6,14 @@ import type { Appointment, Consent, Hospital, MedicationSchedule, Prescription, 
 import { nextAppointment } from "../src/lib/appointments.ts";
 import { formatCountdown, formatDateOnly, localTimeToIso, toDateInput } from "../src/lib/format.ts";
 import { canOfferSchedule, doseLine, isInstructionSafe, medicationReviewReasons, scheduleBlock } from "../src/lib/safety.ts";
-import { enabledReminderTimes, nextReminder } from "../src/lib/schedule.ts";
+import { nextReminder } from "../src/lib/schedule.ts";
 import { describeAccessEvent } from "../src/lib/access.ts";
 import { consentStatus, providerLabel, scopeLabel, sortConsents } from "../src/lib/consents.ts";
 import { filterHospitals, groupAppointments } from "../src/lib/filter.ts";
 import { BLOOD_GROUPS, GENDER_OPTIONS, genderLabel } from "../src/lib/profileOptions.ts";
 import { durationDays, suggestEndDate, suggestTimes } from "../src/lib/frequency.ts";
-import { blankToNull, dateOfBirthProblem, isFutureDateOnly, listProblem, phoneProblem, isValidDateOnly, isValidEmail, isValidTimeOfDay, parseList, passwordProblem } from "../src/lib/validation.ts";
+import { healthCardQrUrl } from "../src/lib/qr.ts";
+import { blankToNull, dateOfBirthProblem, integerRangeProblem, uploadProblem, isFutureDateOnly, listProblem, phoneProblem, isValidDateOnly, isValidEmail, isValidTimeOfDay, parseList, passwordProblem } from "../src/lib/validation.ts";
 
 const goodMed: PrescriptionMedication = {
   name: "Paracetamol", strength: "500 mg", dose: "1 tablet", route: "oral", frequency: "twice a day", duration: "3 days", instructions: null, confidence: 0.95,
@@ -108,18 +109,16 @@ const sched = (over: Partial<MedicationSchedule>): MedicationSchedule => ({
 });
 
 describe("schedule helpers", () => {
-  const now = new Date(2026, 9, 9, 12, 0);
-  it("finds the next reminder, rolling to tomorrow when needed", () => {
+  const now = new Date("2026-10-09T06:30:00Z"); // 12:00 in India
+  it("finds the next reminder in the schedule's zone, rolling to tomorrow when needed", () => {
     const r = nextReminder([sched({})], now);
     assert.equal(r?.time, "20:00");
+    assert.equal(r?.at.toISOString(), "2026-10-09T14:30:00.000Z");
     const r2 = nextReminder([sched({ reminderTimes: ["08:00"] })], now);
-    assert.equal(r2?.at.getDate(), 10);
+    assert.equal(r2?.at.toISOString(), "2026-10-10T02:30:00.000Z");
   });
   it("ignores inactive, disabled, ended and malformed schedules", () => {
     assert.equal(nextReminder([sched({ isActive: false }), sched({ remindersEnabled: false }), sched({ remindersActive: false }), sched({ endDate: "2026-10-01" }), sched({ reminderTimes: ["bad"] })], now), null);
-  });
-  it("lists distinct enabled times sorted", () => {
-    assert.deepEqual(enabledReminderTimes([sched({}), sched({ reminderTimes: ["20:00", "06:30"] }), sched({ remindersEnabled: false, reminderTimes: ["01:00"] })]), ["06:30", "08:00", "20:00"]);
   });
 });
 
@@ -279,5 +278,44 @@ describe("frequency and duration suggestions", () => {
     assert.equal(suggestEndDate("2026-10-16", "1 day"), "2026-10-16");
     assert.equal(suggestEndDate("2026-10-16", "2 weeks"), "2026-10-29");
     assert.equal(suggestEndDate("2026-10-16", null), null);
+  });
+});
+
+describe("integerRangeProblem", () => {
+  it("validates optional whole-number fields", () => {
+    assert.equal(integerRangeProblem("", "Age", 0, 120), null);
+    assert.equal(integerRangeProblem(" 30 ", "Age", 0, 120), null);
+    assert.match(integerRangeProblem("121", "Age", 0, 120) ?? "", /between 0 and 120/);
+    assert.match(integerRangeProblem("3.5", "Duration", 0, 365) ?? "", /whole number/);
+    assert.match(integerRangeProblem("-1", "Duration", 0, 365) ?? "", /whole number/);
+    assert.match(integerRangeProblem("abc", "Age", 0, 120) ?? "", /whole number/);
+  });
+});
+
+describe("uploadProblem", () => {
+  it("accepts the types and sizes the API accepts", () => {
+    for (const mimeType of ["image/jpeg", "image/png", "image/webp", "application/pdf", "image/JPEG"]) {
+      assert.equal(uploadProblem({ mimeType, size: 1024 }), null, mimeType);
+    }
+    assert.equal(uploadProblem({ mimeType: "image/jpeg" }), null); // unknown size is left to the server
+  });
+  it("explains HEIC, unsupported types, oversize and empty files", () => {
+    assert.match(uploadProblem({ mimeType: "image/heic", size: 1000 }) ?? "", /HEIC/);
+    assert.match(uploadProblem({ mimeType: "text/plain", size: 10 }) ?? "", /JPG, PNG or WebP/);
+    assert.match(uploadProblem({ mimeType: "image/png", size: 11 * 1024 * 1024 }) ?? "", /under 10 MB/);
+    assert.match(uploadProblem({ mimeType: "image/png", size: 0 }) ?? "", /empty/);
+  });
+});
+
+
+describe("healthCardQrUrl", () => {
+  const web = "https://health-hub-rose.vercel.app/";
+  it("uses the API's https link when it is for this Health ID", () => {
+    assert.equal(healthCardQrUrl("HH-7K2M9QXD", "https://sehat.example.org/qr/HH-7K2M9QXD", web), "https://sehat.example.org/qr/HH-7K2M9QXD");
+  });
+  it("never encodes a localhost, custom-scheme, mismatched or missing link", () => {
+    for (const bad of ["http://localhost:3000/qr/HH-7K2M9QXD", "healthhub://qr/HH-7K2M9QXD", "https://sehat.example.org/qr/HH-OTHERIDX", "", null, undefined]) {
+      assert.equal(healthCardQrUrl("HH-7K2M9QXD", bad, web), "https://health-hub-rose.vercel.app/qr/HH-7K2M9QXD", String(bad));
+    }
   });
 });

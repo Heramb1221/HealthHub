@@ -36,11 +36,10 @@ export async function resolveAuthToken(): Promise<string | null> {
   if (typeof window === "undefined") return null;
   if (window.Clerk?.session?.getToken) {
     try {
+      // A fresh short-lived token each time. It is deliberately NOT copied into localStorage or a cookie, where any
+      // script on the page (or a later visitor to a shared computer) could read it.
       const fresh = await window.Clerk.session.getToken();
-      if (fresh) {
-        localStorage.setItem("hh_token", fresh);
-        return fresh;
-      }
+      if (fresh) return fresh;
     } catch {
 
     }

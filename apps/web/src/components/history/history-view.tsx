@@ -99,7 +99,7 @@ function AddConditionForm({ onCancel, onSaved }: { onCancel: () => void; onSaved
   }
 
   return (
-    <form ref={ref} onSubmit={onSubmit} noValidate className="bg-card max-w-2xl space-y-5 rounded-md border p-5">
+    <form ref={ref} onSubmit={onSubmit} noValidate className="bg-card max-w-2xl space-y-5 rounded-xl border p-5 shadow-[var(--shadow-soft)]">
       <h2 className="text-lg">Add a condition</h2>
       <p className="text-muted-foreground -mt-3 text-sm">It will be saved as reported by you and not verified.</p>
       {formError ? (

@@ -1,111 +1,100 @@
-# HealthHub
+# Sehat Meds (HealthHub)
 
-HealthHub is an India-first personal health-record and care-navigation platform.
+An India-first patient health-record and care-navigation platform: prescription upload and reading, medication reminders, health-card and prescription QR codes, hospital directory and appointments, vaccination records, family profiles, insurance and payments.
+
+> **Status:** release-hardened source tree. Automated checks pass (see [TEST_REPORT.md](TEST_REPORT.md)), but **production readiness has not been established**: live Clerk sign-in, Razorpay sandbox payments and webhooks, real notification delivery, Google Calendar, physical QR scanning, and browser/device checks are still manual items (see [MANUAL_TEST_CHECKLIST.md](MANUAL_TEST_CHECKLIST.md)).
 
 ## Architecture
 
-HealthHub is organized as a typed monorepo:
-- **`apps/api`**: Node.js, Express 5, TypeScript, Prisma 7, PostgreSQL, JWT + Clerk, Google Calendar OAuth, Razorpay sandbox.
-- **`apps/web`**: Next.js 16 (App Router), TypeScript, Tailwind CSS, Lucide icons, Clerk authentication.
-- **`apps/mobile`**: React Native (0.86), Expo SDK 57, TypeScript, Clerk mobile authentication.
-- **`packages/contracts`**: Shared API types and Zod schemas.
+npm-workspaces monorepo:
 
----
+| Path | Package | Description |
+|---|---|---|
+| `apps/api` | `@healthhub/api` | Node.js (>= 22) / Express 5 / TypeScript REST API. Prisma 7 with `@prisma/adapter-pg` on PostgreSQL. Zod validation, helmet, CORS, rate limiting, busboy uploads, Clerk (`@clerk/express`), Razorpay payments, Google Calendar OAuth, pluggable prescription extraction (`mock` or `gemini`, chosen by `EXTRACTION_PROVIDER`; local OCR via tesseract.js). |
+| `apps/web` | `web` | Next.js 16 (App Router) web portal with Tailwind 4, Clerk and a demo/live API mode (`NEXT_PUBLIC_API_MODE`). |
+| `apps/mobile` | `@healthhub/mobile` | Expo SDK 57 / React Native app with Clerk, notifications, camera/document pickers and QR display. |
+| `packages/contracts` | `@healthhub/contracts` | Shared Zod schemas and types. |
 
-## Quickstart
+Typical deployment shape (from the existing guides): web on Vercel, API on Render with a managed PostgreSQL database, mobile through Expo/EAS.
 
-### Option A: Zero-Backend Demo Mode (Instant Evaluation)
+## Prerequisites
 
-Both Web and Mobile clients include built-in synthetic fixtures and work out of the box with zero database or backend setup:
+- Node.js >= 22 (the API requires it; the root `engines` field is >= 20). npm 10+.
+- PostgreSQL 16 for the API and for database-backed tests.
+- Network access to `binaries.prisma.sh` for `prisma generate` / `prisma migrate` (the generated client is already committed in `apps/api/src/generated/prisma`).
+- Optional: `zbar-tools` (`zbarimg`) to run the QR decoder tests (without it they are skipped).
+- Optional: Clerk, Razorpay (sandbox), Google OAuth, Gemini and Resend credentials for live features.
+
+## Installation
 
 ```bash
-# 1. Clone and enter repo
-git clone <repo-url>
-cd HealthHub
-
-# 2. Run Web in Demo Mode
-npm run dev:web
-# -> Open http://localhost:3000 (pre-seeded with demo patients, prescriptions, and hospitals)
-
-# 3. Run Mobile in Demo Mode
-npm run dev:mobile
-# -> Press 'i' for iOS simulator, 'a' for Android emulator, or scan QR with Expo Go
+npm ci
 ```
 
----
+`npm ci` runs the API `postinstall` (`prisma generate`), which needs network access to Prisma's binary host. If that host is unreachable, `npm ci --ignore-scripts` installs everything else.
 
-### Option B: Full Live Stack (Database + API + Clients)
+## Environment configuration
 
-#### 1. Configure Environments
-Copy the template files:
+Each app has its own example file. **Never commit real `.env` files**; copy and fill in locally or in your hosting dashboard.
+
 ```bash
-cp apps/api/.env.example apps/api/.env
-cp apps/web/.env.example apps/web/.env.local
+cp apps/api/.env.example    apps/api/.env
+cp apps/web/.env.example    apps/web/.env.local
 cp apps/mobile/.env.example apps/mobile/.env
 ```
 
-Ensure `apps/web/.env.local` has:
-```env
-NEXT_PUBLIC_API_MODE=live
-API_ORIGIN=http://localhost:4000
-```
+Key settings: API `DATABASE_URL`, `JWT_SECRET`, `CORS_ORIGINS`, `CLERK_SECRET_KEY`, `QR_LINK_BASE` (required, https, in production); web `NEXT_PUBLIC_API_MODE` (`demo` or `live`), `API_ORIGIN`, Clerk keys; mobile `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY`. Every setting is described in [DEPLOYMENT_AND_ENVIRONMENT_GUIDE.md](DEPLOYMENT_AND_ENVIRONMENT_GUIDE.md).
 
-Ensure `apps/mobile/.env` has:
-```env
-EXPO_PUBLIC_APP_MODE=live
-EXPO_PUBLIC_API_URL=http://localhost:4000/api/v1
-```
+## Local development
 
-#### 2. Start PostgreSQL & Run Migrations
 ```bash
-cd apps/api
-npm install
-npx prisma migrate dev
-npm run seed:demo
+npm run dev:api      # API with watch mode
+npm run dev:web      # Next.js dev server
+npm run dev:mobile   # Expo dev server
+npm run seed:demo    # demo data (requires a database)
 ```
 
-#### 3. Start Development Services (from Root)
+Apply migrations to a local database with `npm --prefix apps/api run db:migrate:dev` (development) or `db:migrate:deploy` (deployment).
+
+## Testing
+
 ```bash
-# Start API (port 4000)
-npm run dev:api
-
-# Start Web (port 3000)
-npm run dev:web
-
-# Start Mobile
-npm run dev:mobile
+npm run typecheck:all
+npm run lint:all
+npm run test:all     # API + mobile
+npm run test:web
 ```
 
----
+Database-backed API tests (the majority of the API suite, including QR sessions and authorization) are skipped unless `TEST_DATABASE_URL` is set. It must point at a database whose name ends in `_test`; the harness drops and recreates its `public` schema.
 
-## Root Orchestration Scripts
+```bash
+TEST_DATABASE_URL=postgresql://USER:PASSWORD@localhost:5432/sehat_test npm run test:api
+```
 
-You can run quality gates and developer workflows from the monorepo root:
+QR decoder tests additionally need `zbarimg` on the `PATH`. They decode generated QR images with an independent decoder; they do not test physical-device scanning.
 
-| Command | Action |
-| :--- | :--- |
-| `npm run typecheck:all` | Runs `tsc --noEmit` across API, Web, Mobile, and Contracts |
-| `npm run lint:all` | Runs ESLint across API, Web, and Mobile |
-| `npm run test:all` | Runs all unit and validation suites (API Vitest + Mobile Node Runner) |
-| `npm run build:all` | Builds API bundle, Web static/prerender output, and Hermes mobile bundles |
-| `npm run dev:api` | Starts backend development server on port 4000 |
-| `npm run dev:web` | Starts Next.js development server on port 3000 |
-| `npm run dev:mobile`| Starts Expo Metro bundler |
+## Build
 
----
+```bash
+npm run build:api
+npm run build:web
+npm run build:mobile   # expo export check for android + ios
+npm run build:all
+```
 
-## Critical Safety Boundaries & Gating
+## Deployment overview
 
-- **Prescriptions**: Scanned/physical uploads are never claimed as newly issued or clinician-verified. Low confidence extractions are visibly marked `needs_review` / `unverified`.
-- **Medication Schedules**: Only created from reviewed, sufficiently confident prescription records. Doses are self-reported.
-- **Symptom Checker**: Triage advisory only with emergency red flags; never autonomously diagnoses or prescribes.
-- **Payments**: Razorpay sandbox mode for appointment reservations and bill previews; no real banking transactions are simulated.
-- **Zero Hallucination**: All synthetic fixtures and demo data are explicitly marked in the UI.
+1. Provision PostgreSQL and run `npm --prefix apps/api run db:migrate:deploy`.
+2. Deploy the API with production environment variables (including an https `QR_LINK_BASE`).
+3. Deploy the web app with `NEXT_PUBLIC_API_MODE=live` and `API_ORIGIN` set to the API.
+4. Build the mobile app with Expo/EAS using the production Clerk publishable key.
+5. Work through [MANUAL_TEST_CHECKLIST.md](MANUAL_TEST_CHECKLIST.md) with sandbox keys before any release.
 
----
+## Documentation
 
-## Specification Documents
-- [docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md): Core functional scope and boundary rules.
-- [docs/API_CONTRACT.md](docs/API_CONTRACT.md): Comprehensive REST endpoint definitions and schemas.
-- [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md): Visual hierarchy, typography, colors, and components.
-- [docs/INTEGRATION_PROTOCOL.md](docs/INTEGRATION_PROTOCOL.md): Multi-workstream coordination standards.
+- [docs/HealthHub_Complete_Feature_Specification.md](docs/HealthHub_Complete_Feature_Specification.md): feature specification
+- [docs/QUALITY_AUDIT.md](docs/QUALITY_AUDIT.md): baseline quality audit
+- [docs/patch-reports/](docs/patch-reports/): redesign, i18n and accessibility reports
+- [DEPLOYMENT_AND_ENVIRONMENT_GUIDE.md](DEPLOYMENT_AND_ENVIRONMENT_GUIDE.md): deployment and environment settings
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md), [IMPLEMENTATION_REPORT.md](IMPLEMENTATION_REPORT.md): progress and report
+- [TEST_REPORT.md](TEST_REPORT.md), [BUG_FIX_REPORT.md](BUG_FIX_REPORT.md), [MANUAL_TEST_CHECKLIST.md](MANUAL_TEST_CHECKLIST.md): testing and fixes

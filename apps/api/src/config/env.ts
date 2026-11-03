@@ -37,7 +37,7 @@ const schema = z
   UPLOAD_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(20),
   PATIENT_PRESCRIPTION_LIMIT: z.coerce.number().int().min(1).default(100),
 
-  EXTRACTION_PROVIDER: z.enum(["disabled", "mock", "gemini"]).default("disabled"),
+  EXTRACTION_PROVIDER: z.enum(["disabled", "mock", "local", "local_then_gemini", "gemini"]).default("disabled"),
   GEMINI_API_KEY: z.string().default(""),
   GEMINI_MODEL: z.string().default("gemini-3.5-flash"),
   PROCESS_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(10),
@@ -50,6 +50,7 @@ const schema = z
     }),
   QR_SESSION_TTL_MINUTES: z.coerce.number().int().min(1).max(60).default(15),
   QR_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(30),
+  EMERGENCY_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(20),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).default(60_000),
   RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(120),
   RESEND_API_KEY: z.string().default(""),
@@ -57,6 +58,8 @@ const schema = z
   RAZORPAY_KEY_ID: z.string().default(""),
   RAZORPAY_KEY_SECRET: z.string().default(""),
   RAZORPAY_WEBHOOK_SECRET: z.string().default(""),
+  /** Consultation fee charged per appointment, in paise. The server decides the amount; clients cannot. */
+  APPOINTMENT_FEE_PAISE: z.coerce.number().int().min(100).max(10_000_000).default(50_000),
   GOOGLE_CLIENT_ID: z.string().default(""),
   GOOGLE_CLIENT_SECRET: z.string().default(""),
   GOOGLE_REDIRECT_URI: z.string().default("http://localhost:3000/api/v1/calendar/google/callback"),
@@ -67,6 +70,14 @@ const schema = z
   })
 
   .superRefine((env, ctx) => {
+    if (env.NODE_ENV === "production" && !/^https:\/\/[^/\s]+\.[^/\s]+/i.test(env.QR_LINK_BASE)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["QR_LINK_BASE"],
+        message:
+          "must be your public https web address in production (for example https://your-site.example/), otherwise every QR code on health cards and prescription PDFs would point somewhere unusable",
+      });
+    }
     if (env.NODE_ENV === "production" && env.DEV_AUTH_ENABLED) {
       ctx.addIssue({
         code: "custom",
@@ -74,11 +85,11 @@ const schema = z
         message: "development-only login must not be enabled in production",
       });
     }
-    if (env.EXTRACTION_PROVIDER === "gemini" && !env.GEMINI_API_KEY) {
+    if ((env.EXTRACTION_PROVIDER === "gemini" || env.EXTRACTION_PROVIDER === "local_then_gemini") && !env.GEMINI_API_KEY) {
       ctx.addIssue({
         code: "custom",
         path: ["GEMINI_API_KEY"],
-        message: "GEMINI_API_KEY is required when EXTRACTION_PROVIDER=gemini",
+        message: "GEMINI_API_KEY is required when EXTRACTION_PROVIDER is gemini or local_then_gemini",
       });
     }
   });

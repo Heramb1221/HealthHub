@@ -1,5 +1,7 @@
 import type { Env } from "../config/env.js";
+import { FallbackExtractionProvider } from "./chainProvider.js";
 import { GeminiExtractionProvider } from "./geminiProvider.js";
+import { LocalOcrExtractionProvider } from "./localOcrProvider.js";
 import { MockExtractionProvider } from "./mockProvider.js";
 import type { ExtractionProvider } from "./types.js";
 
@@ -13,6 +15,10 @@ export function createExtractionProvider(
       return new MockExtractionProvider();
     case "gemini":
       return new GeminiExtractionProvider(geminiApiKey ?? "", geminiModel);
+    case "local":
+      return new LocalOcrExtractionProvider();
+    case "local_then_gemini":
+      return new FallbackExtractionProvider(new LocalOcrExtractionProvider(), new GeminiExtractionProvider(geminiApiKey ?? "", geminiModel));
     case "disabled":
       return null;
   }

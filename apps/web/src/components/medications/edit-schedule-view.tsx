@@ -81,7 +81,7 @@ function EditForm({ schedule, concern }: { schedule: MedicationSchedule; concern
         </Alert>
       ) : null}
 
-      <dl className="bg-card divide-y rounded-md border px-4 text-sm">
+      <dl className="bg-card divide-y rounded-xl border px-4 text-sm shadow-[var(--shadow-soft)]">
         <div className="grid gap-1 py-3 sm:grid-cols-[10rem_1fr]">
           <dt className="text-muted-foreground">Medicine</dt>
           <dd className="font-medium">
@@ -124,16 +124,19 @@ function EditForm({ schedule, concern }: { schedule: MedicationSchedule; concern
             "Save reminders"
           )}
         </Button>
-        <Button asChild variant="outline">
+        <Button asChild variant="outline" disabled={times.length === 0}>
           <a
-            href={createGoogleCalendarWebUrl({
+            aria-disabled={times.length === 0}
+            href={times.length === 0 ? undefined : createGoogleCalendarWebUrl({
+              id: schedule.id,
               medicationName: schedule.medicationName,
               strength: schedule.strength,
               dose: schedule.dose,
               frequency: schedule.frequency,
-              time: times[0] || "08:00",
+              time: times[0] as string,
               startDate: schedule.startDate,
               endDate: endDate || null,
+              ...(schedule.timezone ? { timezone: schedule.timezone } : {}),
             })}
             target="_blank"
             rel="noopener noreferrer"

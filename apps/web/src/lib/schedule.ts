@@ -1,5 +1,6 @@
 import type { DoseEvent, MedicationSchedule, Prescription } from "@/lib/api/types";
 import { isInstructionSafe } from "@/lib/prescription-safety";
+import { addDays, dateInZone, isValidTimeZone, zonedInstant } from "@/lib/zoned-time";
 
 export interface UpcomingReminder {
   schedule: MedicationSchedule;
@@ -19,21 +20,17 @@ export function toIsoDate(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-function atTime(day: Date, hhmm: string): Date | null {
-  const match = /^(\d{1,2}):(\d{2})$/.exec(hhmm);
-  if (!match) return null;
-  const [h, m] = [Number(match[1]), Number(match[2])];
-  if (h > 23 || m > 59) return null;
-  return new Date(day.getFullYear(), day.getMonth(), day.getDate(), h, m, 0, 0);
+/** The zone a schedule's times are written in. Old or demo data without one falls back to this device's zone. */
+export function scheduleZone(schedule: MedicationSchedule): string {
+  if (schedule.timezone && isValidTimeZone(schedule.timezone)) return schedule.timezone;
+  const device = typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "";
+  return device && isValidTimeZone(device) ? device : "UTC";
 }
 
-function parseDay(iso: string): Date {
-  return new Date(`${iso}T00:00:00`);
-}
-
-function inRange(schedule: MedicationSchedule, at: Date): boolean {
-  if (at < parseDay(schedule.startDate)) return false;
-  if (schedule.endDate && at > new Date(`${schedule.endDate}T23:59:59`)) return false;
+/** Start and end are calendar days in the schedule's own zone, so they are compared as plain dates, never as instants. */
+function dayInRange(schedule: MedicationSchedule, ymd: string): boolean {
+  if (ymd < schedule.startDate.slice(0, 10)) return false;
+  if (schedule.endDate && ymd > schedule.endDate.slice(0, 10)) return false;
   return true;
 }
 
@@ -43,26 +40,67 @@ export function eventForSlot(schedule: MedicationSchedule, at: Date): DoseEvent 
   return matches.sort((a, b) => b.recordedAt.localeCompare(a.recordedAt))[0] ?? null;
 }
 
-export function slotsForDay(schedules: MedicationSchedule[], day: Date): DoseSlot[] {
-  const slots: DoseSlot[] = [];
-  for (const schedule of schedules) {
-    if (!schedule.active) continue;
-    for (const time of schedule.times) {
-      const at = atTime(day, time);
-      if (!at || !inRange(schedule, at)) continue;
-      slots.push({ schedule, at, event: eventForSlot(schedule, at) });
-    }
+/**
+ * Dose slots for one calendar day. `day`'s calendar date is taken as the day in each schedule's own time zone, so a
+ * schedule written for Asia/Kolkata shows 08:00 India time whatever zone this browser is in, and daylight-saving
+ * changes move the instant, not the wall-clock time.
+ */
+function slotsOnScheduleDay(schedule: MedicationSchedule, ymd: string): DoseSlot[] {
+  if (!schedule.active || !dayInRange(schedule, ymd)) return [];
+  const zone = scheduleZone(schedule);
+  const out: DoseSlot[] = [];
+  for (const time of schedule.times) {
+    const at = zonedInstant(ymd, time, zone);
+    if (at) out.push({ schedule, at, event: eventForSlot(schedule, at) });
   }
-  return slots.sort((a, b) => a.at.getTime() - b.at.getTime());
+  return out;
 }
 
+export function slotsForDay(schedules: MedicationSchedule[], day: Date): DoseSlot[] {
+  const ymd = toIsoDate(day);
+  return schedules.flatMap((schedule) => slotsOnScheduleDay(schedule, ymd)).sort((a, b) => a.at.getTime() - b.at.getTime());
+}
+
+/** The next dose still to take. Skips schedules whose reminders are off, finished, paused, or out of date with the prescription. */
 export function nextReminder(schedules: MedicationSchedule[], now: Date = new Date()): UpcomingReminder | null {
-  for (let offset = 0; offset < 14; offset++) {
-    const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
-    const slot = slotsForDay(schedules, day).find((s) => s.at >= now && !s.event);
-    if (slot) return { schedule: slot.schedule, at: slot.at };
+  let best: UpcomingReminder | null = null;
+  for (const schedule of schedules) {
+    if (!schedule.active || schedule.remindersEnabled === false || schedule.remindersActive === false) continue;
+    const zone = scheduleZone(schedule);
+    const today = dateInZone(now, zone);
+    for (let offset = 0; offset < 14; offset++) {
+      const ymd = addDays(today, offset);
+      if (!dayInRange(schedule, ymd)) continue;
+      const slot = schedule.times
+        .map((time) => zonedInstant(ymd, time, zone))
+        .filter((at): at is Date => at !== null && at >= now && !eventForSlot(schedule, at))
+        .sort((a, b) => a.getTime() - b.getTime())[0];
+      if (slot) {
+        if (!best || slot < best.at) best = { schedule, at: slot };
+        break;
+      }
+    }
   }
-  return null;
+  return best;
+}
+
+/**
+ * Slots that have just come due and are still unrecorded: due within the last `windowMs`, for schedules whose
+ * reminders are on and current. Used to fire an alert once per dose while the page is open.
+ */
+export function dueSlots(schedules: MedicationSchedule[], now: Date, windowMs = 5 * 60_000): DoseSlot[] {
+  const due: DoseSlot[] = [];
+  for (const schedule of schedules) {
+    if (schedule.remindersEnabled === false || schedule.remindersActive === false) continue;
+    // "Today" is decided in the schedule's own zone, not this browser's.
+    const today = dateInZone(now, scheduleZone(schedule));
+    for (const ymd of [addDays(today, -1), today]) {
+      for (const slot of slotsOnScheduleDay(schedule, ymd)) {
+        if (slot.at.getTime() <= now.getTime() && now.getTime() - slot.at.getTime() < windowMs && !slot.event) due.push(slot);
+      }
+    }
+  }
+  return due;
 }
 
 export type ScheduleConcern = "prescription_missing" | "medicine_changed" | "needs_review";

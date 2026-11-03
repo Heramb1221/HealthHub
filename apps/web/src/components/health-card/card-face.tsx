@@ -62,7 +62,7 @@ function HologramSeal() {
     <div
       aria-hidden="true"
       className="relative flex size-7 shrink-0 items-center justify-center rounded-full border border-amber-400/80 bg-gradient-to-tr from-amber-200 via-rose-200 to-sky-300 shadow-xs"
-      title="Authentic Sehat Med Credential"
+      title="Authentic Sehat Meds Credential"
     >
       <div className="flex flex-col items-center text-[6px] font-black tracking-tighter text-slate-800 uppercase leading-none">
         <ShieldCheck className="size-3 text-amber-900" />
@@ -119,7 +119,7 @@ export function CardFront({ card, className }: { card: HealthCard; className?: s
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/logo.png"
-              alt="Sehat Med"
+              alt="Sehat Meds"
               className="size-5.5 rounded object-contain shrink-0"
               onError={(e) => {
                 e.currentTarget.style.display = "none";
@@ -127,10 +127,10 @@ export function CardFront({ card, className }: { card: HealthCard; className?: s
             />
             <div className="min-w-0 leading-none">
               <p className="text-[10px] font-black tracking-wide text-[#0e3a6c] uppercase truncate">
-                SEHAT MED DIGITAL HEALTH CARD
+                SEHAT MEDS DIGITAL HEALTH CARD
               </p>
               <p className="text-[7.5px] font-semibold text-slate-500 truncate">
-                सेहत मेड डिजिटल कार्ड · Bharat ka apna Sathi
+                Sehat Meds डिजिटल कार्ड · Bharat ka apna Saathi
               </p>
             </div>
           </div>
@@ -232,7 +232,7 @@ export function CardFront({ card, className }: { card: HealthCard; className?: s
               <DemoTag /> DEMO CARD
             </p>
           ) : (
-            <p className="text-[6px] text-slate-500">SEHAT MED HEALTH NETWORK</p>
+            <p className="text-[6px] text-slate-500">SEHAT MEDS HEALTH NETWORK</p>
           )}
         </div>
 
@@ -269,7 +269,7 @@ export function CardBack({ card, className }: { card: HealthCard; className?: st
     >
 
       <div className="h-6 w-full bg-[#181d24] border-b border-black/40 flex items-center justify-between px-3 text-[7px] font-mono tracking-widest text-slate-400">
-        <span>SEHAT MED DIGITAL HEALTH CARD</span>
+        <span>SEHAT MEDS DIGITAL HEALTH CARD</span>
         <span>ISO/IEC 7810 CR80</span>
       </div>
 
@@ -329,10 +329,10 @@ export function CardBack({ card, className }: { card: HealthCard; className?: st
 
           <div className="space-y-0.5 text-[6px] leading-tight text-slate-600">
             <p>
-              • <strong>Hospital Access:</strong> Instant scan provides authenticated triage data.
+              • <strong>Hospital Access:</strong> A signed-in care provider can scan this for emergency details.
             </p>
             <p>
-              • <strong>If found:</strong> Return to any Hospital/PHC or contact help@sehatmed.in.
+              • <strong>If found:</strong> Please return to any hospital or pharmacy.
             </p>
           </div>
         </div>
@@ -340,8 +340,8 @@ export function CardBack({ card, className }: { card: HealthCard; className?: st
 
       <div className="relative z-10 flex items-center justify-between border-t border-slate-300/80 bg-white/70 px-3 py-1">
         <div className="text-[6px] text-slate-500 leading-tight">
-          <p className="font-bold text-slate-700 uppercase">Sehat Med Health Network</p>
-          <p>www.sehatmed.in · Toll-Free: 1800-11-4477</p>
+          <p className="font-bold text-slate-700 uppercase">Sehat Meds Health Network</p>
+          <p>Not an official national health ID</p>
         </div>
         <LinearBarcode code={card.healthId || "HH-CARD-2026"} />
       </div>

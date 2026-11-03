@@ -31,6 +31,7 @@ export function normalizeSchedule(raw: unknown): MedicationSchedule {
     : Array.isArray(item.reminderTimes)
       ? (item.reminderTimes as string[])
       : [];
+  const timezone = typeof item.timezone === "string" && item.timezone ? item.timezone : undefined;
   const startDate = String(item.startDate ?? "");
   const endDate = (item.endDate as string | null) ?? null;
   const active = typeof item.active === "boolean" ? item.active : Boolean(item.isActive ?? true);
@@ -41,9 +42,10 @@ export function normalizeSchedule(raw: unknown): MedicationSchedule {
         id: String(e.id ?? ""),
         scheduleId: String(e.scheduleId ?? id),
         scheduledFor: String(e.scheduledFor ?? ""),
-        status: (e.status === "skipped" ? "skipped" : "taken") as "taken" | "skipped",
+        // Only the two real answers are accepted; anything else is dropped below rather than shown as "taken".
+        status: e.status as "taken" | "skipped",
         recordedAt: String(e.recordedAt ?? new Date().toISOString()),
-      }))
+      })).filter((e) => e.status === "taken" || e.status === "skipped")
     : [];
 
   return {
@@ -56,9 +58,29 @@ export function normalizeSchedule(raw: unknown): MedicationSchedule {
     times,
     startDate,
     endDate,
+    ...(timezone ? { timezone } : {}),
+    ...(typeof item.remindersEnabled === "boolean" ? { remindersEnabled: item.remindersEnabled } : {}),
+    ...(typeof item.remindersActive === "boolean" ? { remindersActive: item.remindersActive } : {}),
+    ...(item.sourceStatus === "current" || item.sourceStatus === "changed" || item.sourceStatus === "removed" ? { sourceStatus: item.sourceStatus } : {}),
+    ...(typeof item.sourceVersionNumber === "number" ? { sourceVersionNumber: item.sourceVersionNumber } : {}),
     active,
     doseEvents,
     isDemo: Boolean(item.isDemo || id.startsWith("demo-")),
+  };
+}
+
+/** The exact body the API's strict createScheduleSchema accepts. */
+export function toCreateBody(input: CreateScheduleInput & { versionNumber: number }) {
+  return {
+    prescriptionId: input.prescriptionId,
+    versionNumber: input.versionNumber,
+    medicationPosition: input.medicationIndex,
+    startDate: input.startDate,
+    endDate: input.endDate || null,
+    reminderTimes: input.times,
+    // The API refuses "reminders on" without at least one time.
+    remindersEnabled: input.times.length > 0,
+    timezone: typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC" : "UTC",
   };
 }
 
@@ -80,16 +102,11 @@ const liveSchedulesApi: MedicationSchedulesApi = {
     return found;
   },
   async create(input) {
-    const payload = {
-      prescriptionId: input.prescriptionId,
-      versionNumber: input.versionNumber ?? 1,
-      medicationPosition: input.medicationIndex,
-      startDate: input.startDate,
-      endDate: input.endDate || null,
-      reminderTimes: input.times,
-      remindersEnabled: true,
-      timezone: typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC" : "UTC",
-    };
+    // The API only makes a schedule from the prescription version the patient reviewed. A reviewed prescription is at
+    // least version 2 (extraction, then the patient's correction), so assuming version 1 made every request fail.
+    const versionNumber =
+      input.versionNumber ?? (await request<{ versionNumber: number }>(`/prescriptions/${encodeURIComponent(input.prescriptionId)}/latest`)).versionNumber;
+    const payload = toCreateBody({ ...input, versionNumber });
     const res = await request<unknown>("/medication-schedules", { method: "POST", json: payload });
     return normalizeSchedule(res);
   },

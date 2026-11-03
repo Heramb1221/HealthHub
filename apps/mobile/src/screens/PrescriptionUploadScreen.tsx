@@ -1,15 +1,18 @@
+import { Feather } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { useState } from "react";
+import { View } from "react-native";
 
 import { prescriptionApi } from "../api/endpoints";
 import { describeError } from "../api/errors";
 import type { UploadFile } from "../api/types";
+import { uploadProblem } from "../lib/validation";
 import type { RootStackParamList } from "../navigation/types";
-import { AppText, Banner, Button, Card, Screen, Stack } from "../ui/components";
+import { AppText, Banner, Button, Card, Row, Screen, SectionTitle, Stack } from "../ui/components";
 import { PermissionDenied } from "../ui/states";
-import { space } from "../ui/theme";
+import { colors, radius, space } from "../ui/theme";
 
 type Props = NativeStackScreenProps<RootStackParamList, "PrescriptionUpload">;
 
@@ -31,6 +34,7 @@ export function PrescriptionUploadScreen({ navigation }: Props) {
       name: asset.fileName ?? `prescription-${Date.now()}.jpg`,
       mimeType: asset.mimeType ?? "image/jpeg",
       ...(asset.fileSize !== undefined ? { size: asset.fileSize } : {}),
+      ...(asset.file ? { file: asset.file } : {}),
     });
   }
 
@@ -60,31 +64,41 @@ export function PrescriptionUploadScreen({ navigation }: Props) {
       const asset = result.assets?.[0];
       if (!result.canceled && asset) fromAsset(asset);
     } catch {
-      setNotice("Couldn't open your photo library. Check HealthHub's photo access in Settings.");
+      setNotice("Couldn't open your photo library. Check Sehat Meds's photo access in Settings.");
     }
   }
 
   async function pickPdf() {
-    setNotice(null);
-    setError(null);
     try {
-      const result = await DocumentPicker.getDocumentAsync({ type: "application/pdf", copyToCacheDirectory: true, multiple: false });
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "application/pdf",
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+
       const asset = result.assets?.[0];
+
       if (!result.canceled && asset) {
         setFile({
           uri: asset.uri,
           name: asset.name || `prescription-${Date.now()}.pdf`,
           mimeType: asset.mimeType ?? "application/pdf",
           ...(asset.size !== undefined ? { size: asset.size } : {}),
+          ...(asset.file ? { file: asset.file } : {}),
         });
       }
-    } catch {
-      setNotice("Couldn't open the file picker on this device.");
+    } catch (error) {
+      console.error("[PRESCRIPTION] PDF selection failed:", error);
     }
   }
 
   async function upload() {
-    if (!file) return;
+    if (!file || uploading) return;
+    const problem = uploadProblem(file);
+    if (problem) {
+      setError(problem);
+      return;
+    }
     setUploading(true);
     setError(null);
     try {
@@ -102,13 +116,13 @@ export function PrescriptionUploadScreen({ navigation }: Props) {
     <Screen>
       <Stack>
         <Banner tone="warning" title="Test prescriptions only" icon="alert-triangle">
-          Don't upload real patient records during this prototype. The file is sent to the HealthHub server you're connected to.
+          Don't upload real patient records during this prototype. The file is sent to the Sehat Meds server you're connected to.
         </Banner>
-        <AppText variant="heading" accessibilityRole="header">Choose a prescription</AppText>
+        <SectionTitle>Choose a prescription</SectionTitle>
         <AppText muted>Use a flat, well-lit photo with all text in frame, or a PDF (JPEG, PNG, WebP or PDF; very large files may be refused). English-language prescriptions work best.</AppText>
 
         {cameraDenied ? (
-          <PermissionDenied what="Camera" why="HealthHub needs the camera only to photograph a prescription when you choose Take photo. You can also pick a photo or PDF instead." />
+          <PermissionDenied what="Camera" why="Sehat Meds needs the camera only to photograph a prescription when you choose Take photo. You can also pick a photo or PDF instead." />
         ) : null}
         {notice ? <Banner tone="info" title={notice} icon="info" /> : null}
 
@@ -120,9 +134,16 @@ export function PrescriptionUploadScreen({ navigation }: Props) {
 
         {file ? (
           <Card>
-            <AppText variant="label">Ready to upload</AppText>
-            <AppText selectable>{file.name}</AppText>
-            <AppText variant="small" muted>{[file.mimeType, describeSize(file.size)].filter(Boolean).join(" · ")}</AppText>
+            <Row style={{ alignItems: "flex-start" }}>
+              <View style={{ width: 40, height: 40, borderRadius: radius.md, backgroundColor: colors.iconTile, alignItems: "center", justifyContent: "center" }} importantForAccessibility="no">
+                <Feather name={file.mimeType === "application/pdf" ? "file" : "image"} size={20} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <AppText variant="label">Ready to upload</AppText>
+                <AppText selectable>{file.name}</AppText>
+                <AppText variant="small" muted>{[file.mimeType, describeSize(file.size)].filter(Boolean).join(" · ")}</AppText>
+              </View>
+            </Row>
           </Card>
         ) : null}
         {error ? <Banner tone="danger" title={error} icon="alert-circle" /> : null}
