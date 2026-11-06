@@ -2,55 +2,34 @@
   "expo": {
     "name": "Sehat Meds",
     "slug": "sehat-med",
-    "version": "0.1.0",
-    "scheme": "healthhub",
+    "version": "1.0.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "light",
+    "scheme": "sehatmeds",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": false,
-      "bundleIdentifier": "in.healthhub.mobile",
-      "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
+      "bundleIdentifier": "in.healthhub.mobile"
     },
     "android": {
-      "package": "in.healthhub.mobile",
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#12355b"
-      },
-      "permissions": [
-        "android.permission.RECORD_AUDIO"
-      ]
+      "package": "in.healthhub.mobile"
     },
     "plugins": [
+      "expo-font",
+      "expo-secure-store",
+      "expo-image-picker",
+      "expo-document-picker",
+      "expo-notifications",
+      "expo-sharing",
       [
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#f2f7f6"
-        }
-      ],
-      "expo-secure-store",
-      [
-        "expo-image-picker",
-        {
-          "cameraPermission": "Sehat Meds uses the camera only when you choose to photograph a prescription to upload.",
-          "photosPermission": "Sehat Meds reads a photo from your library only when you choose one to upload as a prescription."
-        }
-      ],
-      "expo-document-picker",
-      [
-        "expo-notifications",
-        {
-          "color": "#12355b"
+          "backgroundColor": "#ffffff"
         }
       ]
     ],
-    "icon": "./assets/icon.png",
     "extra": {
       "eas": {
         "projectId": "febfa6e7-9463-49ef-912e-3e3fef6743c8"
